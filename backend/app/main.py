@@ -5,13 +5,13 @@ Fitvise Backend API - Main FastAPI application
 import logging
 from contextlib import asynccontextmanager
 
+from app.application import llm_service
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.v1.router import router
-from app.services.llm_service import llm_service
 
 # Configure logging
 logging.basicConfig(
@@ -98,16 +98,4 @@ async def global_exception_handler(request, exc):
             "error": "Internal server error",
             "detail": "An unexpected error occurred" if settings.environment == "production" else str(exc)
         }
-    )
-
-
-if __name__ == "__main__":
-    import uvicorn
-    
-    uvicorn.run(
-        "app.main:app",
-        host=settings.api_host,
-        port=settings.api_port,
-        reload=settings.debug,
-        log_level=settings.log_level.lower()
     )

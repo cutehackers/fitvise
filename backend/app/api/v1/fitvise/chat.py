@@ -1,3 +1,4 @@
+
 """
 Workout API endpoints for fitness-related LLM interactions.
 """
@@ -7,15 +8,15 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 
 from app.core.config import settings
-from app.schemas.workout import (
+from app.schemas.chat import (
     ApiErrorResponse,
     HealthResponse,
-    PromptRequest,
-    PromptResponse,
+    ChatRequest,
 )
-from app.services.llm_service import LlmService, QueryRequest, llm_service
+from app.application.llm_service import LlmService, llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -140,93 +141,6 @@ async def health(
         return _build_health_response("unhealthy", False)
 
 
-@router.post(
-    "/prompt",
-    response_model=PromptResponse,
-    responses={
-        400: {"model": ApiErrorResponse, "description": "Invalid request parameters"},
-        503: {"model": ApiErrorResponse, "description": "LLM service unavailable"},
-        500: {"model": ApiErrorResponse, "description": "Internal server error"},
-    },
-    summary="Prompt Fitness AI",
-    description="Send prompts to AI for fitness advice, workout plans, and health guidance",
-    tags=["prompt"]
-)
-async def prompt(
-    request: PromptRequest,
-    llm_service: LlmService = Depends(get_llm_service),
-) -> PromptResponse:
-    """
-    Send prompt to fitness AI and get response.
-    
-    Processes fitness-related prompts and returns AI-generated responses for
-    workout plans, exercise recommendations, nutrition advice, and general fitness guidance.
-    
-    Args:
-        request: User prompt and generation preferences
-        llm_service: LLM service dependency
-        
-    Returns:
-        WorkoutPromptResponse: AI response with metadata
-        
-    Raises:
-        HTTPException: 400 for invalid requests, 503 for service issues, 500 for errors
-    """
-    try:
-        # Input validation
-        if not request.query.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=_build_error_response(
-                    message=ERROR_MESSAGES["empty_query"],
-                    error_type="invalid_request_error",
-                    code="EMPTY_QUERY",
-                    param="query"
-                )
-            )
-        
-        # Prepare LLM request
-        llm_request = QueryRequest(
-            query=request.query,
-            context=request.context,
-            temperature=request.temperature,
-            max_tokens=request.max_tokens,
-        )
-        
-        # Generate workout plan
-        logger.info(f"Generating response for query: {request.query[:100]}...")
-        llm_response = await llm_service.query(llm_request)
-        
-        # Handle service errors
-        if not llm_response.success:
-            raise _on_llm_error(llm_response.error)
-        
-        # Build successful response
-        return PromptResponse(
-            response=llm_response.response,
-            model=llm_response.model,
-            tokens_used=llm_response.tokens_used,
-            prompt_tokens=llm_response.prompt_tokens,
-            completion_tokens=llm_response.completion_tokens,
-            duration_ms=llm_response.total_duration_ms,
-            success=True,
-        )
-        
-    except HTTPException:
-        raise
-        
-    except Exception as e:
-        logger.error(f"Unexpected error in prompt processing: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=_build_error_response(
-                message=ERROR_MESSAGES["unexpected_error"],
-                error_type="internal_server_error",
-                code="UNEXPECTED_ERROR"
-            )
-        )
-
-
 @router.get(
     "/models",
     response_model=Dict[str, Any],
@@ -250,3 +164,66 @@ async def get_available_models() -> Dict[str, Any]:
         "service": HEALTH_CHECK_SERVICE_NAME,
         "version": settings.app_version,
     }
+
+
+@router.post(
+    "/chat",
+    response_class=StreamingResponse,
+    summary="Chat with Fitness AI (Streaming)",
+    description="Send a chat message to the AI and receive a streaming response.",
+    tags=["chat"]
+)
+async def chat(
+    request: ChatRequest,
+    llm_service: LlmService = Depends(get_llm_service),
+) -> StreamingResponse:
+    """
+    Handle chat requests with streaming responses.
+    
+    Args:
+        request: Chat request with message history
+        llm_service: LLM service dependency
+        
+    Returns:
+        StreamingResponse: A stream of JSON objects with response chunks
+    """
+    try:
+        if not request.messages:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_build_error_response(
+                    message="Messages cannot be empty",
+                    error_type="invalid_request_error",
+                    code="EMPTY_MESSAGES",
+                    param="messages"
+                )
+            )
+
+        async def stream_generator():
+            try:
+                async for chunk in llm_service.chat(request):
+                    yield f"{chunk.model_dump_json()}\n"
+            except Exception as e:
+                # Handle any exceptions from the LLM service
+                error_response = _build_error_response(
+                    message=str(e),
+                    error_type="stream_error",
+                    code="STREAM_ERROR"
+                )
+                yield f"{error_response}\n"
+
+        return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
+
+    except HTTPException:
+        raise
+        
+    except Exception as e:
+        logger.error(f"Unexpected error in chat endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_build_error_response(
+                message="An unexpected error occurred",
+                error_type="internal_server_error",
+                code="UNEXPECTED_ERROR"
+            )
+        )

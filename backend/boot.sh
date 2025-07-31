@@ -15,7 +15,7 @@ INSTALL_DEPS=false
 
 # Function to show usage
 show_help() {
-    echo "🏋️  Fitvise Backend API Startup Script"
+    echo "🏋️ Starting Fitvise server"
     echo "======================================"
     echo ""
     echo "Usage: $0 [OPTIONS]"
@@ -49,7 +49,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🏋️  Fitvise Backend API Startup Script"
+echo "🏋️ Starting Fitvise server"
 echo "====================================="
 
 # Check if virtual environment exists

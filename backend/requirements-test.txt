@@ -1,0 +1,31 @@
+# Test dependencies for Fitvise Backend
+
+# Core testing framework
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-xdist==3.3.1  # Parallel test execution
+
+# HTTP testing
+httpx==0.25.2  # Already in main requirements, but explicit for testing
+requests==2.31.0
+
+# Test utilities
+factory-boy==3.3.0  # Test data generation
+faker==20.1.0  # Fake data generation
+freezegun==1.2.2  # Time mocking
+responses==0.23.3  # HTTP request/response mocking
+
+# Performance testing
+pytest-benchmark==4.0.0  # Performance benchmarking
+pytest-timeout==2.2.0  # Test timeout management
+
+# Code quality
+pytest-clarity==1.0.1  # Better assertion error messages
+pytest-sugar==0.9.7  # Better test output formatting
+pytest-html==4.1.1  # HTML test reports
+
+# Development utilities
+pytest-watch==4.2.0  # Watch files and re-run tests
+pytest-picked==0.4.6  # Run tests related to git changes

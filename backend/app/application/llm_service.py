@@ -1,7 +1,8 @@
 import json
 import logging
-from typing import Dict, Any, Optional, List, AsyncGenerator
+from typing import AsyncGenerator
 from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
+from backend.app.schemas.chat_payload_builder import ChatPayloadBuilder
 import httpx
 
 from app.core.config import settings
@@ -23,6 +24,13 @@ class LlmService:
             timeout=httpx.Timeout(self.timeout),
             limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
         )
+        
+        # Initialize payload builder with default configuration
+        self.chat_payload_builder = ChatPayloadBuilder(
+            default_model=self.model_name,
+            default_temperature=self.default_temperature,
+            default_max_tokens=self.default_max_tokens
+        )
 
     async def chat(self, request: ChatRequest) -> AsyncGenerator[ChatResponse, None]:
         """
@@ -42,7 +50,7 @@ class LlmService:
             ApiErrorResponse: If an API error or timeout occurs
         """
         try:
-            payload = self._prepare_chat_request_payload(request)
+            payload = self.chat_payload_builder.build(request)
             logger.info(f"Sending payload to Ollama: {payload}")
 
             # The key change is here: Use a 'with' block for streaming
@@ -72,84 +80,6 @@ class LlmService:
             logger.error(f"Unexpected error in LLM chat stream: {str(e)}")
             raise Exception("An unexpected error occurred while processing your chat request")
 
-    def _prepare_chat_request_payload(self, request: ChatRequest) -> Dict[str, Any]:
-        """
-        Prepare the API payload for chat completion request.
-        
-        This method constructs the JSON payload for the Ollama chat API's
-        /api/chat endpoint. It transforms the ChatRequest into the format
-        expected by the chat completion API.
-        
-        Args:
-            request (ChatRequest): Chat request with message history and parameters
-        
-        Returns:
-            Dict[str, Any]: Formatted API payload for chat completion
-        """
-        payload = {
-            "model": request.model or self.model_name,
-            "messages": [self._format_ollama_message(msg) for msg in request.messages] if request.messages else [],
-            "stream": request.stream
-        }
-        
-        # Add optional fields if present
-        if request.tools:
-            payload["tools"] = request.tools
-            
-        if request.think is not None:
-            payload["think"] = request.think
-            
-        if request.format:
-            payload["format"] = request.format
-            
-        if request.keep_alive:
-            payload["keep_alive"] = request.keep_alive
-            
-        # Handle options - merge request options with defaults
-        options = request.options.copy() if request.options else {}
-        
-        # Set default options if not provided
-        if "temperature" not in options:
-            options["temperature"] = self.default_temperature
-        if "top_p" not in options:
-            options["top_p"] = 0.9
-        if "num_predict" not in options:
-            options["num_predict"] = self.default_max_tokens
-            
-        payload["options"] = options
-        
-        return payload
-
-    def _format_ollama_message(self, msg: ChatMessage) -> Dict[str, Any]:
-        """
-        Format a ChatMessage for Ollama API, including only valid fields.
-        
-        Valid Ollama message fields:
-        - role: required - "system", "user", "assistant", or "tool"  
-        - content: required - message content
-        - images: optional - list of base64 encoded images (for multimodal models)
-        - tool_calls: optional - list of tool calls (for assistant messages)
-        - tool_name: optional - name of tool that was executed (for tool messages)
-        """
-        message = {
-            "role": msg.role,
-            "content": msg.content
-        }
-        
-        # Add optional fields only if they have values
-        if (msg.thinking):
-            message["thinking"] = msg.thinking
-        
-        if msg.images:
-            message["images"] = msg.images
-            
-        if msg.tool_calls:
-            message["tool_calls"] = msg.tool_calls
-            
-        if msg.tool_name:
-            message["tool_name"] = msg.tool_name
-            
-        return message
                 
     def _parse_chat_stream_chunk(self, chunk: bytes) -> ChatResponse:
         """Parse a single chunk from the chat stream."""

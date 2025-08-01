@@ -44,22 +44,23 @@ class LlmService:
         try:
             payload = self._prepare_chat_request_payload(request)
             logger.info(f"Sending payload to Ollama: {payload}")
-            
-            # Use a regular POST request and manually parse the streaming response
-            response = await self.client.post(
+
+            # The key change is here: Use a 'with' block for streaming
+            async with self.client.stream(
+                "POST",
                 f"{self.base_url}/api/chat",
                 headers={"Content-Type": "application/json"},
                 json=payload,
                 timeout=self.timeout
-            )
-            logger.info(f"Ollama response status: {response.status_code}")
-            response.raise_for_status()
-            
-            # Parse the response content line by line
-            content = response.text
-            for line in content.strip().split('\n'):
-                if line.strip():
-                    yield self._parse_chat_stream_chunk(line.encode())
+            ) as response:
+                logger.info(f"Ollama response status: {response.status_code}")
+                response.raise_for_status()
+
+                # Iterate over the response line by line as it arrives
+                # This is the correct way to handle a streaming JSONL response
+                async for line in response.aiter_lines():
+                    if line.strip():
+                        yield self._parse_chat_stream_chunk(line.encode())
 
         except httpx.TimeoutException:
             logger.error(f"LLM chat request timeout after {self.timeout}s")

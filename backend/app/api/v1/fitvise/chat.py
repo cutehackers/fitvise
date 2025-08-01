@@ -169,7 +169,7 @@ async def get_available_models() -> Dict[str, Any]:
 @router.post(
     "/chat",
     response_class=StreamingResponse,
-    summary="Chat with Fitness AI (Streaming)",
+    summary="Chat with Fitvise AI (Streaming)",
     description="Send a chat message to the AI and receive a streaming response.",
     tags=["chat"]
 )

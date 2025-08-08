@@ -28,6 +28,11 @@ Fitvise Backend is a sophisticated REST API that leverages Large Language Models
 
 ### Installation
 
+0. **Python dependency management**:
+```bash
+pip freeze > requirements.txt
+```
+
 1. **Clone and setup environment**:
 ```bash
 git clone <repository-url>
@@ -37,7 +42,7 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-2. **Configure environment variables**:
+1. **Configure environment variables**:
 ```bash
 # Create .env file
 cat > .env << EOF

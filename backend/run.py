@@ -11,12 +11,12 @@ if __name__ == "__main__":
     print(f"🔄 Auto-reload: {'enabled' if settings.debug else 'disabled'}")
     print(f"🤖 LLM Model: {settings.llm_model}")
     print("-" * 60)
-    
+
     uvicorn.run(
-        "app.main:app", 
+        "app.main:app",
         host=settings.api_host,
         port=settings.api_port,
         reload=settings.debug,  # Auto-reload during development
         log_level=settings.log_level.lower(),
-        access_log=True
+        access_log=True,
     )

@@ -16,7 +16,7 @@ from app.api.v1.router import router
 # Configure logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -30,9 +30,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Fitvise Backend API...")
     logger.info(f"Environment: {settings.environment}")
     logger.info(f"LLM Model: {settings.llm_model}")
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Fitvise Backend API...")
     await llm_service.close()
@@ -58,10 +58,7 @@ app.add_middleware(
 )
 
 # Include API routers
-app.include_router(
-    router,
-    prefix=settings.api_v1_prefix
-)
+app.include_router(router, prefix=settings.api_v1_prefix)
 
 
 @app.get("/", tags=["root"])
@@ -72,7 +69,7 @@ async def root():
         "version": settings.app_version,
         "environment": settings.environment,
         "docs_url": "/docs" if settings.environment != "production" else "disabled",
-        "api_prefix": settings.api_v1_prefix
+        "api_prefix": settings.api_v1_prefix,
     }
 
 
@@ -82,7 +79,7 @@ async def health():
     return {
         "status": "healthy",
         "service": settings.app_name,
-        "version": settings.app_version
+        "version": settings.app_version,
     }
 
 
@@ -91,11 +88,11 @@ async def health():
 async def global_exception_handler(request, exc):
     """Global exception handler for unhandled errors"""
     logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
-    
+
     return JSONResponse(
         status_code=500,
         content={
             "error": "Internal server error",
-            "detail": "An unexpected error occurred" if settings.environment == "production" else str(exc)
-        }
+            "detail": ("An unexpected error occurred" if settings.environment == "production" else str(exc)),
+        },
     )

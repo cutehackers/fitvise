@@ -1,10 +1,10 @@
-
 """
 Workout API endpoints for fitness-related LLM interactions.
 """
 
 import logging
 from datetime import datetime, timezone
+from queue import Empty
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -13,8 +13,8 @@ from fastapi.responses import StreamingResponse
 from app.core.config import settings
 from app.schemas.chat import (
     ApiErrorResponse,
-    HealthResponse,
     ChatRequest,
+    HealthResponse,
 )
 from app.application.llm_service import LlmService, llm_service
 
@@ -47,48 +47,39 @@ def _get_current_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _build_health_response(
-    status: str, 
-    llm_available: bool, 
-    timestamp: str = None
-) -> HealthResponse:
+def _build_health_response(status: str, llm_available: bool, timestamp: str = None) -> HealthResponse:
     """Create standardized health response."""
     return HealthResponse(
         status=status,
         service=HEALTH_CHECK_SERVICE_NAME,
         version=settings.app_version,
         llm_service_available=llm_available,
-        timestamp=timestamp or _get_current_timestamp()
+        timestamp=timestamp or _get_current_timestamp(),
     )
 
 
 def _build_error_response(
-    message: str, 
-    error_type: str, 
-    code: Optional[str] = None, 
-    param: Optional[str] = None
+    message: str,
+    error_type: str,
+    code: Optional[str] = None,
+    param: Optional[str] = None,
 ) -> dict:
     """Create standardized error response dictionary."""
-    return ApiErrorResponse(
-        code=code,
-        type=error_type,
-        param=param,
-        message=message
-    ).model_dump()
+    return ApiErrorResponse(code=code, type=error_type, param=param, message=message).model_dump()
 
 
 def _on_llm_error(error_message: str) -> HTTPException:
     """Handle LLM service errors with appropriate HTTP status codes."""
     error_lower = error_message.lower()
-    
+
     if "timeout" in error_lower:
         return HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=_build_error_response(
                 message=ERROR_MESSAGES["timeout"],
                 error_type="service_timeout_error",
-                code="LLM_TIMEOUT"
-            )
+                code="LLM_TIMEOUT",
+            ),
         )
     elif "service error" in error_lower:
         return HTTPException(
@@ -96,8 +87,8 @@ def _on_llm_error(error_message: str) -> HTTPException:
             detail=_build_error_response(
                 message=ERROR_MESSAGES["service_error"],
                 error_type="service_unavailable_error",
-                code="LLM_SERVICE_ERROR"
-            )
+                code="LLM_SERVICE_ERROR",
+            ),
         )
     else:
         return HTTPException(
@@ -105,8 +96,8 @@ def _on_llm_error(error_message: str) -> HTTPException:
             detail=_build_error_response(
                 message=ERROR_MESSAGES["generation_failed"],
                 error_type="internal_server_error",
-                code="GENERATION_FAILED"
-            )
+                code="GENERATION_FAILED",
+            ),
         )
 
 
@@ -115,29 +106,27 @@ def _on_llm_error(error_message: str) -> HTTPException:
     response_model=HealthResponse,
     summary="Health Check",
     description="Check the health status of the workout API and LLM service",
-    tags=["health"]
+    tags=["health"],
 )
-async def health(
-    llm_service: LlmService = Depends(get_llm_service)
-) -> HealthResponse:
+async def health(llm_service: LlmService = Depends(get_llm_service)) -> HealthResponse:
     """
     Perform comprehensive health check of the workout API service.
-    
+
     Checks:
         - LLM service availability
         - Overall service status determination
-        
+
     Returns:
         HealthResponse: Service status and availability information
     """
     try:
         llm_available = await llm_service.health()
         service_status = "healthy" if llm_available else "degraded"
-        
+
         return _build_health_response(service_status, llm_available)
-        
+
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        logger.error("Health check failed: %s", e)
         return _build_health_response("unhealthy", False)
 
 
@@ -146,12 +135,12 @@ async def health(
     response_model=Dict[str, Any],
     summary="Get Available Models",
     description="Get information about available LLM models for fitness AI prompts",
-    tags=["models"]
+    tags=["models"],
 )
 async def get_available_models() -> Dict[str, Any]:
     """
     Get information about available LLM models and service configuration.
-    
+
     Returns:
         Dict: Model information and service configuration details
     """
@@ -171,7 +160,7 @@ async def get_available_models() -> Dict[str, Any]:
     response_class=StreamingResponse,
     summary="Chat with Fitvise AI (Streaming)",
     description="Send a chat message to the AI and receive a streaming response.",
-    tags=["chat"]
+    tags=["chat"],
 )
 async def chat(
     request: ChatRequest,
@@ -179,24 +168,24 @@ async def chat(
 ) -> StreamingResponse:
     """
     Handle chat requests with streaming responses.
-    
+
     Args:
         request: Chat request with message history
         llm_service: LLM service dependency
-        
+
     Returns:
         StreamingResponse: A stream of JSON objects with response chunks
     """
     try:
-        if not request.messages:
+        if not request.message:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=_build_error_response(
                     message="Messages cannot be empty",
                     error_type="invalid_request_error",
                     code="EMPTY_MESSAGES",
-                    param="messages"
-                )
+                    param="messages",
+                ),
             )
 
         async def stream_generator():
@@ -205,25 +194,21 @@ async def chat(
                     yield f"{chunk.model_dump_json()}\n"
             except Exception as e:
                 # Handle any exceptions from the LLM service
-                error_response = _build_error_response(
-                    message=str(e),
-                    error_type="stream_error",
-                    code="STREAM_ERROR"
-                )
+                error_response = _build_error_response(message=str(e), error_type="stream_error", code="STREAM_ERROR")
                 yield f"{error_response}\n"
 
         return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
 
     except HTTPException:
         raise
-        
+
     except Exception as e:
-        logger.error(f"Unexpected error in chat endpoint: {str(e)}")
+        logger.error("Unexpected error in chat endpoint: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_build_error_response(
                 message="An unexpected error occurred",
                 error_type="internal_server_error",
-                code="UNEXPECTED_ERROR"
-            )
+                code="UNEXPECTED_ERROR",
+            ),
         )

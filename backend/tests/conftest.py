@@ -48,19 +48,19 @@ def test_settings() -> Settings:
         "LLM_BASE_URL": "http://localhost:11434",
         "LLM_MODEL": "llama2",
         "SECRET_KEY": "test-secret-key-min-32-chars-long",
-        "LOG_LEVEL": "DEBUG"
+        "LOG_LEVEL": "DEBUG",
     }
-    
+
     # Store original values
     original_env = {}
     for key, value in test_env.items():
         original_env[key] = os.environ.get(key)
         os.environ[key] = value
-    
+
     settings = Settings()
-    
+
     yield settings
-    
+
     # Restore original environment
     for key, value in original_env.items():
         if value is None:
@@ -80,7 +80,9 @@ def test_client(test_settings: Settings) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture(scope="session")
-async def async_test_client(test_settings: Settings) -> AsyncGenerator[AsyncClient, None]:
+async def async_test_client(
+    test_settings: Settings,
+) -> AsyncGenerator[AsyncClient, None]:
     """
     Create an async test client for the FastAPI application.
     Useful for testing async endpoints and streaming responses.
@@ -96,25 +98,25 @@ def mock_llm_service():
     Prevents external API calls during testing.
     """
     from unittest.mock import AsyncMock, patch
-    
+
     with patch("app.application.llm_service.LLMService") as mock_service:
         mock_instance = AsyncMock()
         mock_service.return_value = mock_instance
-        
+
         # Default mock responses
         mock_instance.generate_response.return_value = {
             "response": "Mocked workout response",
             "tokens_used": 100,
             "response_time": 0.5,
-            "model": "mocked-model"
+            "model": "mocked-model",
         }
-        
+
         mock_instance.health_check.return_value = {
             "status": "healthy",
             "model": "mocked-model",
-            "response_time": 0.1
+            "response_time": 0.1,
         }
-        
+
         yield mock_instance
 
 
@@ -125,7 +127,7 @@ def sample_workout_request():
         "prompt": "Create a 30-minute cardio workout for beginners",
         "context": "User is a beginner with no equipment",
         "max_tokens": 500,
-        "temperature": 0.7
+        "temperature": 0.7,
     }
 
 
@@ -137,7 +139,7 @@ def sample_workout_response():
         "tokens_used": 150,
         "response_time": 1.2,
         "model": "llama2",
-        "success": True
+        "success": True,
     }
 
 
@@ -148,37 +150,34 @@ def cleanup_test_files():
     Runs after every test function.
     """
     yield  # Run the test
-    
+
     # Cleanup test database
     test_db_path = Path("test.db")
     if test_db_path.exists():
         test_db_path.unlink()
-    
+
     # Cleanup any test uploads
     test_upload_dir = Path("test_uploads")
     if test_upload_dir.exists():
         import shutil
+
         shutil.rmtree(test_upload_dir)
 
 
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest with custom markers."""
+    config.addinivalue_line("markers", "unit: marks tests as unit tests (deselect with '-m \"not unit\"')")
     config.addinivalue_line(
-        "markers", "unit: marks tests as unit tests (deselect with '-m \"not unit\"')"
+        "markers",
+        "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
     )
     config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests (deselect with '-m \"not integration\"')"
+        "markers",
+        "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')",
     )
-    config.addinivalue_line(
-        "markers", "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')"
-    )
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line(
-        "markers", "external: marks tests that require external services"
-    )
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "external: marks tests that require external services")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -191,7 +190,7 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         elif "e2e" in str(item.fspath):
             item.add_marker(pytest.mark.e2e)
-        
+
         # Mark external service tests
         if "external" in item.name or "llm" in item.name.lower():
             item.add_marker(pytest.mark.external)

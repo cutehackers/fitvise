@@ -1,267 +1,253 @@
 """
 Unit tests for LLM service functionality.
 
-Tests the LLMService class methods in isolation using mocks.
+Tests the LlmService class methods in isolation using mocks.
 """
 
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
-import httpx
+from langchain_core.messages import AIMessage
 
-from app.application.llm_service import LLMService
-from tests.utils.test_helpers import generate_data, create_mocks, assert_helpers
+from app.application.llm_service import LlmService
+from app.schemas.chat import ChatRequest, ChatMessage, ChatResponse
 
 
-class TestLLMService:
-    """Test the LLMService class."""
+class TestLlmService:
+    """Test the LlmService class."""
 
     @pytest.fixture
-    def llm_service(self, test_settings):
-        """Create an LLMService instance for testing."""
-        return LLMService(
-            base_url=test_settings.llm_base_url,
-            model=test_settings.llm_model,
-            timeout=test_settings.llm_timeout,
+    def llm_service(self):
+        """Create an LlmService instance for testing."""
+        return LlmService()
+
+    # Validation tests
+    @pytest.mark.asyncio
+    async def test_chat_validation_missing_message(self, llm_service):
+        """Test chat validation when message is missing."""
+        request = ChatRequest(
+            message=None,
+            session_id="test_session_123"
         )
+        
+        with pytest.raises(ValueError, match="Message is required in the request"):
+            async for _ in llm_service.chat(request):
+                pass
+
+    @pytest.mark.asyncio 
+    async def test_chat_validation_empty_message_content(self, llm_service):
+        """Test chat validation when message content is empty."""
+        request = ChatRequest(
+            message=ChatMessage(role="user", content=""),
+            session_id="test_session_123"
+        )
+        
+        with pytest.raises(ValueError, match="Message content cannot be empty"):
+            async for _ in llm_service.chat(request):
+                pass
 
     @pytest.mark.asyncio
-    async def test_generate_response_success(self, llm_service):
-        """Test successful response generation."""
-        # Prepare test data
-        request_data = generate_data.workout_prompt_data()
-        mock_response_data = generate_data.workout_response_data()
-
-        # Mock the HTTP client
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_response = create_mocks.mock_http_response(
-                status_code=200,
-                json_data={
-                    "response": mock_response_data["response"],
-                    "usage": {"total_tokens": mock_response_data["tokens_used"]},
-                    "model": mock_response_data["model"],
-                },
-            )
-            mock_client.post.return_value = mock_response
-
-            # Execute the method
-            result = await llm_service.generate_response(
-                prompt=request_data["prompt"],
-                context=request_data.get("context"),
-                max_tokens=request_data.get("max_tokens"),
-                temperature=request_data.get("temperature"),
-            )
-
-            # Verify the result
-            assert_helpers.assert_valid_workout_response(result)
-            assert result["success"] is True
-            assert isinstance(result["response"], str)
-            assert len(result["response"]) > 0
-            assert result["tokens_used"] > 0
-            assert result["response_time"] > 0
+    async def test_chat_validation_whitespace_only_content(self, llm_service):
+        """Test chat validation when message content is only whitespace."""
+        request = ChatRequest(
+            message=ChatMessage(role="user", content="   \n\t  "),
+            session_id="test_session_123"
+        )
+        
+        with pytest.raises(ValueError, match="Message content cannot be empty"):
+            async for _ in llm_service.chat(request):
+                pass
 
     @pytest.mark.asyncio
-    async def test_generate_response_http_error(self, llm_service):
-        """Test response generation with HTTP error."""
-        request_data = generate_data.workout_prompt_data()
+    async def test_chat_validation_missing_session_id(self, llm_service):
+        """Test chat validation when session_id is missing."""
+        request = ChatRequest(
+            message=ChatMessage(role="user", content="Hello"),
+            session_id=""
+        )
+        
+        with pytest.raises(ValueError, match="Session ID is required for chat history management"):
+            async for _ in llm_service.chat(request):
+                pass
 
-        with patch.object(llm_service, "_client") as mock_client:
-            # Mock HTTP error
-            mock_client.post.side_effect = httpx.HTTPStatusError(
-                "Server error", request=MagicMock(), response=MagicMock(status_code=500)
-            )
+    # Session management tests
+    def test_get_session_history_creates_new_session(self, llm_service):
+        """Test that get_session_history creates a new session if it doesn't exist."""
+        session_id = "new_session_123"
+        
+        # Ensure session doesn't exist initially
+        assert session_id not in llm_service.session_store
+        
+        # Get session history - should create new session
+        history = llm_service.get_session_history(session_id)
+        
+        # Verify session was created
+        assert session_id in llm_service.session_store
+        assert history is not None
 
-            result = await llm_service.generate_response(prompt=request_data["prompt"])
+    def test_get_session_history_reuses_existing_session(self, llm_service):
+        """Test that get_session_history reuses existing session."""
+        session_id = "existing_session_123"
+        
+        # Create session first
+        first_history = llm_service.get_session_history(session_id)
+        
+        # Get session history again
+        second_history = llm_service.get_session_history(session_id)
+        
+        # Should be the same instance
+        assert first_history is second_history
 
-            # Verify error handling
-            assert result["success"] is False
-            assert "error" in result
-            assert result["tokens_used"] == 0
-            assert result["response_time"] > 0
+    def test_get_session_history_invalid_session_id(self, llm_service):
+        """Test that get_session_history raises error for invalid session ID."""
+        with pytest.raises(ValueError, match="Session ID cannot be empty or None"):
+            llm_service.get_session_history("")
+            
+        with pytest.raises(ValueError, match="Session ID cannot be empty or None"):
+            llm_service.get_session_history("   ")
+
+    def test_clear_session(self, llm_service):
+        """Test clearing a specific session."""
+        session_id = "session_to_clear"
+        
+        # Create session
+        llm_service.get_session_history(session_id)
+        assert session_id in llm_service.session_store
+        
+        # Clear session
+        result = llm_service.clear_session(session_id)
+        
+        # Verify session was cleared
+        assert result is True
+        assert session_id not in llm_service.session_store
+
+    def test_clear_nonexistent_session(self, llm_service):
+        """Test clearing a session that doesn't exist."""
+        result = llm_service.clear_session("nonexistent_session")
+        assert result is False
+
+    def test_clear_all_sessions(self, llm_service):
+        """Test clearing all sessions."""
+        # Create multiple sessions
+        llm_service.get_session_history("session1")
+        llm_service.get_session_history("session2") 
+        llm_service.get_session_history("session3")
+        
+        assert llm_service.get_session_count() == 3
+        
+        # Clear all sessions
+        cleared_count = llm_service.clear_all_sessions()
+        
+        # Verify all sessions were cleared
+        assert cleared_count == 3
+        assert llm_service.get_session_count() == 0
+
+    def test_get_session_count(self, llm_service):
+        """Test getting session count."""
+        assert llm_service.get_session_count() == 0
+        
+        # Add sessions
+        llm_service.get_session_history("session1")
+        assert llm_service.get_session_count() == 1
+        
+        llm_service.get_session_history("session2")
+        assert llm_service.get_session_count() == 2
+
+    # Chat functionality tests
+    @pytest.mark.asyncio
+    async def test_chat_success_mock(self, llm_service):
+        """Test successful chat with mocked LLM."""
+        request = ChatRequest(
+            message=ChatMessage(role="user", content="Hello, how are you?"),
+            session_id="test_session_123"
+        )
+        
+        # Mock the LLM chain to return a simple message
+        mock_ai_message = AIMessage(content="I'm doing well, thank you!")
+        
+        with patch.object(llm_service, 'chain') as mock_chain:
+            # Mock the chain's astream method
+            async def mock_astream(*args, **kwargs):
+                yield mock_ai_message
+                
+            mock_chain_with_history = MagicMock()
+            mock_chain_with_history.astream = mock_astream
+            
+            with patch('app.application.llm_service.RunnableWithMessageHistory') as mock_runnable:
+                mock_runnable.return_value = mock_chain_with_history
+                
+                responses = []
+                async for response in llm_service.chat(request):
+                    responses.append(response)
+                
+                # Should get at least 2 responses: content + done
+                assert len(responses) >= 1
+                
+                # Check content response
+                content_response = responses[0]
+                assert isinstance(content_response, ChatResponse)
+                assert content_response.message.content == "I'm doing well, thank you!"
+                assert not content_response.done
+                
+                # Check final response
+                final_response = responses[-1]
+                assert final_response.done
 
     @pytest.mark.asyncio
-    async def test_generate_response_timeout(self, llm_service):
-        """Test response generation with timeout."""
-        request_data = generate_data.workout_prompt_data()
+    async def test_chat_streaming_error_handling(self, llm_service):
+        """Test chat error handling during streaming."""
+        request = ChatRequest(
+            message=ChatMessage(role="user", content="Hello"),
+            session_id="test_session_123"
+        )
+        
+        with patch('app.application.llm_service.RunnableWithMessageHistory') as mock_runnable:
+            # Mock the chain to raise an exception during streaming
+            mock_chain = MagicMock()
+            mock_chain.astream.side_effect = Exception("Streaming failed")
+            mock_runnable.return_value = mock_chain
+            
+            responses = []
+            async for response in llm_service.chat(request):
+                responses.append(response)
+            
+            # Should get error response
+            assert len(responses) == 1
+            error_response = responses[0]
+            assert error_response.done
+            assert not error_response.success
+            assert "Chat streaming failed" in error_response.error
 
-        with patch.object(llm_service, "_client") as mock_client:
-            # Mock timeout
-            mock_client.post.side_effect = httpx.TimeoutException("Request timeout")
-
-            result = await llm_service.generate_response(prompt=request_data["prompt"])
-
-            # Verify timeout handling
-            assert result["success"] is False
-            assert "timeout" in result.get("error", "").lower()
-            assert result["tokens_used"] == 0
-
-    @pytest.mark.asyncio
-    async def test_generate_response_invalid_json(self, llm_service):
-        """Test response generation with invalid JSON response."""
-        request_data = generate_data.workout_prompt_data()
-
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_response = MagicMock()
-            mock_response.status_code = 200
-            mock_response.json.side_effect = ValueError("Invalid JSON")
-            mock_response.text = "Invalid JSON response"
-            mock_client.post.return_value = mock_response
-
-            result = await llm_service.generate_response(prompt=request_data["prompt"])
-
-            # Verify JSON error handling
-            assert result["success"] is False
-            assert "json" in result.get("error", "").lower()
-
+    # Health check tests
     @pytest.mark.asyncio
     async def test_health_check_success(self, llm_service):
         """Test successful health check."""
-        mock_health_data = generate_data.health_response_data()
-
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_response = create_mocks.mock_http_response(
-                status_code=200,
-                json_data={"status": "ok", "model": mock_health_data["model"]},
-            )
-            mock_client.get.return_value = mock_response
-
-            result = await llm_service.health_check()
-
-            # Verify health check result
-            assert_helpers.assert_valid_health_response(result)
-            assert result["status"] == "healthy"
-            assert isinstance(result["response_time"], (int, float))
+        with patch.object(llm_service.llm, 'ainvoke', new_callable=AsyncMock) as mock_ainvoke:
+            mock_ainvoke.return_value = "Health check response"
+            
+            result = await llm_service.health()
+            
+            assert result is True
+            mock_ainvoke.assert_called_once_with("Health check")
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, llm_service):
         """Test health check with service failure."""
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_client.get.side_effect = httpx.ConnectError("Connection failed")
+        with patch.object(llm_service.llm, 'ainvoke', new_callable=AsyncMock) as mock_ainvoke:
+            mock_ainvoke.side_effect = Exception("LLM service unavailable")
+            
+            result = await llm_service.health()
+            
+            assert result is False
 
-            result = await llm_service.health_check()
-
-            # Verify failure handling
-            assert result["status"] == "unhealthy"
-            assert "error" in result
-            assert isinstance(result["response_time"], (int, float))
-
-    @pytest.mark.asyncio
-    async def test_health_check_timeout(self, llm_service):
-        """Test health check with timeout."""
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_client.get.side_effect = httpx.TimeoutException("Health check timeout")
-
-            result = await llm_service.health_check()
-
-            # Verify timeout handling
-            assert result["status"] == "unhealthy"
-            assert "timeout" in result.get("error", "").lower()
-            assert result["response_time"] >= llm_service.timeout
-
-    def test_format_request_data(self, llm_service):
-        """Test request data formatting."""
-        prompt = "Test workout prompt"
-        context = "Test context"
-        max_tokens = 500
-        temperature = 0.7
-
-        formatted_data = llm_service._format_request_data(
-            prompt=prompt,
-            context=context,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-
-        # Verify formatted data structure
-        assert isinstance(formatted_data, dict)
-        assert "prompt" in formatted_data
-        assert "model" in formatted_data
-        assert formatted_data["model"] == llm_service.model
-
-        # Verify prompt includes context
-        full_prompt = formatted_data["prompt"]
-        assert prompt in full_prompt
-        if context:
-            assert context in full_prompt
-
-    def test_format_request_data_defaults(self, llm_service):
-        """Test request data formatting with default values."""
-        prompt = "Test prompt"
-
-        formatted_data = llm_service._format_request_data(prompt=prompt)
-
-        # Verify defaults are applied
-        assert formatted_data["prompt"] == prompt
-        assert formatted_data["model"] == llm_service.model
-        # Should use service defaults for max_tokens and temperature
-
-    @pytest.mark.asyncio
-    async def test_response_parsing_success(self, llm_service):
-        """Test successful response parsing."""
-        mock_response = create_mocks.mock_http_response(
-            status_code=200,
-            json_data={
-                "response": "Test workout response",
-                "usage": {"total_tokens": 150},
-                "model": "test-model",
-            },
-        )
-
-        start_time = 1000.0
-        end_time = 1001.5
-
-        result = llm_service._parse_response(mock_response, start_time, end_time)
-
-        # Verify parsed response
-        assert result["success"] is True
-        assert result["response"] == "Test workout response"
-        assert result["tokens_used"] == 150
-        assert result["model"] == "test-model"
-        assert result["response_time"] == 1.5
-
-    def test_response_parsing_missing_fields(self, llm_service):
-        """Test response parsing with missing fields."""
-        mock_response = create_mocks.mock_http_response(
-            status_code=200,
-            json_data={"response": "Test response"},  # Missing usage and model
-        )
-
-        start_time = 1000.0
-        end_time = 1001.0
-
-        result = llm_service._parse_response(mock_response, start_time, end_time)
-
-        # Should handle missing fields gracefully
-        assert result["success"] is True
-        assert result["response"] == "Test response"
-        assert result["tokens_used"] == 0  # Default
-        assert "model" in result  # Should have some default
-
-    @pytest.mark.asyncio
-    async def test_concurrent_requests(self, llm_service):
-        """Test handling multiple concurrent requests."""
-        import asyncio
-
-        request_data = generate_data.workout_prompt_data()
-        mock_response_data = generate_data.workout_response_data()
-
-        with patch.object(llm_service, "_client") as mock_client:
-            mock_response = create_mocks.mock_http_response(
-                status_code=200,
-                json_data={
-                    "response": mock_response_data["response"],
-                    "usage": {"total_tokens": mock_response_data["tokens_used"]},
-                    "model": mock_response_data["model"],
-                },
-            )
-            mock_client.post.return_value = mock_response
-
-            # Execute multiple concurrent requests
-            tasks = [llm_service.generate_response(prompt=f"{request_data['prompt']} #{i}") for i in range(5)]
-
-            results = await asyncio.gather(*tasks)
-
-            # Verify all requests succeeded
-            assert len(results) == 5
-            for result in results:
-                assert result["success"] is True
-                assert_helpers.assert_valid_workout_response(result)
+    # Test the _parse_chat_stream_chunk method
+    def test_parse_chat_stream_chunk(self, llm_service):
+        """Test parsing a chat stream chunk."""
+        mock_message = AIMessage(content="Test response content")
+        
+        result = llm_service._parse_chat_stream_chunk(mock_message)
+        
+        assert isinstance(result, ChatResponse)
+        assert result.message.content == "Test response content"
+        assert result.message.role == "assistant"
+        assert not result.done
+        assert result.model == llm_service.llm.model

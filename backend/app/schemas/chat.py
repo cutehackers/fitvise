@@ -109,7 +109,7 @@ class ChatRequest(BaseModel):
     """Request model for chat completion"""
 
     model: str = Field(None, description="The model name")
-    message: ChatMessage = Field(None, description="A chat message")
+    message: ChatMessage = Field(..., description="A chat message")
     session_id: str = Field(..., description="Unique session identifier for chat history")
     tools: Optional[List[dict]] = Field(None, description="List of tools in JSON for the model to use if supported")
     think: Optional[bool] = Field(

@@ -418,13 +418,6 @@ config/database.yml
 **/windows/build/
 **/web/build/
 
-# Generated files
-**/*.g.dart
-**/*.freezed.dart
-**/*.gr.dart
-**/*.config.dart
-**/generated/
-
 # ====================================
 # TESTING AND COVERAGE
 # ====================================

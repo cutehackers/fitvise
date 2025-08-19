@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:provider/provider.dart' as provider;
 import 'providers/theme_provider.dart';
-import 'providers/chat_provider.dart';
 import 'screens/chat_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
-  runApp(const FitviseApp());
+  runApp(
+    ProviderScope(
+      child: const FitviseApp(),
+    ),
+  );
 }
 
 class FitviseApp extends StatelessWidget {
@@ -14,12 +18,9 @@ class FitviseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
-      ],
-      child: Consumer<ThemeProvider>(
+    return provider.ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: provider.Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
             title: 'Fitvise - AI Fitness Assistant',

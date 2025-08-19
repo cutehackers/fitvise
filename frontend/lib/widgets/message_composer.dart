@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/chat_provider.dart';
@@ -115,13 +116,13 @@ class _MessageComposerState extends State<MessageComposer> {
                     tooltip: 'Upload workout photo',
                     onPressed: () => _handleFileUpload('image'),
                   ),
-                  const SizedBox(width: 8),
+                  const Gap(8),
                   _AttachmentButton(
                     icon: Icons.attach_file,
                     tooltip: 'Upload file',
                     onPressed: () => _handleFileUpload('file'),
                   ),
-                  const SizedBox(width: 8),
+                  const Gap(8),
                   _AttachmentButton(
                     icon: Icons.description,
                     tooltip: 'Upload fitness plan',

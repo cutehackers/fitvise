@@ -37,6 +37,7 @@ dependencies:
   
   # State management
   provider: ^6.1.1
+  flutter_riverpod: ^2.4.9
   
   # UI components
   flutter_svg: ^2.0.9
@@ -76,7 +77,6 @@ dev_dependencies:
   
   # Code generation
   build_runner: ^2.6.0
-  freezed: ^3.2.0
   json_serializable: ^6.7.1
   retrofit_generator: ^10.0.1
 

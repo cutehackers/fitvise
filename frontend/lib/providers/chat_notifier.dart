@@ -10,6 +10,7 @@ import '../models/chat_message.dart';
 import '../models/chat_request.dart';
 import '../models/chat_response.dart';
 import '../models/message.dart';
+import 'streaming_message_notifier.dart';
 
 /// Chat state containing all chat-related data
 class ChatState {
@@ -70,9 +71,10 @@ class ChatState {
 
 /// Chat notifier provider using Riverpod for state management
 class ChatNotifier extends StateNotifier<ChatState> {
+  final Ref _ref;
   StreamSubscription? _streamSubscription;
 
-  ChatNotifier()
+  ChatNotifier(this._ref)
     : super(
         ChatState(
           messages: [
@@ -87,6 +89,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
           ],
         ),
       );
+
+  /// Get the streaming message notifier
+  StreamingMessageNotifier get _streamingNotifier => _ref.read(streamingMessageProvider.notifier);
 
   @override
   void dispose() {
@@ -168,6 +173,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       text: '',
       timestamp: DateTime.now(),
       type: 'text',
+      isStreaming: true, // Mark as streaming for UI optimization
     );
 
     // Add AI message placeholder to the list
@@ -234,17 +240,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  /// Update streaming message content - only affects AI messages
+  /// Update streaming message content using reactive stream - more efficient for NDJSON
   void _updateStreamingMessage(String messageId, String content) {
-    final currentMessages = state.messages;
-    final messageIndex = currentMessages.indexWhere((msg) => msg.id == messageId);
-
-    if (messageIndex != -1 && currentMessages[messageIndex].sender == 'ai') {
-      final updatedMessages = [...currentMessages];
-      updatedMessages[messageIndex] = currentMessages[messageIndex].copyWith(text: content);
-
-      state = state.copyWith(messages: updatedMessages, streamingContent: content);
-    }
+    // Use the streaming notifier to update only the specific message without rebuilding entire state
+    _streamingNotifier.updateStreamingContent(messageId, content);
+    
+    // Update streaming content in state for fallback/compatibility
+    state = state.copyWith(streamingContent: content);
   }
 
   /// Finalize streaming message - only affects AI messages
@@ -261,7 +263,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       updatedMessages[messageIndex] = currentMessages[messageIndex].copyWith(
         text: finalText,
         actions: <MessageAction>[],
+        isStreaming: false, // Mark as completed streaming
       );
+
+      // Finalize the streaming message and clean up its stream
+      _streamingNotifier.finalizeMessage(messageId, finalText);
 
       state = state.copyWith(messages: updatedMessages, streamingMessageId: null, streamingContent: '');
     }
@@ -278,6 +284,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
         currentMessages[messageIndex].text.isEmpty) {
       final updatedMessages = [...currentMessages];
       updatedMessages.removeAt(messageIndex);
+
+      // Clean up the streaming message and close its stream
+      _streamingNotifier.cleanupMessage(messageId);
 
       state = state.copyWith(messages: updatedMessages, streamingMessageId: null, streamingContent: '');
     }
@@ -370,5 +379,5 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
 /// Provider for accessing chat functionality
 final chatNotifierProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
-  return ChatNotifier();
+  return ChatNotifier(ref);
 });

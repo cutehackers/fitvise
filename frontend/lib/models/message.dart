@@ -6,6 +6,7 @@ class Message {
   final String type; // 'text', 'image', 'file'
   final List<MessageAction>? actions;
   final bool isEdited;
+  final bool isStreaming; // New property to track streaming state
 
   Message({
     required this.id,
@@ -15,6 +16,7 @@ class Message {
     this.type = 'text',
     this.actions,
     this.isEdited = false,
+    this.isStreaming = false, // Default to false for completed messages
   });
 
   Message copyWith({
@@ -25,6 +27,7 @@ class Message {
     String? type,
     List<MessageAction>? actions,
     bool? isEdited,
+    bool? isStreaming,
   }) {
     return Message(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Message {
       type: type ?? this.type,
       actions: actions ?? this.actions,
       isEdited: isEdited ?? this.isEdited,
+      isStreaming: isStreaming ?? this.isStreaming,
     );
   }
 
@@ -46,6 +50,7 @@ class Message {
       'type': type,
       'actions': actions?.map((action) => action.toJson()).toList(),
       'isEdited': isEdited,
+      'isStreaming': isStreaming,
     };
   }
 
@@ -62,6 +67,7 @@ class Message {
               .toList()
           : null,
       isEdited: json['isEdited'] ?? false,
+      isStreaming: json['isStreaming'] ?? false,
     );
   }
 }

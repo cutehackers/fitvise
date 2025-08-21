@@ -14,7 +14,9 @@ class ApiErrorResponse(BaseModel):
         ...,
         description="The category or type of error (e.g., 'invalid_request_error', 'rate_limit_error')",
     )
-    param: Optional[str] = Field(None, description="The parameter that caused the error, if applicable")
+    param: Optional[str] = Field(
+        None, description="The parameter that caused the error, if applicable"
+    )
     message: str = Field(..., description="A human-readable description of the error")
 
 
@@ -50,7 +52,9 @@ class PromptRequest(BaseModel):
         le=2.0,
         description="Response creativity level (0.0=deterministic, 2.0=very creative)",
     )
-    max_tokens: Optional[int] = Field(None, ge=50, le=2000, description="Maximum length of the AI response")
+    max_tokens: Optional[int] = Field(
+        None, ge=50, le=2000, description="Maximum length of the AI response"
+    )
 
 
 class PromptResponse(BaseModel):
@@ -61,9 +65,13 @@ class PromptResponse(BaseModel):
     tokens_used: Optional[int] = Field(None, description="Total tokens consumed")
     prompt_tokens: Optional[int] = Field(None, description="Tokens used for input")
     completion_tokens: Optional[int] = Field(None, description="Tokens used for output")
-    duration_ms: Optional[float] = Field(None, description="Response generation time in milliseconds")
+    duration_ms: Optional[float] = Field(
+        None, description="Response generation time in milliseconds"
+    )
     success: bool = Field(True, description="Whether prompt processing was successful")
-    error: Optional[str] = Field(None, description="Error message if prompt processing failed")
+    error: Optional[str] = Field(
+        None, description="Error message if prompt processing failed"
+    )
 
 
 # Ollama chat request
@@ -91,14 +99,20 @@ class PromptResponse(BaseModel):
 class ChatMessage(BaseModel):
     """Single message in a chat conversation"""
 
-    role: str = Field(..., description="Message role: 'system', 'user', 'assistant', or 'tool'")
+    role: str = Field(
+        ..., description="Message role: 'system', 'user', 'assistant', or 'tool'"
+    )
     content: str = Field(..., description="Message content")
-    thinking: Optional[bool] = Field(False, description="(for thinking models) the model's thinking process")
+    thinking: Optional[bool] = Field(
+        False, description="(for thinking models) the model's thinking process"
+    )
     images: Optional[List[str]] = Field(
         None,
         description="A list of images to include in the message (for multimodal models)",
     )
-    tool_calls: Optional[List[dict]] = Field(None, description="A list of tools in JSON that the model wants to use")
+    tool_calls: Optional[List[dict]] = Field(
+        None, description="A list of tools in JSON that the model wants to use"
+    )
     tool_name: Optional[str] = Field(
         None,
         description="The name of the tool that was executed to inform the model of the result",
@@ -110,8 +124,12 @@ class ChatRequest(BaseModel):
 
     model: str = Field(None, description="The model name")
     message: ChatMessage = Field(..., description="A chat message")
-    session_id: str = Field(..., description="Unique session identifier for chat history")
-    tools: Optional[List[dict]] = Field(None, description="List of tools in JSON for the model to use if supported")
+    session_id: str = Field(
+        ..., description="Unique session identifier for chat history"
+    )
+    tools: Optional[List[dict]] = Field(
+        None, description="List of tools in JSON for the model to use if supported"
+    )
     think: Optional[bool] = Field(
         False,
         description="(for thinking models) should the model think before responding?",
@@ -122,7 +140,9 @@ class ChatRequest(BaseModel):
     )
     options: Optional[dict] = Field(None, description="Additional model parameters")
     stream: bool = Field(True, description="Whether to stream the response")
-    keep_alive: Optional[str] = Field(None, description="Controls how long the model will stay loaded into memory")
+    keep_alive: Optional[str] = Field(
+        None, description="Controls how long the model will stay loaded into memory"
+    )
 
 
 class ChatResponse(BaseModel):
@@ -137,20 +157,38 @@ class ChatResponse(BaseModel):
         None,
         description="The message object from the assistant. Can be empty in the final chunk.",
     )
-    done: bool = Field(..., description="Boolean indicating if this is the final response chunk.")
-    done_reason: Optional[str] = Field(None, description="Reason why generation stopped (e.g., 'stop')")
+    done: bool = Field(
+        ..., description="Boolean indicating if this is the final response chunk."
+    )
+    done_reason: Optional[str] = Field(
+        None, description="Reason why generation stopped (e.g., 'stop')"
+    )
 
     # --- Final response fields (when done=True) ---
-    total_duration: Optional[int] = Field(None, description="Total time spent generating the response (ns).")
-    load_duration: Optional[int] = Field(None, description="Time spent loading the model (ns).")
-    prompt_eval_count: Optional[int] = Field(None, description="Number of tokens in the prompt.")
-    prompt_eval_duration: Optional[int] = Field(None, description="Time spent evaluating the prompt (ns).")
-    eval_count: Optional[int] = Field(None, description="Number of tokens in the response.")
-    eval_duration: Optional[int] = Field(None, description="Time spent generating the response tokens (ns).")
+    total_duration: Optional[int] = Field(
+        None, description="Total time spent generating the response (ns)."
+    )
+    load_duration: Optional[int] = Field(
+        None, description="Time spent loading the model (ns)."
+    )
+    prompt_eval_count: Optional[int] = Field(
+        None, description="Number of tokens in the prompt."
+    )
+    prompt_eval_duration: Optional[int] = Field(
+        None, description="Time spent evaluating the prompt (ns)."
+    )
+    eval_count: Optional[int] = Field(
+        None, description="Number of tokens in the response."
+    )
+    eval_duration: Optional[int] = Field(
+        None, description="Time spent generating the response tokens (ns)."
+    )
 
     # --- Custom internal fields ---
     success: bool = Field(
         True,
         description="Internal flag indicating if the request was processed successfully.",
     )
-    error: Optional[str] = Field(None, description="Internal error message if processing failed.")
+    error: Optional[str] = Field(
+        None, description="Internal error message if processing failed."
+    )

@@ -49,21 +49,31 @@ class Settings(BaseSettings):
         """Convert comma-separated origins to list"""
         if self.cors_origins == "*":
             return ["*"]
-        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+        return [
+            origin.strip() for origin in self.cors_origins.split(",") if origin.strip()
+        ]
 
     @property
     def cors_allow_methods_list(self) -> List[str]:
         """Convert comma-separated methods to list"""
         if self.cors_allow_methods == "*":
             return ["*"]
-        return [method.strip() for method in self.cors_allow_methods.split(",") if method.strip()]
+        return [
+            method.strip()
+            for method in self.cors_allow_methods.split(",")
+            if method.strip()
+        ]
 
     @property
     def cors_allow_headers_list(self) -> List[str]:
         """Convert comma-separated headers to list"""
         if self.cors_allow_headers == "*":
             return ["*"]
-        return [header.strip() for header in self.cors_allow_headers.split(",") if header.strip()]
+        return [
+            header.strip()
+            for header in self.cors_allow_headers.split(",")
+            if header.strip()
+        ]
 
     # Database Configuration
     database_url: str
@@ -88,7 +98,9 @@ class Settings(BaseSettings):
     @property
     def allowed_file_types_list(self) -> List[str]:
         """Convert comma-separated file types to list"""
-        return [ext.strip() for ext in self.allowed_file_types.split(",") if ext.strip()]
+        return [
+            ext.strip() for ext in self.allowed_file_types.split(",") if ext.strip()
+        ]
 
     # Knowledge Base Configuration
     knowledge_base_path: str

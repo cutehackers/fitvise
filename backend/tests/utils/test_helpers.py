@@ -40,8 +40,10 @@ class TestDataGenerator:
     ) -> Dict[str, Any]:
         """Generate workout prompt request data."""
         return {
-            "prompt": prompt or f"Create a workout for {TestDataGenerator.random_string(5)}",
-            "context": context or f"User context: {TestDataGenerator.random_string(20)}",
+            "prompt": prompt
+            or f"Create a workout for {TestDataGenerator.random_string(5)}",
+            "context": context
+            or f"User context: {TestDataGenerator.random_string(20)}",
             "max_tokens": max_tokens or random.randint(100, 1000),
             "temperature": temperature or round(random.uniform(0.1, 1.0), 1),
         }
@@ -56,7 +58,8 @@ class TestDataGenerator:
     ) -> Dict[str, Any]:
         """Generate workout response data."""
         return {
-            "response": response or f"Generated workout: {TestDataGenerator.random_string(100)}",
+            "response": response
+            or f"Generated workout: {TestDataGenerator.random_string(100)}",
             "tokens_used": tokens_used or random.randint(50, 500),
             "response_time": response_time or round(random.uniform(0.1, 5.0), 2),
             "model": model or f"test-model-{TestDataGenerator.random_string(3)}",
@@ -96,7 +99,9 @@ class MockCreators:
             mock_service.generate_response.return_value = (
                 generate_response_return or TestDataGenerator.workout_response_data()
             )
-            mock_service.health_check.return_value = health_check_return or TestDataGenerator.health_response_data()
+            mock_service.health_check.return_value = (
+                health_check_return or TestDataGenerator.health_response_data()
+            )
 
         return mock_service
 
@@ -133,9 +138,13 @@ class AssertionHelpers:
 
         assert isinstance(response_data["response"], str), "Response must be a string"
         assert len(response_data["response"]) > 0, "Response cannot be empty"
-        assert isinstance(response_data["tokens_used"], int), "Tokens used must be an integer"
+        assert isinstance(
+            response_data["tokens_used"], int
+        ), "Tokens used must be an integer"
         assert response_data["tokens_used"] > 0, "Tokens used must be positive"
-        assert isinstance(response_data["response_time"], (int, float)), "Response time must be numeric"
+        assert isinstance(
+            response_data["response_time"], (int, float)
+        ), "Response time must be numeric"
         assert response_data["response_time"] > 0, "Response time must be positive"
         assert isinstance(response_data["model"], str), "Model must be a string"
         assert isinstance(response_data["success"], bool), "Success must be a boolean"
@@ -153,11 +162,15 @@ class AssertionHelpers:
             "unhealthy",
         ], "Status must be 'healthy' or 'unhealthy'"
         assert isinstance(response_data["model"], str), "Model must be a string"
-        assert isinstance(response_data["response_time"], (int, float)), "Response time must be numeric"
+        assert isinstance(
+            response_data["response_time"], (int, float)
+        ), "Response time must be numeric"
         assert response_data["response_time"] >= 0, "Response time must be non-negative"
 
     @staticmethod
-    def assert_api_error_response(response_data: Dict[str, Any], expected_status: int = None):
+    def assert_api_error_response(
+        response_data: Dict[str, Any], expected_status: int = None
+    ):
         """Assert that response data is a valid API error response."""
         required_fields = ["detail", "status_code"]
 
@@ -165,7 +178,9 @@ class AssertionHelpers:
             assert field in response_data, f"Missing required field: {field}"
 
         assert isinstance(response_data["detail"], str), "Detail must be a string"
-        assert isinstance(response_data["status_code"], int), "Status code must be an integer"
+        assert isinstance(
+            response_data["status_code"], int
+        ), "Status code must be an integer"
 
         if expected_status:
             assert (

@@ -19,7 +19,9 @@ from tests.utils.test_helpers import assert_helpers, generate_data
 class TestWorkoutEndpoints:
     """Test workout API endpoints integration."""
 
-    def test_workout_prompt_endpoint_success(self, test_client: TestClient, mock_llm_service):
+    def test_workout_prompt_endpoint_success(
+        self, test_client: TestClient, mock_llm_service
+    ):
         """Test successful workout prompt request."""
         # Setup mock response
         mock_response = SAMPLE_WORKOUT_RESPONSES[0].copy()
@@ -45,7 +47,9 @@ class TestWorkoutEndpoints:
         assert call_args.kwargs["max_tokens"] == request_data["max_tokens"]
         assert call_args.kwargs["temperature"] == request_data["temperature"]
 
-    def test_workout_prompt_endpoint_minimal_request(self, test_client: TestClient, mock_llm_service):
+    def test_workout_prompt_endpoint_minimal_request(
+        self, test_client: TestClient, mock_llm_service
+    ):
         """Test workout prompt with minimal required data."""
         mock_response = generate_data.workout_response_data()
         mock_llm_service.generate_response.return_value = mock_response
@@ -82,7 +86,9 @@ class TestWorkoutEndpoints:
             response_data = response.json()
             assert "detail" in response_data
 
-    def test_workout_prompt_endpoint_service_error(self, test_client: TestClient, mock_llm_service):
+    def test_workout_prompt_endpoint_service_error(
+        self, test_client: TestClient, mock_llm_service
+    ):
         """Test workout prompt when LLM service fails."""
         # Mock service failure
         mock_llm_service.generate_response.return_value = {
@@ -102,7 +108,9 @@ class TestWorkoutEndpoints:
         assert "detail" in response_data
         assert "unavailable" in response_data["detail"].lower()
 
-    def test_workout_prompt_endpoint_timeout(self, test_client: TestClient, mock_llm_service):
+    def test_workout_prompt_endpoint_timeout(
+        self, test_client: TestClient, mock_llm_service
+    ):
         """Test workout prompt with service timeout."""
         # Mock timeout response
         mock_llm_service.generate_response.return_value = {
@@ -155,7 +163,9 @@ class TestWorkoutEndpoints:
         assert response_data["status"] == "unhealthy"
         assert "error" in response_data
 
-    def test_workout_prompt_request_response_headers(self, test_client: TestClient, mock_llm_service):
+    def test_workout_prompt_request_response_headers(
+        self, test_client: TestClient, mock_llm_service
+    ):
         """Test that proper headers are set in responses."""
         mock_response = generate_data.workout_response_data()
         mock_llm_service.generate_response.return_value = mock_response
@@ -239,7 +249,9 @@ class TestWorkoutEndpoints:
 
         def make_request():
             try:
-                request_data = {"prompt": f"Workout request {threading.current_thread().ident}"}
+                request_data = {
+                    "prompt": f"Workout request {threading.current_thread().ident}"
+                }
                 response = test_client.post("/api/v1/workout/prompt", json=request_data)
                 results.append(response.status_code)
             except Exception as e:

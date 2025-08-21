@@ -36,7 +36,9 @@ async def test_workout_api():
         }
 
         try:
-            response = await client.post(f"{BASE_URL}/workout/prompt", json=workout_request, timeout=30.0)
+            response = await client.post(
+                f"{BASE_URL}/workout/prompt", json=workout_request, timeout=30.0
+            )
             print(f"Status: {response.status_code}")
 
             if response.status_code == 200:
@@ -44,7 +46,11 @@ async def test_workout_api():
                 print(f"AI Response:\n{result['response']}")
                 print(f"\nModel: {result['model']}")
                 print(f"Tokens Used: {result['tokens_used']}")
-                print(f"Duration: {result['duration_ms']:.2f}ms" if result["duration_ms"] else "N/A")
+                print(
+                    f"Duration: {result['duration_ms']:.2f}ms"
+                    if result["duration_ms"]
+                    else "N/A"
+                )
             else:
                 print(f"Error Response: {json.dumps(response.json(), indent=2)}")
 

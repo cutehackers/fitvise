@@ -93,6 +93,10 @@ async def global_exception_handler(request, exc):
         status_code=500,
         content={
             "error": "Internal server error",
-            "detail": ("An unexpected error occurred" if settings.environment == "production" else str(exc)),
+            "detail": (
+                "An unexpected error occurred"
+                if settings.environment == "production"
+                else str(exc)
+            ),
         },
     )

@@ -12,7 +12,9 @@ from app.schemas.chat import ChatRequest, ChatMessage
 class ChatPayloadBuilder:
     """Builder for converting ChatRequest to Ollama API payload format."""
 
-    def __init__(self, default_model: str, default_temperature: float, default_max_tokens: int):
+    def __init__(
+        self, default_model: str, default_temperature: float, default_max_tokens: int
+    ):
         """
         Initialize the builder with default configuration values.
 
@@ -36,7 +38,12 @@ class ChatPayloadBuilder:
             Dict containing the formatted API payload for Ollama /api/chat endpoint
         """
         builder = _PayloadBuilder(self)
-        return builder.core_fields(request).optional_fields(request).build_options(request.options).build()
+        return (
+            builder.core_fields(request)
+            .optional_fields(request)
+            .build_options(request.options)
+            .build()
+        )
 
 
 class _PayloadBuilder:
@@ -95,7 +102,9 @@ class _PayloadBuilder:
 
         return self
 
-    def build_options(self, request_options: Optional[Dict[str, Any]]) -> "_PayloadBuilder":
+    def build_options(
+        self, request_options: Optional[Dict[str, Any]]
+    ) -> "_PayloadBuilder":
         """
         Build the options dictionary with defaults for missing values.
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # boot.sh - Fitvise Backend API Startup Script
-# This script automates the process of starting the Fitvise backend server
+# This script automates the process of starting the Fitvise backend server using uv
 #
 # Usage:
 #   ./boot.sh        - Start server (skip dependency installation)
@@ -11,7 +11,7 @@
 set -e  # Exit on any error
 
 # Default values
-INSTALL_DEPS=false
+SYNC_REQUIRED=false
 
 # Function to show usage
 show_help() {
@@ -30,11 +30,22 @@ show_help() {
     echo ""
 }
 
+# Check if uv is installed
+check_uv() {
+    if ! command -v uv &> /dev/null; then
+        echo "❌ uv is not installed. Please install it first:"
+        echo "   curl -LsSf https://astral.sh/uv/install.sh | sh"
+        echo "   # Or via pip: pip install uv"
+        echo "   # Or via brew: brew install uv"
+        exit 1
+    fi
+}
+
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
         -i|--install)
-            INSTALL_DEPS=true
+            SYNC_REQUIRED=true
             shift
             ;;
         -h|--help)
@@ -52,29 +63,20 @@ done
 echo "🏋️ Starting Fitvise server"
 echo "====================================="
 
-# Check if virtual environment exists
-if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment not found. Please create one first:"
-    echo "   python -m venv venv"
-    exit 1
+# Check if uv is available
+check_uv
+
+# Step 1: Ensure virtual environment exists or create it
+if [ ! -d ".venv" ]; then
+    echo "📦 Creating virtual environment with uv..."
+    uv venv
+    echo "✅ Virtual environment created"
 fi
 
-# Step 1: Activate virtual environment
-echo "📦 Activating virtual environment..."
-source venv/bin/activate
-
-# Verify virtual environment is activated
-if [[ "$VIRTUAL_ENV" != "" ]]; then
-    echo "✅ Virtual environment activated: $VIRTUAL_ENV"
-else
-    echo "❌ Failed to activate virtual environment"
-    exit 1
-fi
-
-# Step 2: Install/update dependencies (conditional)
-if [ "$INSTALL_DEPS" = true ]; then
-    echo "📥 Installing/updating dependencies..."
-    pip install -r requirements.txt
+# Step 2: Install/Update dependencies (conditional)
+if [ "$SYNC_REQUIRED" = true ]; then
+    echo "📥 Installing or updating dependencies with uv..."
+    uv sync
     echo "✅ Dependencies installed/updated"
 else
     echo "⏭️  Skipping dependency installation (use -i to install)"
@@ -88,7 +90,7 @@ fi
 
 # Step 4: Test configuration (optional)
 echo "🔧 Testing configuration..."
-if python test_settings.py > /dev/null 2>&1; then
+if uv run python test_settings.py > /dev/null 2>&1; then
     echo "✅ Configuration test passed"
 else
     echo "⚠️  Configuration test failed - check your .env file"
@@ -105,4 +107,4 @@ echo "🚀 Starting Fitvise Backend API server..."
 echo "   Press Ctrl+C to stop the server"
 echo ""
 
-python run.py
+uv run python run.py

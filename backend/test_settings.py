@@ -4,10 +4,10 @@ Settings Class Test - Comprehensive validation of configuration loading
 Verifies that the Settings class successfully loads all values from .env file
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
 # Add app directory to Python path
 sys.path.insert(0, str(Path(__file__).parent / "app"))
@@ -83,6 +83,7 @@ def test_settings_initialization(Settings):
         try:
             # Try to create with minimal config
             import os
+
             from core.config import Settings
 
             # Set some required env vars if missing
@@ -209,32 +210,20 @@ def validate_configuration_fields(settings) -> Dict[str, Any]:
                 continue
 
             # Range validation
-            if "min" in validation and (
-                isinstance(value, (int, float)) and value < validation["min"]
-            ):
+            if "min" in validation and (isinstance(value, (int, float)) and value < validation["min"]):
                 validation_results["failed"] += 1
-                validation_results["errors"].append(
-                    f"{field_name}: Value {value} below minimum {validation['min']}"
-                )
+                validation_results["errors"].append(f"{field_name}: Value {value} below minimum {validation['min']}")
                 print(f"❌ {field_name}: Below minimum")
                 continue
 
-            if "max" in validation and (
-                isinstance(value, (int, float)) and value > validation["max"]
-            ):
+            if "max" in validation and (isinstance(value, (int, float)) and value > validation["max"]):
                 validation_results["failed"] += 1
-                validation_results["errors"].append(
-                    f"{field_name}: Value {value} above maximum {validation['max']}"
-                )
+                validation_results["errors"].append(f"{field_name}: Value {value} above maximum {validation['max']}")
                 print(f"❌ {field_name}: Above maximum")
                 continue
 
             # String length validation
-            if (
-                "min_length" in validation
-                and isinstance(value, str)
-                and len(value) < validation["min_length"]
-            ):
+            if "min_length" in validation and isinstance(value, str) and len(value) < validation["min_length"]:
                 validation_results["failed"] += 1
                 validation_results["errors"].append(
                     f"{field_name}: String too short, minimum {validation['min_length']} characters"
@@ -244,15 +233,11 @@ def validate_configuration_fields(settings) -> Dict[str, Any]:
 
             # If we get here, validation passed
             validation_results["passed"] += 1
-            print(
-                f"✅ {field_name}: {str(value)[:50]}{'...' if len(str(value)) > 50 else ''}"
-            )
+            print(f"✅ {field_name}: {str(value)[:50]}{'...' if len(str(value)) > 50 else ''}")
 
         except Exception as e:
             validation_results["failed"] += 1
-            validation_results["errors"].append(
-                f"{field_name}: Validation error - {str(e)}"
-            )
+            validation_results["errors"].append(f"{field_name}: Validation error - {str(e)}")
             print(f"❌ {field_name}: Exception - {e}")
 
     return validation_results
@@ -304,9 +289,7 @@ def display_summary(validation_results, property_results):
     total_tests = total_field_tests + total_property_tests
     total_passed = validation_results["passed"] + property_results[0]
 
-    print(
-        f"📋 Configuration Fields: {validation_results['passed']}/{total_field_tests} passed"
-    )
+    print(f"📋 Configuration Fields: {validation_results['passed']}/{total_field_tests} passed")
     print(f"🔄 Property Methods: {property_results[0]}/{total_property_tests} passed")
     print(f"🎯 Overall: {total_passed}/{total_tests} tests passed")
 

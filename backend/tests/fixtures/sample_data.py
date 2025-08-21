@@ -2,7 +2,7 @@
 Sample data for testing various scenarios.
 """
 
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 # Sample workout prompts for testing
 SAMPLE_WORKOUT_PROMPTS = [

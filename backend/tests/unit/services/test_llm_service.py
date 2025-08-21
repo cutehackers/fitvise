@@ -4,12 +4,13 @@ Unit tests for LLM service functionality.
 Tests the LlmService class methods in isolation using mocks.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 from langchain_core.messages import AIMessage
 
 from app.application.llm_service import LlmService
-from app.schemas.chat import ChatRequest, ChatMessage, ChatResponse
+from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
 
 
 class TestLlmService:
@@ -33,9 +34,7 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_chat_validation_empty_message_content(self, llm_service):
         """Test chat validation when message content is empty."""
-        request = ChatRequest(
-            message=ChatMessage(role="user", content=""), session_id="test_session_123"
-        )
+        request = ChatRequest(message=ChatMessage(role="user", content=""), session_id="test_session_123")
 
         with pytest.raises(ValueError, match="Message content cannot be empty"):
             async for _ in llm_service.chat(request):
@@ -56,13 +55,9 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_chat_validation_missing_session_id(self, llm_service):
         """Test chat validation when session_id is missing."""
-        request = ChatRequest(
-            message=ChatMessage(role="user", content="Hello"), session_id=""
-        )
+        request = ChatRequest(message=ChatMessage(role="user", content="Hello"), session_id="")
 
-        with pytest.raises(
-            ValueError, match="Session ID is required for chat history management"
-        ):
+        with pytest.raises(ValueError, match="Session ID is required for chat history management"):
             async for _ in llm_service.chat(request):
                 pass
 
@@ -169,9 +164,7 @@ class TestLlmService:
             mock_chain_with_history = MagicMock()
             mock_chain_with_history.astream = mock_astream
 
-            with patch(
-                "app.application.llm_service.RunnableWithMessageHistory"
-            ) as mock_runnable:
+            with patch("app.application.llm_service.RunnableWithMessageHistory") as mock_runnable:
                 mock_runnable.return_value = mock_chain_with_history
 
                 responses = []
@@ -199,9 +192,7 @@ class TestLlmService:
             session_id="test_session_123",
         )
 
-        with patch(
-            "app.application.llm_service.RunnableWithMessageHistory"
-        ) as mock_runnable:
+        with patch("app.application.llm_service.RunnableWithMessageHistory") as mock_runnable:
             # Mock the chain to raise an exception during streaming
             mock_chain = MagicMock()
             mock_chain.astream.side_effect = Exception("Streaming failed")
@@ -222,9 +213,7 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_health_check_success(self, llm_service):
         """Test successful health check."""
-        with patch.object(
-            llm_service.llm, "ainvoke", new_callable=AsyncMock
-        ) as mock_ainvoke:
+        with patch.object(llm_service.llm, "ainvoke", new_callable=AsyncMock) as mock_ainvoke:
             mock_ainvoke.return_value = "Health check response"
 
             result = await llm_service.health()
@@ -235,9 +224,7 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_health_check_failure(self, llm_service):
         """Test health check with service failure."""
-        with patch.object(
-            llm_service.llm, "ainvoke", new_callable=AsyncMock
-        ) as mock_ainvoke:
+        with patch.object(llm_service.llm, "ainvoke", new_callable=AsyncMock) as mock_ainvoke:
             mock_ainvoke.side_effect = Exception("LLM service unavailable")
 
             result = await llm_service.health()

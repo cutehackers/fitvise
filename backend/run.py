@@ -1,17 +1,14 @@
 # run.py - Main entry point for Fitvise Backend API
 import uvicorn
-from app.main import app
+
 from app.core.config import settings
+from app.main import app
 
 if __name__ == "__main__":
     print("🌪️  Starting Fitvise backend server...")
     print(f"🌍 Environment: {settings.environment}")
-    print(
-        f"🌐 API will be available at: http://{settings.api_host}:{settings.api_port}"
-    )
-    print(
-        f"📜 Interactive docs at: http://{settings.api_host}:{settings.api_port}/docs"
-    )
+    print(f"🌐 API will be available at: http://{settings.api_host}:{settings.api_port}")
+    print(f"📜 Interactive docs at: http://{settings.api_host}:{settings.api_port}/docs")
     print(f"🔄 Auto-reload: {'enabled' if settings.debug else 'disabled'}")
     print(f"🤖 LLM Model: {settings.llm_model}")
     print("-" * 60)

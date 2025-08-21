@@ -13,7 +13,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
-from typing import Generator, AsyncGenerator
+from typing import AsyncGenerator, Generator
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,8 +22,8 @@ from httpx import AsyncClient
 # Add the app directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
 
-from app.main import app
 from app.core.config import Settings
+from app.main import app
 
 
 @pytest.fixture(scope="session")
@@ -167,9 +167,7 @@ def cleanup_test_files():
 # Pytest configuration
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: marks tests as unit tests (deselect with '-m \"not unit\"')"
-    )
+    config.addinivalue_line("markers", "unit: marks tests as unit tests (deselect with '-m \"not unit\"')")
     config.addinivalue_line(
         "markers",
         "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
@@ -178,12 +176,8 @@ def pytest_configure(config):
         "markers",
         "e2e: marks tests as end-to-end tests (deselect with '-m \"not e2e\"')",
     )
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
-    )
-    config.addinivalue_line(
-        "markers", "external: marks tests that require external services"
-    )
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "external: marks tests that require external services")
 
 
 def pytest_collection_modifyitems(config, items):

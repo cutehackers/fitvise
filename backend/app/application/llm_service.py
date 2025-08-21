@@ -1,29 +1,24 @@
-import json
 import logging
-
 from operator import itemgetter
-from typing import AsyncGenerator, Dict, List, Optional
+from typing import AsyncGenerator, Dict
 
-from app.core.config import settings
-from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
-from app.domain.entities.message_role import MessageRole
 from langchain.globals import set_debug
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.chat_history import (
     BaseChatMessageHistory,
     InMemoryChatMessageHistory,
 )
-from langchain_core.messages import BaseMessage, AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, trim_messages
+from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_ollama.chat_models import ChatOllama
-from langchain_core.messages import trim_messages
-from itertools import chain
-from langchain_core.messages.utils import count_tokens_approximately
 
-from langchain_core.runnables import RunnablePassthrough
-
+from app.core.config import settings
+from app.domain.entities.message_role import MessageRole
+from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
 set_debug(True)
@@ -44,21 +39,11 @@ class LlmService:
     """
 
     def __init__(self, turns_window: int = 10):
-        # Chat message history trimmesr
-        self.trimmer = trim_messages(
-            max_tokens=MAX_TOKENS_TABLE.get("llama3.2:3b", 128000),
-            token_counter=count_tokens_approximately,
-            strategy="last",
-            # Most chat models expect that chat history starts with either:
-            # (1) a HumanMessage or
-            # (2) a SystemMessage followed by a HumanMessage
-            # start_on="human" makes sure we produce a valid chat history
-            start_on="human",
-            # Usually, we want to keep the SystemMessage
-            # if it's present in the original history.
-            # The SystemMessage has special instructions for the model.
-            include_system=True,
-            allow_partial=False,
+        # LLM model
+        self.llm = ChatOllama(
+            base_url=settings.llm_base_url,
+            model=settings.llm_model,
+            temperature=settings.llm_temperature,
         )
 
         # Chat prompt template
@@ -73,11 +58,20 @@ class LlmService:
             ]
         )
 
-        # LLM model
-        self.llm = ChatOllama(
-            base_url=settings.llm_base_url,
-            model=settings.llm_model,
-            temperature=settings.llm_temperature,
+        # Chat message history trimmesr
+        self.trimmer = trim_messages(
+            max_tokens=MAX_TOKENS_TABLE.get("llama3.2:3b", 128000),
+            token_counter=self.llm,
+            strategy="last",
+            # Most chat models expect that chat history starts with either:
+            # (1) a HumanMessage or
+            # (2) a SystemMessage followed by a HumanMessage
+            # start_on="human" makes sure we produce a valid chat history
+            start_on="human",
+            # Usually, we want to keep the SystemMessage
+            # if it's present in the original history.
+            # The SystemMessage has special instructions for the model.
+            include_system=True,
         )
 
         # Session store
@@ -90,11 +84,7 @@ class LlmService:
         # The chain will use the trimmed history as input.
         # The prompt expects a "history" key, which will be filled with the trimmed messages.
         # The LLM will then generate a response based on the trimmed history.
-        self.chain = (
-            RunnablePassthrough.assign(history=itemgetter("history") | self.trimmer)
-            | self.prompt
-            | self.llm
-        )
+        self.chain = RunnablePassthrough.assign(history=itemgetter("history") | self.trimmer) | self.prompt | self.llm
 
     def get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         """
@@ -180,9 +170,7 @@ class LlmService:
 
         content = request.message.content.strip()
 
-        logger.info(
-            "Chat: request - session_id: %s, content: %s", request.session_id, content
-        )
+        logger.info("Chat: request - session_id: %s, content: %s", request.session_id, content)
 
         chain_with_history = RunnableWithMessageHistory(
             self.chain,
@@ -196,9 +184,7 @@ class LlmService:
             response = ""
 
             config = {"configurable": {"session_id": request.session_id}}
-            async for chunk in chain_with_history.astream(
-                {"input": content}, config=config
-            ):
+            async for chunk in chain_with_history.astream({"input": content}, config=config):
                 # The astream method yields BaseMessage objects or subclasses
                 if isinstance(chunk, BaseMessage):
                     response += chunk.content
@@ -229,9 +215,7 @@ class LlmService:
         return ChatResponse(
             model=self.llm.model,
             created_at="",  # This can be populated if needed
-            message=ChatMessage(
-                role=MessageRole.ASSISTANT.value, content=chunk.content
-            ),
+            message=ChatMessage(role=MessageRole.ASSISTANT.value, content=chunk.content),
             done=False,  # This needs to be determined based on the stream
         )
 

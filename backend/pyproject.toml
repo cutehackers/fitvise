@@ -31,6 +31,9 @@ dependencies = [
     "langchain-ollama>=0.3.6",
 ]
 
+[tool.isort]
+profile = "black"
+
 [tool.black]
 line-length = 120
 target-version = ['py311', 'py312']
@@ -49,3 +52,8 @@ exclude = '''
   | dist
 )/
 '''
+
+[dependency-groups]
+dev = [
+    "isort>=6.0.1",
+]

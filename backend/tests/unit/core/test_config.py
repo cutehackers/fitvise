@@ -5,6 +5,7 @@ Tests the Settings class and configuration loading functionality.
 """
 
 import os
+
 import pytest
 from pydantic import ValidationError
 

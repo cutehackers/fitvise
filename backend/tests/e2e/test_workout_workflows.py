@@ -4,9 +4,10 @@ End-to-end tests for complete workout generation workflows.
 Tests complete user journeys through the workout generation system.
 """
 
+import asyncio
+
 import pytest
 from httpx import AsyncClient
-import asyncio
 
 from tests.fixtures.sample_data import E2E_SCENARIOS, SAMPLE_WORKOUT_PROMPTS
 from tests.utils.test_helpers import assert_helpers
@@ -17,9 +18,7 @@ class TestWorkoutWorkflows:
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
-    async def test_complete_workout_generation_flow(
-        self, async_test_client: AsyncClient
-    ):
+    async def test_complete_workout_generation_flow(self, async_test_client: AsyncClient):
         """Test the complete workflow from health check to workout generation."""
 
         # Step 1: Check service health
@@ -34,9 +33,7 @@ class TestWorkoutWorkflows:
 
         # Step 2: Submit workout request
         request_data = SAMPLE_WORKOUT_PROMPTS[0]
-        workout_response = await async_test_client.post(
-            "/api/v1/workout/prompt", json=request_data
-        )
+        workout_response = await async_test_client.post("/api/v1/workout/prompt", json=request_data)
 
         assert workout_response.status_code == 200
         workout_data = workout_response.json()
@@ -81,9 +78,7 @@ class TestWorkoutWorkflows:
         responses = []
 
         for request_data in workout_requests:
-            response = await async_test_client.post(
-                "/api/v1/workout/prompt", json=request_data
-            )
+            response = await async_test_client.post("/api/v1/workout/prompt", json=request_data)
 
             assert response.status_code == 200
             response_data = response.json()
@@ -94,23 +89,12 @@ class TestWorkoutWorkflows:
         response_texts = [r["response"] for r in responses]
 
         # Responses should be different
-        assert len(set(response_texts)) == len(
-            response_texts
-        ), "All responses should be unique"
+        assert len(set(response_texts)) == len(response_texts), "All responses should be unique"
 
         # Each response should be relevant to its request
-        assert (
-            "cardio" in response_texts[0].lower()
-            or "aerobic" in response_texts[0].lower()
-        )
-        assert (
-            "strength" in response_texts[1].lower()
-            or "muscle" in response_texts[1].lower()
-        )
-        assert (
-            "yoga" in response_texts[2].lower()
-            or "flexibility" in response_texts[2].lower()
-        )
+        assert "cardio" in response_texts[0].lower() or "aerobic" in response_texts[0].lower()
+        assert "strength" in response_texts[1].lower() or "muscle" in response_texts[1].lower()
+        assert "yoga" in response_texts[2].lower() or "flexibility" in response_texts[2].lower()
 
     @pytest.mark.e2e
     @pytest.mark.asyncio
@@ -133,9 +117,7 @@ class TestWorkoutWorkflows:
         # Step 3: Make a valid request to ensure recovery
         if health_response.status_code == 200:
             valid_request = {"prompt": "Simple 15-minute workout"}
-            valid_response = await async_test_client.post(
-                "/api/v1/workout/prompt", json=valid_request
-            )
+            valid_response = await async_test_client.post("/api/v1/workout/prompt", json=valid_request)
 
             # Should work normally after error
             if valid_response.status_code == 200:  # Service may be unavailable
@@ -160,9 +142,7 @@ class TestWorkoutWorkflows:
                 "max_tokens": 300,
             }
 
-            response = await async_test_client.post(
-                "/api/v1/workout/prompt", json=request_data
-            )
+            response = await async_test_client.post("/api/v1/workout/prompt", json=request_data)
 
             return response.status_code, response.json()
 
@@ -204,9 +184,7 @@ class TestWorkoutWorkflows:
             start_time = time.time()
 
             request_data = {"prompt": "Quick workout routine", "max_tokens": 200}
-            response = await async_test_client.post(
-                "/api/v1/workout/prompt", json=request_data
-            )
+            response = await async_test_client.post("/api/v1/workout/prompt", json=request_data)
 
             end_time = time.time()
             response_time = end_time - start_time
@@ -230,9 +208,7 @@ class TestWorkoutWorkflows:
         max_response_time_actual = max(r["response_time"] for r in results)
 
         # Performance assertions
-        assert (
-            success_rate >= min_success_rate
-        ), f"Success rate {success_rate:.2f} below threshold {min_success_rate}"
+        assert success_rate >= min_success_rate, f"Success rate {success_rate:.2f} below threshold {min_success_rate}"
 
         assert (
             max_response_time_actual <= max_response_time
@@ -274,9 +250,7 @@ class TestWorkoutWorkflows:
             "temperature": 0.7,
         }
 
-        response = await async_test_client.post(
-            "/api/v1/workout/prompt", json=request_data
-        )
+        response = await async_test_client.post("/api/v1/workout/prompt", json=request_data)
 
         assert response.status_code == 200
         response_data = response.json()
@@ -304,18 +278,12 @@ class TestWorkoutWorkflows:
             "cool",
         ]
         found_terms = [term for term in fitness_terms if term in workout_text.lower()]
-        assert (
-            len(found_terms) >= 5
-        ), f"Response should contain fitness terminology. Found: {found_terms}"
+        assert len(found_terms) >= 5, f"Response should contain fitness terminology. Found: {found_terms}"
 
         # Should have reasonable token usage
         assert response_data["tokens_used"] > 0, "Should report token usage"
-        assert (
-            response_data["tokens_used"] <= request_data["max_tokens"]
-        ), "Should respect token limit"
+        assert response_data["tokens_used"] <= request_data["max_tokens"], "Should respect token limit"
 
         # Should have reasonable response time
         assert response_data["response_time"] > 0, "Should report response time"
-        assert (
-            response_data["response_time"] <= 30.0
-        ), "Response time should be reasonable"
+        assert response_data["response_time"] <= 30.0, "Response time should be reasonable"

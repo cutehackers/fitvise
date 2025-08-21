@@ -4,19 +4,18 @@ Workout API endpoints for fitness-related LLM interactions.
 
 import logging
 from datetime import datetime, timezone
-from queue import Empty
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
+from app.application.llm_service import LlmService, llm_service
 from app.core.config import settings
 from app.schemas.chat import (
     ApiErrorResponse,
     ChatRequest,
     HealthResponse,
 )
-from app.application.llm_service import LlmService, llm_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +46,7 @@ def _get_current_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _build_health_response(
-    status: str, llm_available: bool, timestamp: str = None
-) -> HealthResponse:
+def _build_health_response(status: str, llm_available: bool, timestamp: str = None) -> HealthResponse:
     """Create standardized health response."""
     return HealthResponse(
         status=status,
@@ -67,9 +64,7 @@ def _build_error_response(
     param: Optional[str] = None,
 ) -> dict:
     """Create standardized error response dictionary."""
-    return ApiErrorResponse(
-        code=code, type=error_type, param=param, message=message
-    ).model_dump()
+    return ApiErrorResponse(code=code, type=error_type, param=param, message=message).model_dump()
 
 
 def _on_llm_error(error_message: str) -> HTTPException:
@@ -198,9 +193,7 @@ async def chat(
                     yield f"{chunk.model_dump_json()}\n"
             except Exception as e:
                 # Handle any exceptions from the LLM service
-                error_response = _build_error_response(
-                    message=str(e), error_type="stream_error", code="STREAM_ERROR"
-                )
+                error_response = _build_error_response(message=str(e), error_type="stream_error", code="STREAM_ERROR")
                 yield f"{error_response}\n"
 
         return StreamingResponse(stream_generator(), media_type="application/x-ndjson")

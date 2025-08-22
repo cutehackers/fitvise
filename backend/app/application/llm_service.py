@@ -9,7 +9,6 @@ from langchain_core.chat_history import (
     InMemoryChatMessageHistory,
 )
 from langchain_core.messages import BaseMessage, trim_messages
-from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.runnables import RunnablePassthrough

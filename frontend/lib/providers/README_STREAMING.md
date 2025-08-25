@@ -6,7 +6,7 @@ The `messageStreamProvider` is designed to optimize chat message updates by prov
 
 ## Key Components
 
-### 1. StreamingMessageNotifier
+### 1. StreamMessageNotifier
 - **Location**: `lib/providers/streaming_message_notifier.dart`
 - **Purpose**: Manages individual streams for each message ID
 - **Benefits**: Reactive updates, memory efficiency, automatic cleanup

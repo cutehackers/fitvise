@@ -15,16 +15,7 @@ import '../models/message.dart';
 enum HttpMethod { get, put, post, delete, options, head, patch, trace }
 
 class ChatProvider extends ChangeNotifier {
-  List<Message> _messages = [
-    Message(
-      id: '1',
-      sender: 'ai',
-      text:
-          "Welcome to Fitvise! 💪 I'm your AI fitness assistant. I can help you with workout plans, nutrition advice, exercise techniques, and tracking your fitness progress. What would you like to work on today?",
-      timestamp: DateTime.now(),
-      type: 'text',
-    ),
-  ];
+  List<Message> _messages = [];
 
   bool _isTyping = false;
   bool _isRecording = false;
@@ -92,7 +83,7 @@ class ChatProvider extends ChangeNotifier {
     // Add new user message
     final userMessage = Message(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      sender: 'user',
+      role: MessageRole.user,
       text: text,
       timestamp: DateTime.now(),
       type: 'text',
@@ -143,7 +134,7 @@ class ChatProvider extends ChangeNotifier {
 
     final streamingMessage = Message(
       id: streamingMessageId,
-      sender: 'ai',
+      role: MessageRole.ai,
       text: '',
       timestamp: DateTime.now(),
       type: 'text',
@@ -248,7 +239,7 @@ class ChatProvider extends ChangeNotifier {
     // Fallback message
     return Message(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      sender: 'ai',
+      role: MessageRole.ai,
       text: content.isEmpty ? 'I apologize, but I didn\'t receive a complete response. Please try again.' : content,
       timestamp: DateTime.now(),
       type: 'text',
@@ -263,7 +254,7 @@ class ChatProvider extends ChangeNotifier {
 
     // Only remove the specific streaming message if it exists and is empty
     final messageIndex = _messages.indexWhere((msg) => msg.id == messageId);
-    if (messageIndex != -1 && _messages[messageIndex].sender == 'ai' && _messages[messageIndex].text.isEmpty) {
+    if (messageIndex != -1 && _messages[messageIndex].role == MessageRole.ai && _messages[messageIndex].text.isEmpty) {
       _messages.removeAt(messageIndex);
       notifyListeners();
     }
@@ -315,7 +306,7 @@ class ChatProvider extends ChangeNotifier {
 
     return Message(
       id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
-      sender: 'ai',
+      role: MessageRole.ai,
       text: errorText,
       timestamp: DateTime.now(),
       type: 'text',

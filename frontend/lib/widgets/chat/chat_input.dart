@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
+
 import '../../theme/app_theme.dart';
 
 /// Configuration class for chat input appearance and behavior
@@ -27,9 +29,9 @@ class ChatInputConfig {
     this.maxLength = 2000,
     this.textStyle,
     this.hintStyle,
-    this.padding = const EdgeInsets.all(20),
+    this.padding = const EdgeInsets.all(16),
     this.margin = EdgeInsets.zero,
-    this.borderRadius = 28,
+    this.borderRadius = 16,
     this.backgroundColor,
     this.gradient,
     this.borderColor,
@@ -49,16 +51,11 @@ class AttachmentOption {
   final String type;
   final VoidCallback? onPressed;
 
-  const AttachmentOption({
-    required this.icon,
-    required this.tooltip,
-    required this.type,
-    this.onPressed,
-  });
+  const AttachmentOption({required this.icon, required this.tooltip, required this.type, this.onPressed});
 }
 
 /// A modern, feature-rich chat input widget
-/// 
+///
 /// Features:
 /// - Glassmorphic design with gradients
 /// - Voice input support
@@ -71,34 +68,34 @@ class AttachmentOption {
 class ChatInput extends StatefulWidget {
   /// Text editing controller
   final TextEditingController controller;
-  
+
   /// Configuration for input appearance
   final ChatInputConfig? config;
-  
+
   /// Callback when send button is pressed
   final ValueChanged<String>? onSend;
-  
+
   /// Callback when text changes
   final ValueChanged<String>? onChanged;
-  
+
   /// Callback for voice input toggle
   final VoidCallback? onVoiceToggle;
-  
+
   /// Whether voice recording is active
   final bool isRecording;
-  
+
   /// Whether the input is in loading state
   final bool isLoading;
-  
+
   /// Custom status text to display
   final String? statusText;
-  
+
   /// Whether the send button is enabled
   final bool enabled;
-  
+
   /// Focus node for the text field
   final FocusNode? focusNode;
-  
+
   /// Custom attachment options
   final List<AttachmentOption>? attachmentOptions;
 
@@ -126,38 +123,26 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   late AnimationController _recordingController;
   late Animation<double> _sendButtonScale;
   late Animation<double> _recordingPulse;
-  
+
   bool _hasText = false;
 
   @override
   void initState() {
     super.initState();
-    
-    _sendButtonController = AnimationController(
-      duration: const Duration(milliseconds: 200),
-      vsync: this,
-    );
-    
-    _recordingController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
-    
+
+    _sendButtonController = AnimationController(duration: const Duration(milliseconds: 200), vsync: this);
+
+    _recordingController = AnimationController(duration: const Duration(milliseconds: 1000), vsync: this);
+
     _sendButtonScale = Tween<double>(
       begin: 0.8,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _sendButtonController,
-      curve: Curves.elasticOut,
-    ));
-    
+    ).animate(CurvedAnimation(parent: _sendButtonController, curve: Curves.elasticOut));
+
     _recordingPulse = Tween<double>(
       begin: 0.8,
       end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _recordingController,
-      curve: Curves.easeInOut,
-    ));
+    ).animate(CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut));
 
     widget.controller.addListener(_onTextChanged);
     _updateSendButton();
@@ -166,13 +151,13 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(ChatInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onTextChanged);
       widget.controller.addListener(_onTextChanged);
       _updateSendButton();
     }
-    
+
     if (oldWidget.isRecording != widget.isRecording) {
       if (widget.isRecording) {
         _recordingController.repeat(reverse: true);
@@ -221,37 +206,27 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final config = widget.config ?? _getDefaultConfig(theme);
-    
+
     return Container(
       padding: config.padding,
       margin: config.margin,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(
-            color: theme.dividerColor.withValues(alpha: 0.3),
-          ),
-        ),
+        border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -4)),
         ],
       ),
       child: Column(
         children: [
           // Attachment options
-          if (config.enableAttachments)
-            _buildAttachmentOptions(config),
+          if (config.enableAttachments) _buildAttachmentOptions(config),
 
           // Main input area
           _buildInputArea(context, config),
 
           // Status and character count
-          if (config.showStatusText || config.showCharacterCount)
-            _buildStatusArea(context, config),
+          if (config.showStatusText || config.showCharacterCount) _buildStatusArea(context, config),
         ],
       ),
     );
@@ -285,9 +260,9 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
 
   Widget _buildAttachmentOptions(ChatInputConfig config) {
     final options = widget.attachmentOptions ?? config.attachmentOptions;
-    
+
     if (options.isEmpty) return const SizedBox.shrink();
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -305,13 +280,9 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildAttachmentButton({
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
+  Widget _buildAttachmentButton({required IconData icon, required String tooltip, required VoidCallback onPressed}) {
     final theme = Theme.of(context);
-    
+
     return Tooltip(
       message: tooltip,
       child: Container(
@@ -320,9 +291,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
               ? const Color(0xFF374151).withValues(alpha: 0.5)
               : Colors.white.withValues(alpha: 0.8),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: theme.dividerColor.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
         ),
         child: Material(
           color: Colors.transparent,
@@ -331,11 +300,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
             onTap: onPressed,
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Icon(
-                icon,
-                size: 20,
-                color: theme.iconTheme.color?.withValues(alpha: 0.7),
-              ),
+              child: Icon(icon, size: 20, color: theme.iconTheme.color?.withValues(alpha: 0.7)),
             ),
           ),
         ),
@@ -345,30 +310,27 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
 
   Widget _buildInputArea(BuildContext context, ChatInputConfig config) {
     final theme = Theme.of(context);
-    
+
     return Container(
-      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        gradient: config.gradient ?? LinearGradient(
-          colors: [
-            AppTheme.primaryBlue.withValues(alpha: 0.1),
-            AppTheme.secondaryPurple.withValues(alpha: 0.1),
-          ],
-        ),
+        gradient:
+            config.gradient ??
+            LinearGradient(
+              colors: [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.secondaryPurple.withValues(alpha: 0.1)],
+            ),
         borderRadius: BorderRadius.circular(config.borderRadius),
-        border: Border.all(
-          color: config.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2),
-          width: 1.5,
-        ),
+        border: Border.all(color: config.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2), width: 1.5),
         boxShadow: config.shadows,
       ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: config.backgroundColor ?? (theme.brightness == Brightness.dark
-              ? const Color(0xFF374151).withValues(alpha: 0.9)
-              : Colors.white.withValues(alpha: 0.95)),
-          borderRadius: BorderRadius.circular(config.borderRadius - 4),
+          color:
+              config.backgroundColor ??
+              (theme.brightness == Brightness.dark
+                  ? const Color(0xFF374151).withValues(alpha: 0.9)
+                  : Colors.white.withValues(alpha: 0.95)),
+          borderRadius: BorderRadius.circular(config.borderRadius),
         ),
         child: Row(
           children: [
@@ -382,34 +344,30 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
                 enabled: widget.enabled,
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.send,
-                style: config.textStyle ?? TextStyle(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.white
-                      : const Color(0xFF111827),
-                  fontSize: 15,
-                  height: 1.4,
-                ),
+                style:
+                    config.textStyle ??
+                    TextStyle(
+                      color: theme.brightness == Brightness.dark ? Colors.white : const Color(0xFF111827),
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
                 decoration: InputDecoration(
                   hintText: config.hintText,
-                  hintStyle: config.hintStyle ?? TextStyle(
-                    color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
-                    fontSize: 15,
-                  ),
+                  hintStyle:
+                      config.hintStyle ??
+                      TextStyle(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6), fontSize: 15),
                   border: InputBorder.none,
+                  focusedBorder: InputBorder.none,
                   counterText: '', // Hide default counter
                   contentPadding: EdgeInsets.zero,
                 ),
                 onSubmitted: widget.enabled ? (_) => _handleSend() : null,
               ),
             ),
-            const SizedBox(width: 12),
+            const Gap(12),
 
             // Voice recording button
-            if (config.enableVoiceInput)
-              _buildVoiceButton(),
-            
-            if (config.enableVoiceInput)
-              const SizedBox(width: 8),
+            if (config.enableVoiceInput) ...[_buildVoiceButton(), const Gap(8)],
 
             // Send button
             _buildSendButton(),
@@ -421,7 +379,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
 
   Widget _buildVoiceButton() {
     final theme = Theme.of(context);
-    
+
     return AnimatedBuilder(
       animation: _recordingPulse,
       builder: (context, child) {
@@ -429,13 +387,9 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
           scale: widget.isRecording ? _recordingPulse.value : 1.0,
           child: Container(
             decoration: BoxDecoration(
-              color: widget.isRecording
-                  ? Colors.red.withValues(alpha: 0.1)
-                  : Colors.transparent,
+              color: widget.isRecording ? Colors.red.withValues(alpha: 0.1) : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
-              border: widget.isRecording
-                  ? Border.all(color: Colors.red.withValues(alpha: 0.3))
-                  : null,
+              border: widget.isRecording ? Border.all(color: Colors.red.withValues(alpha: 0.3)) : null,
             ),
             child: Material(
               color: Colors.transparent,
@@ -447,9 +401,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
                   child: Icon(
                     widget.isRecording ? Icons.mic_off_rounded : Icons.mic_rounded,
                     size: 20,
-                    color: widget.isRecording
-                        ? Colors.red
-                        : theme.iconTheme.color?.withValues(alpha: 0.7),
+                    color: widget.isRecording ? Colors.red : theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -462,7 +414,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
 
   Widget _buildSendButton() {
     final canSend = _hasText && widget.enabled && !widget.isLoading;
-    
+
     return AnimatedBuilder(
       animation: _sendButtonScale,
       builder: (context, child) {
@@ -478,9 +430,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: !canSend
-                  ? Theme.of(context).disabledColor.withValues(alpha: 0.3)
-                  : null,
+              color: !canSend ? Theme.of(context).disabledColor.withValues(alpha: 0.3) : null,
               borderRadius: BorderRadius.circular(20),
               boxShadow: canSend
                   ? [
@@ -527,7 +477,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
     final statusText = widget.statusText ?? _getDefaultStatusText();
     final characterCount = widget.controller.text.length;
     final maxLength = config.maxLength ?? 2000;
-    
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: Row(
@@ -554,9 +504,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
                     ? Colors.red
                     : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                 fontSize: 12,
-                fontWeight: characterCount > maxLength * 0.9
-                    ? FontWeight.w600
-                    : FontWeight.normal,
+                fontWeight: characterCount > maxLength * 0.9 ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
         ],
@@ -593,13 +541,7 @@ class SimpleChatInput extends StatelessWidget {
   final String? hintText;
   final bool enabled;
 
-  const SimpleChatInput({
-    super.key,
-    required this.controller,
-    this.onSend,
-    this.hintText,
-    this.enabled = true,
-  });
+  const SimpleChatInput({super.key, required this.controller, this.onSend, this.hintText, this.enabled = true});
 
   @override
   Widget build(BuildContext context) {

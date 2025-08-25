@@ -28,7 +28,7 @@ class MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isUser = message.sender == 'user';
+    final isUser = message.role == MessageRole.user;
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     return Container(
@@ -109,7 +109,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildMessageContent(BuildContext context, ChatProvider chatProvider) {
-    final isUser = message.sender == 'user';
+    final isUser = message.role == MessageRole.user;
 
     return Row(
       mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,

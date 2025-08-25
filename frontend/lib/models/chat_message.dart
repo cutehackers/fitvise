@@ -9,7 +9,7 @@ part 'chat_message.g.dart';
 @freezed
 abstract class ChatMessage with _$ChatMessage {
   const factory ChatMessage({
-    required String role,
+    required String role, // 'user' or 'ai', or 'system'
     required String content,
     @Default(false) bool thinking,
     @JsonKey(name: 'images') List<String>? images,

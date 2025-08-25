@@ -7,7 +7,7 @@ import 'screens/chat_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() {
-  runApp(ProviderScope(child: const FitviseApp()));
+  runApp(const ProviderScope(child: FitviseApp()));
 }
 
 class FitviseApp extends StatelessWidget {
@@ -20,7 +20,7 @@ class FitviseApp extends StatelessWidget {
       child: provider.Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
-            title: 'Fitvise - AI Fitness Assistant',
+            title: 'Fitvise',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,

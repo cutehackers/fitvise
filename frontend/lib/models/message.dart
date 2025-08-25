@@ -1,6 +1,8 @@
+enum MessageRole { user, ai, system }
+
 class Message {
   final String id;
-  final String sender; // 'user' or 'ai'
+  final MessageRole role; // 'user' or 'ai', 'system'
   final String text;
   final DateTime timestamp;
   final String type; // 'text', 'image', 'file'
@@ -8,20 +10,40 @@ class Message {
   final bool isEdited;
   final bool isStreaming; // New property to track streaming state
 
-  Message({
-    required this.id,
-    required this.sender,
+  const Message({
+    required this.role,
     required this.text,
     required this.timestamp,
+    this.id = '',
     this.type = 'text',
     this.actions,
     this.isEdited = false,
     this.isStreaming = false, // Default to false for completed messages
   });
 
+  const Message.user({
+    required this.text,
+    required this.timestamp,
+    this.id = '',
+    this.type = 'text',
+    this.actions,
+    this.isEdited = false,
+    this.isStreaming = false, // Default to false for completed messages
+  }) : role = MessageRole.user;
+
+  const Message.ai({
+    required this.text,
+    required this.timestamp,
+    this.id = '',
+    this.type = 'text',
+    this.actions,
+    this.isEdited = false,
+    this.isStreaming = false, // Default to false for completed messages
+  }) : role = MessageRole.ai;
+
   Message copyWith({
     String? id,
-    String? sender,
+    MessageRole? role,
     String? text,
     DateTime? timestamp,
     String? type,
@@ -31,7 +53,7 @@ class Message {
   }) {
     return Message(
       id: id ?? this.id,
-      sender: sender ?? this.sender,
+      role: role ?? this.role,
       text: text ?? this.text,
       timestamp: timestamp ?? this.timestamp,
       type: type ?? this.type,
@@ -44,7 +66,7 @@ class Message {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'sender': sender,
+      'role': role,
       'text': text,
       'timestamp': timestamp.toIso8601String(),
       'type': type,
@@ -57,14 +79,12 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['id'],
-      sender: json['sender'],
+      role: json['role'],
       text: json['text'],
       timestamp: DateTime.parse(json['timestamp']),
       type: json['type'] ?? 'text',
       actions: json['actions'] != null
-          ? (json['actions'] as List)
-              .map((action) => MessageAction.fromJson(action))
-              .toList()
+          ? (json['actions'] as List).map((action) => MessageAction.fromJson(action)).toList()
           : null,
       isEdited: json['isEdited'] ?? false,
       isStreaming: json['isStreaming'] ?? false,
@@ -76,23 +96,14 @@ class MessageAction {
   final String label;
   final String action;
 
-  MessageAction({
-    required this.label,
-    required this.action,
-  });
+  MessageAction({required this.label, required this.action});
 
   Map<String, dynamic> toJson() {
-    return {
-      'label': label,
-      'action': action,
-    };
+    return {'label': label, 'action': action};
   }
 
   factory MessageAction.fromJson(Map<String, dynamic> json) {
-    return MessageAction(
-      label: json['label'],
-      action: json['action'],
-    );
+    return MessageAction(label: json['label'], action: json['action']);
   }
 }
 
@@ -101,9 +112,5 @@ class WelcomePrompt {
   final String text;
   final String category;
 
-  WelcomePrompt({
-    required this.icon,
-    required this.text,
-    required this.category,
-  });
+  WelcomePrompt({required this.icon, required this.text, required this.category});
 }

@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   testWidgets('Fitvise app launches', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const FitviseApp());
+    await tester.pumpWidget(const App());
 
     // Verify that the app launches and shows Fitvise AI
     expect(find.text('Fitvise AI'), findsOneWidget);

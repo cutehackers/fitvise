@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 import '../models/message.dart';
-import '../providers/chat_provider.dart';
+
+/// Welcome prompts data - same as
 
 class WelcomeSection extends StatelessWidget {
   const WelcomeSection({super.key, required this.sessionId});
 
   final String sessionId;
 
+  List<WelcomePrompt> get welcomePrompts => [
+    WelcomePrompt(icon: '🏋️', text: 'Create a personalized workout plan', category: 'Workout'),
+    WelcomePrompt(icon: '🥗', text: 'Get nutrition and meal planning advice', category: 'Nutrition'),
+    WelcomePrompt(icon: '📊', text: 'Track my fitness progress', category: 'Progress'),
+    WelcomePrompt(icon: '💡', text: 'Learn proper exercise techniques', category: 'Education'),
+    WelcomePrompt(icon: '🎯', text: 'Set and achieve fitness goals', category: 'Goals'),
+    WelcomePrompt(icon: '🧘', text: 'Recovery and wellness tips', category: 'Wellness'),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
       child: Column(
@@ -32,10 +39,17 @@ class WelcomeSection extends StatelessWidget {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
-            itemCount: chatProvider.welcomePrompts.length,
+            itemCount: welcomePrompts.length,
             itemBuilder: (context, index) {
-              final prompt = chatProvider.welcomePrompts[index];
-              return _WelcomePromptCard(prompt: prompt, onTap: () => chatProvider.sendWelcomePrompt(sessionId, prompt));
+              final prompt = welcomePrompts[index];
+
+              return _WelcomePromptCard(
+                prompt: prompt,
+                onTap: () {
+                  // sendWelcomePrompt
+                  // provider.sendWelcomePrompt(sessionId, prompt)
+                },
+              );
             },
           ),
         ],
@@ -53,9 +67,9 @@ class WelcomeSection extends StatelessWidget {
 
 class _WelcomePromptCard extends StatefulWidget {
   final WelcomePrompt prompt;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _WelcomePromptCard({required this.prompt, required this.onTap});
+  const _WelcomePromptCard({required this.prompt, this.onTap});
 
   @override
   State<_WelcomePromptCard> createState() => _WelcomePromptCardState();

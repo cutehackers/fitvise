@@ -1,7 +1,7 @@
 import 'package:fitvise/providers/message_ids_provider.dart';
 import 'package:fitvise/providers/message_provider.dart';
-import 'package:fitvise/widgets/chat/chat_input.dart';
 import 'package:fitvise/widgets/chat/message_bubble.dart';
+import 'package:fitvise/widgets/chat/message_composer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -419,7 +419,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
         final chatState = ref.watch(messageListProvider);
         final chatNotifier = ref.read(messageListProvider.notifier);
 
-        return ChatInput(
+        return MessageComposer(
           controller: _textController,
           onSend: (text) {
             chatNotifier.sendMessage(_sessionId, text);

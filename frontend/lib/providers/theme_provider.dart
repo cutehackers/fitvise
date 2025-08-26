@@ -1,47 +1,51 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class ThemeProvider extends ChangeNotifier {
-  bool _isDarkMode = false;
-  SharedPreferences? _prefs;
+// Provider
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) => ThemeModeNotifier());
 
-  bool get isDarkMode => _isDarkMode;
-  String get theme => _isDarkMode ? 'dark' : 'light';
+// ThemeMode 상태 관리
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  late SharedPreferences _prefs;
 
-  ThemeProvider() {
-    _loadTheme();
-  }
+  ThemeModeNotifier() : super(ThemeMode.system);
 
-  Future<void> _loadTheme() async {
+  bool get isDarkMode => state == ThemeMode.dark;
+
+  Future<void> load() async {
     _prefs = await SharedPreferences.getInstance();
-    
+
     // Check saved preference first, then system preference
-    final savedTheme = _prefs?.getString('fitvise_theme');
-    if (savedTheme != null) {
-      _isDarkMode = savedTheme == 'dark';
+    final theme = _prefs.getString('prefs_theme');
+    if (theme != null) {
+      state = switch (theme) {
+        'system' => ThemeMode.system,
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
     } else {
-      // Use system preference if no saved preference
       final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
-      _isDarkMode = brightness == Brightness.dark;
+      state = brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.system;
     }
-    
-    notifyListeners();
   }
 
-  Future<void> toggleTheme() async {
-    _isDarkMode = !_isDarkMode;
-    
-    // Save to preferences
-    await _prefs?.setString('fitvise_theme', _isDarkMode ? 'dark' : 'light');
-    
-    notifyListeners();
-  }
+  // 테마 모드 변경 메소드
+  void changeThemeMode(ThemeMode mode) => state = mode;
 
-  Future<void> setTheme(bool isDark) async {
-    if (_isDarkMode != isDark) {
-      _isDarkMode = isDark;
-      await _prefs?.setString('fitvise_theme', _isDarkMode ? 'dark' : 'light');
-      notifyListeners();
+  // 테마 모드 토글 메소드
+  void toggleThemeMode() {
+    switch (state) {
+      case ThemeMode.system:
+        state = ThemeMode.light;
+        break;
+      case ThemeMode.light:
+        state = ThemeMode.dark;
+        break;
+      case ThemeMode.dark:
+        state = ThemeMode.system;
+        break;
     }
   }
 }

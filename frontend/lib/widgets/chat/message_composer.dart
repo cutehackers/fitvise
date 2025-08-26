@@ -24,7 +24,7 @@ class AttachmentOption {
 /// - Auto-expanding text field
 /// - Send button with loading states
 /// - Keyboard shortcuts support
-class ChatInput extends StatefulWidget {
+class MessageComposer extends StatefulWidget {
   /// Text editing controller
   final TextEditingController controller;
 
@@ -104,7 +104,7 @@ class ChatInput extends StatefulWidget {
   /// Custom attachment options
   final List<AttachmentOption> attachmentOptions;
 
-  const ChatInput({
+  const MessageComposer({
     super.key,
     required this.controller,
     this.onSend,
@@ -136,10 +136,10 @@ class ChatInput extends StatefulWidget {
   });
 
   @override
-  State<ChatInput> createState() => _ChatInputState();
+  State<MessageComposer> createState() => _MessageComposerState();
 }
 
-class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
+class _MessageComposerState extends State<MessageComposer> with TickerProviderStateMixin {
   late AnimationController _sendButtonController;
   late AnimationController _recordingController;
   late Animation<double> _sendButtonScale;
@@ -170,7 +170,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   }
 
   @override
-  void didUpdateWidget(ChatInput oldWidget) {
+  void didUpdateWidget(MessageComposer oldWidget) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.controller != widget.controller) {

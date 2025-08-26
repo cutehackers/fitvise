@@ -429,19 +429,17 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
           isRecording: chatState.isRecording,
           isLoading: chatState.isLoading,
           statusText: _getStatusText(chatState),
-          config: const ChatInputConfig(
-            hintText: 'Ask about workouts, nutrition, or fitness goals...',
-            maxLength: 2000,
-            enableVoiceInput: true,
-            enableAttachments: true,
-            showCharacterCount: true,
-            showStatusText: true,
-            attachmentOptions: [
-              AttachmentOption(icon: Icons.image_rounded, tooltip: 'Upload workout photo', type: 'image'),
-              AttachmentOption(icon: Icons.attach_file_rounded, tooltip: 'Upload file', type: 'file'),
-              AttachmentOption(icon: Icons.description_rounded, tooltip: 'Upload fitness plan', type: 'document'),
-            ],
-          ),
+          hintText: 'Ask about workouts, nutrition, or fitness goals...',
+          maxLength: 2000,
+          enableVoiceInput: true,
+          enableAttachments: true,
+          showCharacterCount: true,
+          showStatusText: true,
+          attachmentOptions: const [
+            AttachmentOption(icon: Icons.image_rounded, tooltip: 'Upload workout photo', type: 'image'),
+            AttachmentOption(icon: Icons.attach_file_rounded, tooltip: 'Upload file', type: 'file'),
+            AttachmentOption(icon: Icons.description_rounded, tooltip: 'Upload fitness plan', type: 'document'),
+          ],
         );
       },
     );

@@ -3,47 +3,6 @@ import 'package:gap/gap.dart';
 
 import '../../theme/app_theme.dart';
 
-/// Configuration class for chat input appearance and behavior
-class ChatInputConfig {
-  final String? hintText;
-  final int? maxLines;
-  final int? maxLength;
-  final TextStyle? textStyle;
-  final TextStyle? hintStyle;
-  final EdgeInsetsGeometry padding;
-  final EdgeInsetsGeometry margin;
-  final double borderRadius;
-  final Color? backgroundColor;
-  final Gradient? gradient;
-  final Color? borderColor;
-  final List<BoxShadow>? shadows;
-  final bool showCharacterCount;
-  final bool showStatusText;
-  final bool enableVoiceInput;
-  final bool enableAttachments;
-  final List<AttachmentOption> attachmentOptions;
-
-  const ChatInputConfig({
-    this.hintText,
-    this.maxLines,
-    this.maxLength = 2000,
-    this.textStyle,
-    this.hintStyle,
-    this.padding = const EdgeInsets.all(16),
-    this.margin = EdgeInsets.zero,
-    this.borderRadius = 16,
-    this.backgroundColor,
-    this.gradient,
-    this.borderColor,
-    this.shadows,
-    this.showCharacterCount = true,
-    this.showStatusText = true,
-    this.enableVoiceInput = true,
-    this.enableAttachments = true,
-    this.attachmentOptions = const [],
-  });
-}
-
 /// Attachment option configuration
 class AttachmentOption {
   final IconData icon;
@@ -69,9 +28,6 @@ class ChatInput extends StatefulWidget {
   /// Text editing controller
   final TextEditingController controller;
 
-  /// Configuration for input appearance
-  final ChatInputConfig? config;
-
   /// Callback when send button is pressed
   final ValueChanged<String>? onSend;
 
@@ -96,13 +52,61 @@ class ChatInput extends StatefulWidget {
   /// Focus node for the text field
   final FocusNode? focusNode;
 
+  // Appearance Configuration
+  /// Hint text for the input field
+  final String? hintText;
+
+  /// Maximum number of lines for the input field
+  final int? maxLines;
+
+  /// Maximum character length
+  final int maxLength;
+
+  /// Text style for input text
+  final TextStyle? textStyle;
+
+  /// Text style for hint text
+  final TextStyle? hintStyle;
+
+  /// Padding around the entire widget
+  final EdgeInsetsGeometry padding;
+
+  /// Margin around the entire widget
+  final EdgeInsetsGeometry margin;
+
+  /// Border radius for the input container
+  final double borderRadius;
+
+  /// Background color for the input container
+  final Color? backgroundColor;
+
+  /// Gradient for the input container
+  final Gradient? gradient;
+
+  /// Border color for the input container
+  final Color? borderColor;
+
+  /// Box shadows for the input container
+  final List<BoxShadow>? shadows;
+
+  /// Whether to show character count
+  final bool showCharacterCount;
+
+  /// Whether to show status text
+  final bool showStatusText;
+
+  /// Whether to enable voice input button
+  final bool enableVoiceInput;
+
+  /// Whether to enable attachment buttons
+  final bool enableAttachments;
+
   /// Custom attachment options
-  final List<AttachmentOption>? attachmentOptions;
+  final List<AttachmentOption> attachmentOptions;
 
   const ChatInput({
     super.key,
     required this.controller,
-    this.config,
     this.onSend,
     this.onChanged,
     this.onVoiceToggle,
@@ -111,7 +115,24 @@ class ChatInput extends StatefulWidget {
     this.statusText,
     this.enabled = true,
     this.focusNode,
-    this.attachmentOptions,
+    // Appearance Configuration
+    this.hintText,
+    this.maxLines,
+    this.maxLength = 2000,
+    this.textStyle,
+    this.hintStyle,
+    this.padding = const EdgeInsets.all(16),
+    this.margin = EdgeInsets.zero,
+    this.borderRadius = 8,
+    this.backgroundColor,
+    this.gradient,
+    this.borderColor,
+    this.shadows,
+    this.showCharacterCount = true,
+    this.showStatusText = true,
+    this.enableVoiceInput = true,
+    this.enableAttachments = true,
+    this.attachmentOptions = const [],
   });
 
   @override
@@ -205,11 +226,14 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final config = widget.config ?? _getDefaultConfig(theme);
+    final effectiveHintText = widget.hintText ?? _getDefaultHintText();
+    final effectiveAttachmentOptions = widget.attachmentOptions.isEmpty
+        ? _getDefaultAttachmentOptions()
+        : widget.attachmentOptions;
 
     return Container(
-      padding: config.padding,
-      margin: config.margin,
+      padding: widget.padding,
+      margin: widget.margin,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor.withValues(alpha: 0.95),
         border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
@@ -220,56 +244,55 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
       child: Column(
         children: [
           // Attachment options
-          if (config.enableAttachments) _buildAttachmentOptions(config),
+          if (widget.enableAttachments) _buildAttachmentOptions(effectiveAttachmentOptions),
 
           // Main input area
-          _buildInputArea(context, config),
+          _buildInputArea(context, theme, effectiveHintText),
 
           // Status and character count
-          if (config.showStatusText || config.showCharacterCount) _buildStatusArea(context, config),
+          if (widget.showStatusText || widget.showCharacterCount) _buildStatusArea(context, theme),
         ],
       ),
     );
   }
 
-  ChatInputConfig _getDefaultConfig(ThemeData theme) {
-    return ChatInputConfig(
-      hintText: 'Ask about workouts, nutrition, or fitness goals...',
-      attachmentOptions: [
-        AttachmentOption(
-          icon: Icons.image_rounded,
-          tooltip: 'Upload workout photo',
-          type: 'image',
-          onPressed: () => _handleAttachment('image'),
-        ),
-        AttachmentOption(
-          icon: Icons.attach_file_rounded,
-          tooltip: 'Upload file',
-          type: 'file',
-          onPressed: () => _handleAttachment('file'),
-        ),
-        AttachmentOption(
-          icon: Icons.description_rounded,
-          tooltip: 'Upload fitness plan',
-          type: 'document',
-          onPressed: () => _handleAttachment('document'),
-        ),
-      ],
-    );
+  String _getDefaultHintText() {
+    return 'Ask about workouts, nutrition, or fitness goals...';
   }
 
-  Widget _buildAttachmentOptions(ChatInputConfig config) {
-    final options = widget.attachmentOptions ?? config.attachmentOptions;
+  List<AttachmentOption> _getDefaultAttachmentOptions() {
+    return [
+      AttachmentOption(
+        icon: Icons.image_rounded,
+        tooltip: 'Upload workout photo',
+        type: 'image',
+        onPressed: () => _handleAttachment('image'),
+      ),
+      AttachmentOption(
+        icon: Icons.attach_file_rounded,
+        tooltip: 'Upload file',
+        type: 'file',
+        onPressed: () => _handleAttachment('file'),
+      ),
+      AttachmentOption(
+        icon: Icons.description_rounded,
+        tooltip: 'Upload fitness plan',
+        type: 'document',
+        onPressed: () => _handleAttachment('document'),
+      ),
+    ];
+  }
 
+  Widget _buildAttachmentOptions(List<AttachmentOption> options) {
     if (options.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: options.map((option) {
           return Container(
             margin: const EdgeInsets.only(right: 10),
-            child: _buildAttachmentButton(
+            child: _AttachmentButton(
               icon: option.icon,
               tooltip: option.tooltip,
               onPressed: option.onPressed ?? () => _handleAttachment(option.type),
@@ -280,57 +303,27 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildAttachmentButton({required IconData icon, required String tooltip, required VoidCallback onPressed}) {
-    final theme = Theme.of(context);
-
-    return Tooltip(
-      message: tooltip,
-      child: Container(
-        decoration: BoxDecoration(
-          color: theme.brightness == Brightness.dark
-              ? const Color(0xFF374151).withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onPressed,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Icon(icon, size: 20, color: theme.iconTheme.color?.withValues(alpha: 0.7)),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputArea(BuildContext context, ChatInputConfig config) {
-    final theme = Theme.of(context);
-
+  Widget _buildInputArea(BuildContext context, ThemeData theme, String hintText) {
     return Container(
       decoration: BoxDecoration(
         gradient:
-            config.gradient ??
+            widget.gradient ??
             LinearGradient(
               colors: [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.secondaryPurple.withValues(alpha: 0.1)],
             ),
-        borderRadius: BorderRadius.circular(config.borderRadius),
-        border: Border.all(color: config.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2), width: 1.5),
-        boxShadow: config.shadows,
+        borderRadius: BorderRadius.circular(widget.borderRadius),
+        border: Border.all(color: widget.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2), width: 1.5),
+        boxShadow: widget.shadows,
       ),
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color:
-              config.backgroundColor ??
+              widget.backgroundColor ??
               (theme.brightness == Brightness.dark
                   ? const Color(0xFF374151).withValues(alpha: 0.9)
                   : Colors.white.withValues(alpha: 0.95)),
-          borderRadius: BorderRadius.circular(config.borderRadius),
+          borderRadius: BorderRadius.circular(widget.borderRadius),
         ),
         child: Row(
           children: [
@@ -339,25 +332,31 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
               child: TextField(
                 controller: widget.controller,
                 focusNode: widget.focusNode,
-                maxLines: config.maxLines,
-                maxLength: config.maxLength,
+                maxLines: widget.maxLines,
+                maxLength: widget.maxLength,
                 enabled: widget.enabled,
                 textCapitalization: TextCapitalization.sentences,
                 textInputAction: TextInputAction.send,
                 style:
-                    config.textStyle ??
+                    widget.textStyle ??
                     TextStyle(
                       color: theme.brightness == Brightness.dark ? Colors.white : const Color(0xFF111827),
                       fontSize: 15,
                       height: 1.4,
                     ),
                 decoration: InputDecoration(
-                  hintText: config.hintText,
+                  hintText: hintText,
                   hintStyle:
-                      config.hintStyle ??
+                      widget.hintStyle ??
                       TextStyle(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6), fontSize: 15),
+                  filled: true,
+                  fillColor: Colors.transparent,
+                  focusColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
                   border: InputBorder.none,
                   focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  enabledBorder: InputBorder.none,
                   counterText: '', // Hide default counter
                   contentPadding: EdgeInsets.zero,
                 ),
@@ -367,7 +366,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
             const Gap(12),
 
             // Voice recording button
-            if (config.enableVoiceInput) ...[_buildVoiceButton(), const Gap(8)],
+            if (widget.enableVoiceInput) ...[_buildVoiceButton(), const Gap(8)],
 
             // Send button
             _buildSendButton(),
@@ -472,11 +471,10 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildStatusArea(BuildContext context, ChatInputConfig config) {
-    final theme = Theme.of(context);
+  Widget _buildStatusArea(BuildContext context, ThemeData theme) {
     final statusText = widget.statusText ?? _getDefaultStatusText();
     final characterCount = widget.controller.text.length;
-    final maxLength = config.maxLength ?? 2000;
+    final maxLength = widget.maxLength;
 
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -484,7 +482,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Status text
-          if (config.showStatusText)
+          if (widget.showStatusText)
             Expanded(
               child: Text(
                 statusText,
@@ -496,7 +494,7 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
             ),
 
           // Character count
-          if (config.showCharacterCount)
+          if (widget.showCharacterCount)
             Text(
               '$characterCount/$maxLength',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -534,27 +532,38 @@ class _ChatInputState extends State<ChatInput> with TickerProviderStateMixin {
   }
 }
 
-/// A simplified chat input for basic use cases
-class SimpleChatInput extends StatelessWidget {
-  final TextEditingController controller;
-  final ValueChanged<String>? onSend;
-  final String? hintText;
-  final bool enabled;
+class _AttachmentButton extends StatelessWidget {
+  final IconData icon;
+  final String? tooltip;
+  final VoidCallback? onPressed;
 
-  const SimpleChatInput({super.key, required this.controller, this.onSend, this.hintText, this.enabled = true});
+  const _AttachmentButton({required this.icon, this.tooltip, this.onPressed, super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChatInput(
-      controller: controller,
-      onSend: onSend,
-      enabled: enabled,
-      config: ChatInputConfig(
-        hintText: hintText ?? 'Type a message...',
-        enableVoiceInput: false,
-        enableAttachments: false,
-        showStatusText: false,
-        showCharacterCount: false,
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: tooltip,
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.brightness == Brightness.dark
+              ? const Color(0xFF374151).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: theme.dividerColor.withValues(alpha: 0.3)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onPressed,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Icon(icon, size: 16, color: theme.iconTheme.color?.withValues(alpha: 0.7)),
+            ),
+          ),
+        ),
       ),
     );
   }

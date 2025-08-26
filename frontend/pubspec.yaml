@@ -36,8 +36,10 @@ dependencies:
   cupertino_icons: ^1.0.8
   
   # State management
-  provider: ^6.1.1
-  flutter_riverpod: ^2.4.9
+  flutter_riverpod: ^2.4.9  
+  hooks_riverpod: ^2.6.1
+  flutter_hooks: ^0.21.3+1
+  riverpod_annotation: ^2.6.1
   
   # UI components
   flutter_svg: ^2.0.9
@@ -74,18 +76,22 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  
-  # Code generation
-  build_runner: ^2.6.0
-  json_serializable: ^6.7.1
-  retrofit_generator: ^10.0.1
-
+    
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  custom_lint: ^0.7.5
+  riverpod_lint: ^2.6.5
+  freezed_lint: ^0.0.9
+  freezed: ^3.0.4
+  
+  # Code generation
+  build_runner: ^2.7.0
+  json_serializable: ^6.9.4
+  retrofit_generator: ^10.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

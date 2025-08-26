@@ -3,7 +3,6 @@ import 'package:fitvise/providers/message_provider.dart';
 import 'package:fitvise/widgets/chat/message_bubble.dart';
 import 'package:fitvise/widgets/chat/message_composer.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:uuid/uuid.dart';
@@ -113,7 +112,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
     final messageIds = ref.watch(messageIdsProvider);
 
     if (messageIds.isNotEmpty) {
-      ref.listen(messageProvider(messageIds.last), (_, __) {
+      ref.listen(messageProvider(messageIds.last), (_, _) {
         _scrollToBottom();
       });
     }
@@ -185,7 +184,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
           ),
 
           // Enhanced input area using new component
-          _buildModularInputArea(),
+          _messageComposer(),
         ],
       ),
     );
@@ -229,112 +228,19 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
                     curve: Curves.easeOut,
                   ),
                 ),
-                child: _buildModularMessageBubble(messageId),
+                child: MessageBubble(
+                  messageId: messageId,
+                  animated: true,
+                  animationDuration: Duration(
+                    milliseconds: 300 + (ref.watch(messageIdsProvider).indexOf(messageId) * 50.0).toInt(),
+                  ),
+                ),
               ),
             ),
           );
         },
       );
     }).toList();
-  }
-
-  Widget _buildModularMessageBubble(String messageId) {
-    return Consumer(
-      builder: (context, ref, child) {
-        final message = ref.watch(messageProvider(messageId));
-        // final chatState = ref.watch(messageListProvider);
-        // final chatNotifier = ref.read(messageListProvider.notifier);
-        // final isStreaming = chatState.streamingMessageId == message.id;
-
-        // Handle editing mode
-        // if (chatState.editingMessageId == message.id) {
-        //   return _buildEnhancedEditingInterface(chatState, chatNotifier);
-        // }
-
-        return MessageBubble(
-          messageId: messageId,
-          actions: message.actions != null && message.actions!.isNotEmpty
-              ? message.actions!.map((action) {
-                  return _buildEnhancedActionButton(action);
-                }).toList()
-              : null,
-          messageActions: [
-            _buildActionButton(
-              icon: Icons.copy_rounded,
-              onPressed: () => _copyToClipboard(message.text),
-              tooltip: 'Copy message',
-            ),
-            // if (isUser)
-            //   _buildActionButton(
-            //     icon: Icons.edit_rounded,
-            //     onPressed: () => chatNotifier.startEditingMessage(message.id, message.text),
-            //     tooltip: 'Edit message',
-            //   ),
-          ],
-          animated: true,
-          animationDuration: Duration(
-            milliseconds: 300 + (ref.watch(messageIdsProvider).indexOf(messageId) * 50.0).toInt(),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildActionButton({required IconData icon, required VoidCallback onPressed, required String tooltip}) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF374151).withValues(alpha: 0.9)
-            : Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(18),
-        elevation: 2,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: onPressed,
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            child: Icon(
-              icon,
-              size: 16,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white.withValues(alpha: 0.8)
-                  : const Color(0xFF374151).withValues(alpha: 0.8),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEnhancedActionButton(MessageAction action) {
-    final chatNotifier = ref.read(messageListProvider.notifier);
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(24),
-          onTap: () => chatNotifier.sendMessage(_sessionId, action.label),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.secondaryPurple.withValues(alpha: 0.1)],
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              action.label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.primaryBlue),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildEnhancedEditingInterface(MessageListState chatState, MessageListNotifier chatNotifier) {
@@ -413,7 +319,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
     );
   }
 
-  Widget _buildModularInputArea() {
+  Widget _messageComposer() {
     return Builder(
       builder: (context) {
         final chatState = ref.watch(messageListProvider);
@@ -442,23 +348,6 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
           ],
         );
       },
-    );
-  }
-
-  // Legacy helper methods removed - now using modular components
-
-  // Legacy send message method removed - handled by ChatInput component
-
-  // File upload handling moved to ChatInput component
-
-  void _copyToClipboard(String text) {
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Message copied to clipboard'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
     );
   }
 

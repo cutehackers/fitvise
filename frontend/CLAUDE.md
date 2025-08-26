@@ -65,6 +65,7 @@ Screen → View → Layout → Group → (Atom)
 ```
 - Atomic components have no suffix
 - Follow existing naming patterns in `lib/ui/widget/`
+- Create seperate widget component class rahter then using `Widget _build...` inner method.
 
 ### Code Generation
 - **Freezed & JSON**: Generates for `lib/**/domain/entity/**.dart` - immutable data classes with JSON serialization

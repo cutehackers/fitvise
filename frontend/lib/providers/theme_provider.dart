@@ -9,7 +9,9 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((r
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   late SharedPreferences _prefs;
 
-  ThemeModeNotifier() : super(ThemeMode.system);
+  ThemeModeNotifier() : super(ThemeMode.system) {
+    load();
+  }
 
   bool get isDarkMode => state == ThemeMode.dark;
 
@@ -38,13 +40,19 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   void toggleThemeMode() {
     switch (state) {
       case ThemeMode.system:
+        print('Theme> System -> Light');
+        _prefs.setString('prefs_theme', 'light');
         state = ThemeMode.light;
         break;
       case ThemeMode.light:
+        print('Theme> Light -> Dark');
+        _prefs.setString('prefs_theme', 'light');
         state = ThemeMode.dark;
         break;
       case ThemeMode.dark:
-        state = ThemeMode.system;
+        print('Theme> Dark -> Light');
+        _prefs.setString('prefs_theme', 'light');
+        state = ThemeMode.light;
         break;
     }
   }

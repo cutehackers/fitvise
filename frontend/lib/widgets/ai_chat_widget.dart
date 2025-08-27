@@ -107,7 +107,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
 
   @override
   Widget build(BuildContext context) {
-    final isTyping = ref.watch(messageListProvider.select((s) => s.isTyping));
+    //final isTyping = ref.watch(messageListProvider.select((s) => s.isTyping));
 
     final messageIds = ref.watch(messageIdsProvider);
 
@@ -184,7 +184,37 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
           ),
 
           // Enhanced input area using new component
-          _messageComposer(),
+          Consumer(
+            builder: (context, ref, child) {
+              final isLoading = ref.watch(messageListProvider.select((e) => e.isLoading));
+              final isRecording = ref.watch(messageListProvider.select((e) => e.isRecording));
+              final isStreaming = ref.watch(messageListProvider.select((e) => e.isStreaming));
+              final chatNotifier = ref.read(messageListProvider.notifier);
+
+              return MessageComposer(
+                controller: _textController,
+                onSend: (text) {
+                  chatNotifier.sendMessage(_sessionId, text);
+                  _textController.clear();
+                },
+                onVoiceToggle: chatNotifier.toggleRecording,
+                isRecording: isRecording,
+                isLoading: isLoading,
+                statusText: _getStatusText(isRecording, isStreaming),
+                hintText: 'Ask about workouts, nutrition, or fitness goals...',
+                maxLength: 2000,
+                enableVoiceInput: true,
+                enableAttachments: true,
+                showCharacterCount: true,
+                showStatusText: true,
+                attachmentOptions: const [
+                  AttachmentOption(icon: Icons.image_rounded, tooltip: 'Upload workout photo', type: 'image'),
+                  AttachmentOption(icon: Icons.attach_file_rounded, tooltip: 'Upload file', type: 'file'),
+                  AttachmentOption(icon: Icons.description_rounded, tooltip: 'Upload fitness plan', type: 'document'),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -243,7 +273,9 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
     }).toList();
   }
 
-  Widget _buildEnhancedEditingInterface(MessageListState chatState, MessageListNotifier chatNotifier) {
+  // ignore: unused_element
+  Widget _buildEditMessageBubble(MessageListState chatState, MessageListNotifier messageListNotifier) {
+    // EditMessageBubble
     return Container(
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
       margin: const EdgeInsets.only(right: 8),
@@ -260,7 +292,7 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
         children: [
           TextFormField(
             initialValue: chatState.editText,
-            onChanged: chatNotifier.updateEditText,
+            onChanged: messageListNotifier.updateEditText,
             maxLines: 3,
             style: TextStyle(
               color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF111827),
@@ -290,14 +322,14 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: chatNotifier.cancelEditing,
+                onPressed: messageListNotifier.cancelEditing,
                 style: TextButton.styleFrom(foregroundColor: Theme.of(context).textTheme.bodyMedium?.color),
                 child: const Text('Cancel'),
               ),
               const SizedBox(width: 12),
               ElevatedButton(
                 onPressed: () {
-                  chatNotifier.sendMessage(
+                  messageListNotifier.sendMessage(
                     _sessionId,
                     chatState.editText,
                     isEdit: true,
@@ -319,46 +351,12 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
     );
   }
 
-  Widget _messageComposer() {
-    return Builder(
-      builder: (context) {
-        final chatState = ref.watch(messageListProvider);
-        final chatNotifier = ref.read(messageListProvider.notifier);
-
-        return MessageComposer(
-          controller: _textController,
-          onSend: (text) {
-            chatNotifier.sendMessage(_sessionId, text);
-            _textController.clear();
-          },
-          onVoiceToggle: chatNotifier.toggleRecording,
-          isRecording: chatState.isRecording,
-          isLoading: chatState.isLoading,
-          statusText: _getStatusText(chatState),
-          hintText: 'Ask about workouts, nutrition, or fitness goals...',
-          maxLength: 2000,
-          enableVoiceInput: true,
-          enableAttachments: true,
-          showCharacterCount: true,
-          showStatusText: true,
-          attachmentOptions: const [
-            AttachmentOption(icon: Icons.image_rounded, tooltip: 'Upload workout photo', type: 'image'),
-            AttachmentOption(icon: Icons.attach_file_rounded, tooltip: 'Upload file', type: 'file'),
-            AttachmentOption(icon: Icons.description_rounded, tooltip: 'Upload fitness plan', type: 'document'),
-          ],
-        );
-      },
-    );
-  }
-
-  String _getStatusText(MessageListState chatState) {
-    if (chatState.isRecording) {
+  String _getStatusText(bool isRecording, bool isStreaming) {
+    if (isRecording) {
       return '🔴 Recording... Tap mic to stop';
-    } else if (chatState.isTyping) {
+    } else if (isStreaming) {
       return 'Fitvise AI is thinking...';
     }
     return 'Shift+Enter for new line';
   }
-
-  // Legacy time formatting moved to MessageBubble component
 }

@@ -21,9 +21,15 @@ final messageListProvider = StateNotifierProvider<MessageListNotifier, MessageLi
 
 /// Chat state containing all chat-related data
 class MessageListState {
-  final bool isTyping;
+  /// true if AI is currently streaming a response
+  final bool isStreaming;
+
+  /// true if recording audio input
   final bool isRecording;
+
+  /// true if it is starting request / waiting for response
   final bool isLoading;
+
   final String? editingMessageId;
   final String editText;
   final String? streamingMessageId;
@@ -31,7 +37,7 @@ class MessageListState {
   final String? error;
 
   const MessageListState({
-    this.isTyping = false,
+    this.isStreaming = false,
     this.isRecording = false,
     this.isLoading = false,
     this.editingMessageId,
@@ -56,7 +62,7 @@ class MessageListState {
     String? error,
   }) {
     return MessageListState(
-      isTyping: isTyping ?? this.isTyping,
+      isStreaming: isTyping ?? isStreaming,
       isRecording: isRecording ?? this.isRecording,
       isLoading: isLoading ?? this.isLoading,
       editingMessageId: editingMessageId ?? this.editingMessageId,

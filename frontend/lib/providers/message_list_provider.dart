@@ -32,9 +32,6 @@ class MessageListState {
 
   final String? editingMessageId;
   final String editText;
-  final String? streamingMessageId;
-  final String streamingContent;
-  final String? error;
 
   const MessageListState({
     this.isStreaming = false,
@@ -42,9 +39,6 @@ class MessageListState {
     this.isLoading = false,
     this.editingMessageId,
     this.editText = '',
-    this.streamingMessageId,
-    this.streamingContent = '',
-    this.error,
   });
 
   // List<Message> get messages => messageMap.values.toList();
@@ -67,9 +61,6 @@ class MessageListState {
       isLoading: isLoading ?? this.isLoading,
       editingMessageId: editingMessageId ?? this.editingMessageId,
       editText: editText ?? this.editText,
-      streamingMessageId: streamingMessageId ?? this.streamingMessageId,
-      streamingContent: streamingContent ?? this.streamingContent,
-      error: error ?? this.error,
     );
   }
 }
@@ -81,7 +72,6 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
 
   final LinkedHashMap<String, Message> messageMap = LinkedHashMap<String, Message>();
   final Map<String, StringBuffer> _buffers = {};
-  String? _currentStreamingMessageId;
 
   MessageListNotifier(this._ref)
     : super(
@@ -138,8 +128,8 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
 
     // Add ai message. begin streaming response with empty content.
     final messageId = DateTime.now().millisecondsSinceEpoch.toString();
+
     // prepare chat stream
-    _currentStreamingMessageId = messageId;
     _buffers[messageId] = StringBuffer();
     _addMessage(
       Message.ai(
@@ -261,7 +251,6 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
 
   /// Clean up streaming message on error - only removes empty AI messages
   void _cleanUpChatStream(String messageId) {
-    _currentStreamingMessageId = null;
     _ref.read(messageProvider(messageId).notifier).setStreaming(false);
     _buffers.remove(messageId);
   }
@@ -269,13 +258,7 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
   ///---------------
 
   /// Handle errors while preserving user messages
-  void _onMessageError(String error) {
-    // Clean up any incomplete streaming message
-    final streamingId = state.streamingMessageId;
-    if (streamingId != null) {
-      _cleanUpChatStream(streamingId);
-    }
-  }
+  void _onMessageError(String error) {}
 
   /// Start editing message
   void startEditingMessage(String messageId, String currentText) {

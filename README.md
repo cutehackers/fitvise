@@ -4,7 +4,6 @@
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-009688.svg?style=flat&logo=FastAPI)](https://fastapi.tiangolo.com)
 [![Flutter](https://img.shields.io/badge/Flutter-3.8+-02569B.svg?style=flat&logo=Flutter)](https://flutter.dev)
-[![React](https://img.shields.io/badge/React-18.2-61DAFB.svg?style=flat&logo=React)](https://reactjs.org)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
 ## 🌟 Overview
@@ -14,7 +13,7 @@ Fitvise is a comprehensive AI-powered fitness platform that provides personalize
 ### Key Features
 
 🤖 **AI-Powered Coaching** - Personalized workout plans, nutrition advice, and exercise recommendations
-📱 **Multi-Platform Support** - Native mobile apps (Flutter) and web interface (React)
+📱 **Multi-Platform Support** - Native mobile apps (Flutter)
 🏗️ **Production-Ready Backend** - Scalable FastAPI architecture with comprehensive health monitoring
 🎯 **Conversational Interface** - Natural language interaction with quick replies and voice input
 ⚡ **Real-Time Chat** - Typing indicators, message editing, and responsive user experience
@@ -69,7 +68,6 @@ fitvise/
 ### Prerequisites
 
 - **Python 3.8+** for backend development
-- **Node.js 16+** for React web app
 - **Flutter 3.8+** for mobile app development
 - **Ollama** or compatible LLM service
 
@@ -79,9 +77,9 @@ fitvise/
 ```bash
 git clone <repository-url>
 cd fitvise/backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+uv venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+uv pip sync requirements.txt
 ```
 
 2. **Configure environment variables**:
@@ -122,20 +120,6 @@ flutter run --dart-define=API_BASE_URL=http://your-api-url:8000
 ```bash
 flutter run  # Debug mode
 flutter run --release  # Production mode
-```
-
-### React Web App Setup
-
-1. **Navigate to React directory**:
-```bash
-cd fitvise/frontend-react
-npm install
-```
-
-2. **Start the development server**:
-```bash
-npm start
-# Web app available at: http://localhost:3000
 ```
 
 ### LLM Service Setup
@@ -292,11 +276,6 @@ flutter packages pub run build_runner watch      # Watch for changes
 - `freezed: ^3.2.0` + `json_annotation: ^4.8.1` - Immutable models
 - `speech_to_text: ^6.6.0` - Voice input support
 - `shared_preferences: ^2.2.2` - Local storage for themes
-
-**React Dependencies**:
-- `react: ^18.2.0` - Core React framework
-- `lucide-react: ^0.292.0` - Icon library  
-- `tailwindcss: ^3.3.6` - Utility-first CSS framework
 
 ## 🔧 Configuration
 

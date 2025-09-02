@@ -68,9 +68,12 @@ class MessageAttachment {
     this.metadata,
   });
 
-  bool get isImage => type == 'image' || (mimeType?.startsWith('image/') ?? false);
-  bool get isVideo => type == 'video' || (mimeType?.startsWith('video/') ?? false);
-  bool get isAudio => type == 'audio' || (mimeType?.startsWith('audio/') ?? false);
+  bool get isImage =>
+      type == 'image' || (mimeType?.startsWith('image/') ?? false);
+  bool get isVideo =>
+      type == 'video' || (mimeType?.startsWith('video/') ?? false);
+  bool get isAudio =>
+      type == 'audio' || (mimeType?.startsWith('audio/') ?? false);
   bool get isDocument => type == 'document' || !isImage && !isVideo && !isAudio;
 
   String get formattedSize {
@@ -82,7 +85,7 @@ class MessageAttachment {
 }
 
 /// A versatile widget for displaying message attachments
-/// 
+///
 /// Features:
 /// - Support for images, videos, audio, and documents
 /// - Thumbnail generation and caching
@@ -94,28 +97,28 @@ class MessageAttachment {
 class MessageAttachmentWidget extends StatefulWidget {
   /// The attachment to display
   final MessageAttachment attachment;
-  
+
   /// Configuration for appearance
   final AttachmentConfig? config;
-  
+
   /// Whether the attachment is being uploaded
   final bool isUploading;
-  
+
   /// Upload/download progress (0.0 to 1.0)
   final double? progress;
-  
+
   /// Callback when attachment is tapped
   final VoidCallback? onTap;
-  
+
   /// Callback when download is requested
   final VoidCallback? onDownload;
-  
+
   /// Callback when remove is requested
   final VoidCallback? onRemove;
-  
+
   /// Whether to show action buttons
   final bool showActions;
-  
+
   /// Custom error message
   final String? errorMessage;
 
@@ -133,7 +136,8 @@ class MessageAttachmentWidget extends StatefulWidget {
   });
 
   @override
-  State<MessageAttachmentWidget> createState() => _MessageAttachmentWidgetState();
+  State<MessageAttachmentWidget> createState() =>
+      _MessageAttachmentWidgetState();
 }
 
 class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
@@ -145,19 +149,15 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
   @override
   void initState() {
     super.initState();
-    
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeOut,
-    ));
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
 
     _animationController.forward();
   }
@@ -172,7 +172,7 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final config = widget.config ?? _getDefaultConfig(theme);
-    
+
     return AnimatedBuilder(
       animation: _fadeAnimation,
       builder: (context, child) {
@@ -205,11 +205,16 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
     );
   }
 
-  Widget _buildAttachmentContainer(BuildContext context, AttachmentConfig config) {
+  Widget _buildAttachmentContainer(
+    BuildContext context,
+    AttachmentConfig config,
+  ) {
     return Container(
       constraints: BoxConstraints(
         maxWidth: config.maxWidth,
-        maxHeight: widget.attachment.isImage ? config.maxHeight : double.infinity,
+        maxHeight: widget.attachment.isImage
+            ? config.maxHeight
+            : double.infinity,
       ),
       margin: config.margin,
       decoration: BoxDecoration(
@@ -239,7 +244,9 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
             width: double.infinity,
             height: config.maxHeight,
             color: Colors.grey[200],
-            child: widget.attachment.url != null || widget.attachment.localPath != null
+            child:
+                widget.attachment.url != null ||
+                    widget.attachment.localPath != null
                 ? Image.network(
                     widget.attachment.url ?? widget.attachment.localPath!,
                     fit: BoxFit.cover,
@@ -265,19 +272,17 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
           _buildProgressOverlay(),
 
         // Actions overlay
-        if (widget.showActions && !widget.isUploading)
-          _buildActionsOverlay(),
+        if (widget.showActions && !widget.isUploading) _buildActionsOverlay(),
 
         // Error overlay
-        if (_hasError || widget.errorMessage != null)
-          _buildErrorOverlay(),
+        if (_hasError || widget.errorMessage != null) _buildErrorOverlay(),
       ],
     );
   }
 
   Widget _buildFileAttachment(BuildContext context, AttachmentConfig config) {
     final theme = Theme.of(context);
-    
+
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
@@ -298,9 +303,9 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
                 size: 24,
               ),
             ),
-            
+
             const SizedBox(width: 12),
-            
+
             // File info
             Expanded(
               child: Column(
@@ -322,14 +327,19 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
                         Text(
                           widget.attachment.formattedSize,
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                            color: theme.textTheme.bodySmall?.color?.withValues(
+                              alpha: 0.6,
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
                       ],
                       if (widget.attachment.type.isNotEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: _getFileTypeColor().withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
@@ -345,17 +355,16 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
                         ),
                     ],
                   ),
-                  
+
                   // Progress bar for file uploads
                   if (widget.isUploading || widget.progress != null)
                     _buildProgressBar(),
                 ],
               ),
             ),
-            
+
             // Action buttons
-            if (widget.showActions && !widget.isUploading)
-              _buildFileActions(),
+            if (widget.showActions && !widget.isUploading) _buildFileActions(),
           ],
         ),
       ),
@@ -367,19 +376,16 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
       width: double.infinity,
       height: double.infinity,
       color: Colors.grey[200],
-      child: const Icon(
-        Icons.image,
-        size: 48,
-        color: Colors.grey,
-      ),
+      child: const Icon(Icons.image, size: 48, color: Colors.grey),
     );
   }
 
   Widget _buildImageLoadingState(ImageChunkEvent loadingProgress) {
     final progress = loadingProgress.expectedTotalBytes != null
-        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+        ? loadingProgress.cumulativeBytesLoaded /
+              loadingProgress.expectedTotalBytes!
         : null;
-    
+
     return Container(
       width: double.infinity,
       height: double.infinity,
@@ -459,18 +465,11 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.error_outline,
-                color: Colors.white,
-                size: 32,
-              ),
+              const Icon(Icons.error_outline, color: Colors.white, size: 32),
               const SizedBox(height: 8),
               Text(
                 widget.errorMessage ?? 'Failed to load image',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 12),
@@ -501,18 +500,11 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
       child: const Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.broken_image,
-            size: 48,
-            color: Colors.grey,
-          ),
+          Icon(Icons.broken_image, size: 48, color: Colors.grey),
           SizedBox(height: 8),
           Text(
             'Failed to load image',
-            style: TextStyle(
-              color: Colors.grey,
-              fontSize: 12,
-            ),
+            style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
         ],
       ),
@@ -523,7 +515,7 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
     if (widget.progress == null && !widget.isUploading) {
       return const SizedBox.shrink();
     }
-    
+
     return Container(
       margin: const EdgeInsets.only(top: 8),
       child: Column(
@@ -532,7 +524,9 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
           LinearProgressIndicator(
             value: widget.progress,
             backgroundColor: Colors.grey[300],
-            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+            valueColor: const AlwaysStoppedAnimation<Color>(
+              AppTheme.primaryBlue,
+            ),
           ),
           if (widget.progress != null) ...[
             const SizedBox(height: 4),
@@ -585,7 +579,9 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
       message: tooltip,
       child: Container(
         decoration: BoxDecoration(
-          color: backgroundColor?.withValues(alpha: 0.9) ?? Colors.black.withValues(alpha: 0.7),
+          color:
+              backgroundColor?.withValues(alpha: 0.9) ??
+              Colors.black.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(compact ? 16 : 20),
         ),
         child: Material(
@@ -595,11 +591,7 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
             onTap: onPressed,
             child: Padding(
               padding: EdgeInsets.all(compact ? 6 : 8),
-              child: Icon(
-                icon,
-                color: Colors.white,
-                size: compact ? 14 : 16,
-              ),
+              child: Icon(icon, color: Colors.white, size: compact ? 14 : 16),
             ),
           ),
         ),
@@ -611,10 +603,14 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
     if (widget.attachment.isAudio) return Icons.audiotrack;
     if (widget.attachment.isVideo) return Icons.videocam;
     if (widget.attachment.isDocument) {
-      if (widget.attachment.mimeType?.contains('pdf') ?? false) return Icons.picture_as_pdf;
-      if (widget.attachment.mimeType?.contains('word') ?? false) return Icons.description;
-      if (widget.attachment.mimeType?.contains('excel') ?? false) return Icons.table_chart;
-      if (widget.attachment.mimeType?.contains('powerpoint') ?? false) return Icons.slideshow;
+      if (widget.attachment.mimeType?.contains('pdf') ?? false)
+        return Icons.picture_as_pdf;
+      if (widget.attachment.mimeType?.contains('word') ?? false)
+        return Icons.description;
+      if (widget.attachment.mimeType?.contains('excel') ?? false)
+        return Icons.table_chart;
+      if (widget.attachment.mimeType?.contains('powerpoint') ?? false)
+        return Icons.slideshow;
     }
     return Icons.insert_drive_file;
   }
@@ -623,10 +619,14 @@ class _MessageAttachmentWidgetState extends State<MessageAttachmentWidget>
     if (widget.attachment.isAudio) return Colors.orange;
     if (widget.attachment.isVideo) return Colors.red;
     if (widget.attachment.isDocument) {
-      if (widget.attachment.mimeType?.contains('pdf') ?? false) return Colors.red;
-      if (widget.attachment.mimeType?.contains('word') ?? false) return Colors.blue;
-      if (widget.attachment.mimeType?.contains('excel') ?? false) return Colors.green;
-      if (widget.attachment.mimeType?.contains('powerpoint') ?? false) return Colors.orange;
+      if (widget.attachment.mimeType?.contains('pdf') ?? false)
+        return Colors.red;
+      if (widget.attachment.mimeType?.contains('word') ?? false)
+        return Colors.blue;
+      if (widget.attachment.mimeType?.contains('excel') ?? false)
+        return Colors.green;
+      if (widget.attachment.mimeType?.contains('powerpoint') ?? false)
+        return Colors.orange;
     }
     return AppTheme.primaryBlue;
   }
@@ -664,8 +664,12 @@ class AttachmentGrid extends StatelessWidget {
       return MessageAttachmentWidget(
         attachment: attachments.first,
         config: config,
-        onTap: onAttachmentTap != null ? () => onAttachmentTap!(attachments.first) : null,
-        onDownload: onDownload != null ? () => onDownload!(attachments.first) : null,
+        onTap: onAttachmentTap != null
+            ? () => onAttachmentTap!(attachments.first)
+            : null,
+        onDownload: onDownload != null
+            ? () => onDownload!(attachments.first)
+            : null,
         onRemove: onRemove != null ? () => onRemove!(attachments.first) : null,
         showActions: showActions,
       );
@@ -681,10 +685,15 @@ class AttachmentGrid extends StatelessWidget {
           child: MessageAttachmentWidget(
             attachment: attachment,
             config: config?.copyWith(
-              maxWidth: (MediaQuery.of(context).size.width * 0.78) / maxColumns - 4,
+              maxWidth:
+                  (MediaQuery.of(context).size.width * 0.78) / maxColumns - 4,
             ),
-            onTap: onAttachmentTap != null ? () => onAttachmentTap!(attachment) : null,
-            onDownload: onDownload != null ? () => onDownload!(attachment) : null,
+            onTap: onAttachmentTap != null
+                ? () => onAttachmentTap!(attachment)
+                : null,
+            onDownload: onDownload != null
+                ? () => onDownload!(attachment)
+                : null,
             onRemove: onRemove != null ? () => onRemove!(attachment) : null,
             showActions: showActions,
           ),

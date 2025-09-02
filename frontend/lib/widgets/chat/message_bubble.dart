@@ -64,18 +64,25 @@ class MessageBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
-    final isUser = ref.watch(messageProvider(messageId).select((s) => s.role == MessageRole.user));
-    final actions = ref.watch(messageProvider(messageId).select((s) => s.actions));
+    final isUser = ref.watch(
+      messageProvider(messageId).select((s) => s.role == MessageRole.user),
+    );
+    final actions = ref.watch(
+      messageProvider(messageId).select((s) => s.actions),
+    );
 
     final configs = _getConfigs(theme, isUser);
 
     Widget bubble = Container(
       margin: configs.margin,
       child: Column(
-        crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           // Sender info (for AI messages)
-          if (!isUser && configs.showAvatar) _Sender(avatar: avatar, senderName: senderName, config: configs),
+          if (!isUser && configs.showAvatar)
+            _Sender(avatar: avatar, senderName: senderName, config: configs),
 
           // Message content
           MessageContent(
@@ -86,8 +93,13 @@ class MessageBubble extends ConsumerWidget {
             messageActions: [
               Consumer(
                 builder: (context, ref, child) {
-                  final text = ref.watch(messageProvider(messageId).select((s) => s.text));
-                  return ContentAction(icon: Icons.copy_rounded, onPressed: () => _copyToClipboard(context, text));
+                  final text = ref.watch(
+                    messageProvider(messageId).select((s) => s.text),
+                  );
+                  return ContentAction(
+                    icon: Icons.copy_rounded,
+                    onPressed: () => _copyToClipboard(context, text),
+                  );
                 },
               ),
               // user
@@ -108,7 +120,8 @@ class MessageBubble extends ConsumerWidget {
             ),
 
           // Timestamp
-          if (configs.showTimestamp && timestamp != null) _Time(timestamp: timestamp!, isUser: isUser),
+          if (configs.showTimestamp && timestamp != null)
+            _Time(timestamp: timestamp!, isUser: isUser),
         ],
       ),
     );
@@ -132,11 +145,14 @@ class MessageBubble extends ConsumerWidget {
   }
 
   MessageBubbleConfig _getConfigs(ThemeData theme, bool isUser) {
-    final defaultConfig = isUser ? _getDefaultUserConfig(theme) : _getDefaultAiConfig(theme);
+    final defaultConfig = isUser
+        ? _getDefaultUserConfig(theme)
+        : _getDefaultAiConfig(theme);
 
     return config != null
         ? MessageBubbleConfig(
-            backgroundColor: config!.backgroundColor ?? defaultConfig.backgroundColor,
+            backgroundColor:
+                config!.backgroundColor ?? defaultConfig.backgroundColor,
             gradient: config!.gradient ?? defaultConfig.gradient,
             borderColor: config!.borderColor ?? defaultConfig.borderColor,
             borderRadius: config!.borderRadius,
@@ -161,9 +177,18 @@ class MessageBubble extends ConsumerWidget {
         end: Alignment.bottomRight,
       ),
       shadows: [
-        BoxShadow(color: AppTheme.primaryBlue.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4)),
+        BoxShadow(
+          color: AppTheme.primaryBlue.withValues(alpha: 0.1),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
       ],
-      textStyle: const TextStyle(color: Colors.white, fontSize: 14.5, height: 1.5, fontWeight: FontWeight.w400),
+      textStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 14.5,
+        height: 1.5,
+        fontWeight: FontWeight.w400,
+      ),
       showAvatar: false,
     );
   }
@@ -172,13 +197,23 @@ class MessageBubble extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return MessageBubbleConfig(
-      backgroundColor: isDark ? const Color(0xFF374151).withValues(alpha: 0.8) : Colors.white.withValues(alpha: 0.9),
+      backgroundColor: isDark
+          ? const Color(0xFF374151).withValues(alpha: 0.8)
+          : Colors.white.withValues(alpha: 0.9),
       borderColor: isDark
           ? const Color(0xFF4B5563).withValues(alpha: 0.5)
           : const Color(0xFFE5E7EB).withValues(alpha: 0.8),
-      shadows: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 12, offset: const Offset(0, 4))],
+      shadows: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.1),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ],
       textStyle: TextStyle(
-        color: isDark ? Colors.white.withValues(alpha: 0.95) : const Color(0xFF111827),
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.95)
+            : const Color(0xFF111827),
         fontSize: 14.5,
         height: 1.5,
         fontWeight: FontWeight.w400,
@@ -287,7 +322,11 @@ class _Avatar extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
-          BoxShadow(color: AppTheme.primaryBlue.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: const Icon(Icons.fitness_center, color: Colors.white, size: 14),
@@ -301,7 +340,12 @@ class _Sender extends StatelessWidget {
   final String? senderName;
   final MessageBubbleConfig config;
 
-  const _Sender({this.avatar, this.senderName, required this.config, super.key});
+  const _Sender({
+    this.avatar,
+    this.senderName,
+    required this.config,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -314,7 +358,9 @@ class _Sender extends StatelessWidget {
           Text(
             senderName ?? 'Fitvise AI',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+              color: Theme.of(
+                context,
+              ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -369,11 +415,17 @@ class _Time extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(left: isUser ? 0 : 38, right: isUser ? 8 : 0, top: 6),
+      padding: EdgeInsets.only(
+        left: isUser ? 0 : 38,
+        right: isUser ? 8 : 0,
+        top: 6,
+      ),
       child: Text(
         _formatTime(timestamp),
         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+          color: Theme.of(
+            context,
+          ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
           fontSize: 11,
           fontWeight: FontWeight.w400,
         ),
@@ -382,7 +434,9 @@ class _Time extends StatelessWidget {
   }
 
   String _formatTime(DateTime timestamp) {
-    final hour = timestamp.hour > 12 ? timestamp.hour - 12 : (timestamp.hour == 0 ? 12 : timestamp.hour);
+    final hour = timestamp.hour > 12
+        ? timestamp.hour - 12
+        : (timestamp.hour == 0 ? 12 : timestamp.hour);
     final period = timestamp.hour >= 12 ? 'PM' : 'AM';
     final minute = timestamp.minute.toString().padLeft(2, '0');
     return '$hour:$minute $period';
@@ -410,15 +464,21 @@ class MessageContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final messageText = ref.watch(messageProvider(messageId).select((s) => s.text));
+    final messageText = ref.watch(
+      messageProvider(messageId).select((s) => s.text),
+    );
 
     return Row(
-      mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+      mainAxisAlignment: isUser
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Flexible(
           child: Container(
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * config.maxWidth),
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * config.maxWidth,
+            ),
             child: Stack(
               children: [
                 Container(
@@ -428,7 +488,9 @@ class MessageContent extends ConsumerWidget {
                     gradient: config.gradient,
                     color: config.backgroundColor,
                     borderRadius: BorderRadius.circular(config.borderRadius),
-                    border: config.borderColor != null ? Border.all(color: config.borderColor!) : null,
+                    border: config.borderColor != null
+                        ? Border.all(color: config.borderColor!)
+                        : null,
                     boxShadow: config.shadows,
                   ),
                   child: Column(
@@ -443,7 +505,8 @@ class MessageContent extends ConsumerWidget {
                             style: TextStyle(
                               color: isUser
                                   ? Colors.white.withValues(alpha: 0.7)
-                                  : Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+                                  : Theme.of(context).textTheme.bodySmall?.color
+                                        ?.withValues(alpha: 0.5),
                               fontSize: 11,
                               fontStyle: FontStyle.italic,
                               fontWeight: FontWeight.w300,
@@ -466,7 +529,10 @@ class MessageContent extends ConsumerWidget {
                     bottom: 0,
                     child: SizedBox(
                       width: 90,
-                      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: messageActions!),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: messageActions!,
+                      ),
                     ),
                   ),
               ],
@@ -483,7 +549,11 @@ class _ActionButtonContainer extends StatelessWidget {
   final List<Widget> actions;
   final bool isUser;
 
-  const _ActionButtonContainer({required this.actions, required this.isUser, super.key});
+  const _ActionButtonContainer({
+    required this.actions,
+    required this.isUser,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -513,14 +583,23 @@ class _ActionButton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.secondaryPurple.withValues(alpha: 0.1)],
+                colors: [
+                  AppTheme.primaryBlue.withValues(alpha: 0.1),
+                  AppTheme.secondaryPurple.withValues(alpha: 0.1),
+                ],
               ),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppTheme.primaryBlue.withValues(alpha: 0.3),
+              ),
             ),
             child: Text(
               action.label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppTheme.primaryBlue),
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.primaryBlue,
+              ),
             ),
           ),
         ),

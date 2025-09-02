@@ -55,7 +55,8 @@ class AiChatWidget extends ConsumerStatefulWidget {
   ConsumerState<AiChatWidget> createState() => _AiChatWidgetState();
 }
 
-class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProviderStateMixin {
+class _AiChatWidgetState extends ConsumerState<AiChatWidget>
+    with TickerProviderStateMixin {
   late final ScrollController _scrollController;
   late final TextEditingController _textController;
   late final String _sessionId;
@@ -70,10 +71,15 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
     _textController = TextEditingController();
     _sessionId = widget.sessionId ?? const Uuid().v4();
 
-    _typingAnimationController = AnimationController(duration: const Duration(milliseconds: 1500), vsync: this)
-      ..repeat();
+    _typingAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
 
-    _fadeAnimationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this)..forward();
+    _fadeAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    )..forward();
 
     // Listen to chat state changes to auto-scroll
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -133,7 +139,9 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
                       end: Alignment.bottomCenter,
                       colors: [
                         Theme.of(context).scaffoldBackgroundColor,
-                        Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.95),
+                        Theme.of(
+                          context,
+                        ).scaffoldBackgroundColor.withValues(alpha: 0.95),
                       ],
                     ),
                   ),
@@ -186,9 +194,15 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
           // Enhanced input area using new component
           Consumer(
             builder: (context, ref, child) {
-              final isLoading = ref.watch(messageListProvider.select((e) => e.isLoading));
-              final isRecording = ref.watch(messageListProvider.select((e) => e.isRecording));
-              final isStreaming = ref.watch(messageListProvider.select((e) => e.isStreaming));
+              final isLoading = ref.watch(
+                messageListProvider.select((e) => e.isLoading),
+              );
+              final isRecording = ref.watch(
+                messageListProvider.select((e) => e.isRecording),
+              );
+              final isStreaming = ref.watch(
+                messageListProvider.select((e) => e.isStreaming),
+              );
               final chatNotifier = ref.read(messageListProvider.notifier);
 
               return MessageComposer(
@@ -208,9 +222,21 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
                 showCharacterCount: true,
                 showStatusText: true,
                 attachmentOptions: const [
-                  AttachmentOption(icon: Icons.image_rounded, tooltip: 'Upload workout photo', type: 'image'),
-                  AttachmentOption(icon: Icons.attach_file_rounded, tooltip: 'Upload file', type: 'file'),
-                  AttachmentOption(icon: Icons.description_rounded, tooltip: 'Upload fitness plan', type: 'document'),
+                  AttachmentOption(
+                    icon: Icons.image_rounded,
+                    tooltip: 'Upload workout photo',
+                    type: 'image',
+                  ),
+                  AttachmentOption(
+                    icon: Icons.attach_file_rounded,
+                    tooltip: 'Upload file',
+                    type: 'file',
+                  ),
+                  AttachmentOption(
+                    icon: Icons.description_rounded,
+                    tooltip: 'Upload fitness plan',
+                    type: 'document',
+                  ),
                 ],
               );
             },
@@ -237,7 +263,10 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
             child: SlideTransition(
               position:
                   Tween<Offset>(
-                    begin: Offset(message.role == MessageRole.user ? 1.0 : -1.0, 0.0),
+                    begin: Offset(
+                      message.role == MessageRole.user ? 1.0 : -1.0,
+                      0.0,
+                    ),
                     end: Offset.zero,
                   ).animate(
                     CurvedAnimation(
@@ -262,7 +291,11 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
                   messageId: messageId,
                   animated: true,
                   animationDuration: Duration(
-                    milliseconds: 300 + (ref.watch(messageIdsProvider).indexOf(messageId) * 50.0).toInt(),
+                    milliseconds:
+                        300 +
+                        (ref.watch(messageIdsProvider).indexOf(messageId) *
+                                50.0)
+                            .toInt(),
                   ),
                 ),
               ),
@@ -274,10 +307,15 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
   }
 
   // ignore: unused_element
-  Widget _buildEditMessageBubble(MessageListState chatState, MessageListNotifier messageListNotifier) {
+  Widget _buildEditMessageBubble(
+    MessageListState chatState,
+    MessageListNotifier messageListNotifier,
+  ) {
     // EditMessageBubble
     return Container(
-      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.78,
+      ),
       margin: const EdgeInsets.only(right: 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -286,7 +324,13 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
             : Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.primaryBlue.withValues(alpha: 0.3)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 16, offset: const Offset(0, 4))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -295,24 +339,34 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
             onChanged: messageListNotifier.updateEditText,
             maxLines: 3,
             style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF111827),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF111827),
               fontSize: 14.5,
             ),
             decoration: InputDecoration(
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.3)),
+                borderSide: BorderSide(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                ),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.3)),
+                borderSide: BorderSide(
+                  color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                ),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide(color: AppTheme.primaryBlue, width: 2),
               ),
               hintText: 'Edit your message...',
-              hintStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.5)),
+              hintStyle: TextStyle(
+                color: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.color?.withValues(alpha: 0.5),
+              ),
               contentPadding: const EdgeInsets.all(16),
             ),
             autofocus: true,
@@ -323,7 +377,11 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
             children: [
               TextButton(
                 onPressed: messageListNotifier.cancelEditing,
-                style: TextButton.styleFrom(foregroundColor: Theme.of(context).textTheme.bodyMedium?.color),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.color,
+                ),
                 child: const Text('Cancel'),
               ),
               const SizedBox(width: 12),
@@ -340,7 +398,9 @@ class _AiChatWidgetState extends ConsumerState<AiChatWidget> with TickerProvider
                   backgroundColor: AppTheme.primaryBlue,
                   foregroundColor: Colors.white,
                   elevation: 2,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: const Text('Save'),
               ),

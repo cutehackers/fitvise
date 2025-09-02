@@ -22,5 +22,6 @@ abstract class ChatRequest with _$ChatRequest {
     @JsonKey(name: 'keep_alive') String? keepAlive,
   }) = _ChatRequest;
 
-  factory ChatRequest.fromJson(Map<String, dynamic> json) => _$ChatRequestFromJson(json);
+  factory ChatRequest.fromJson(Map<String, dynamic> json) =>
+      _$ChatRequestFromJson(json);
 }

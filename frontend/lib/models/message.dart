@@ -84,7 +84,9 @@ class Message {
       timestamp: DateTime.parse(json['timestamp']),
       type: json['type'] ?? 'text',
       actions: json['actions'] != null
-          ? (json['actions'] as List).map((action) => MessageAction.fromJson(action)).toList()
+          ? (json['actions'] as List)
+                .map((action) => MessageAction.fromJson(action))
+                .toList()
           : null,
       isEdited: json['isEdited'] ?? false,
       isStreaming: json['isStreaming'] ?? false,
@@ -112,5 +114,9 @@ class WelcomePrompt {
   final String text;
   final String category;
 
-  WelcomePrompt({required this.icon, required this.text, required this.category});
+  WelcomePrompt({
+    required this.icon,
+    required this.text,
+    required this.category,
+  });
 }

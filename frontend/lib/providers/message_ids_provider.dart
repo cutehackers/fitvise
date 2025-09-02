@@ -1,8 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final messageIdsProvider = StateNotifierProvider<MessageIdsNotifier, List<String>>((ref) {
-  return MessageIdsNotifier();
-});
+final messageIdsProvider =
+    StateNotifierProvider<MessageIdsNotifier, List<String>>((ref) {
+      return MessageIdsNotifier();
+    });
 
 class MessageIdsNotifier extends StateNotifier<List<String>> {
   MessageIdsNotifier() : super([]);

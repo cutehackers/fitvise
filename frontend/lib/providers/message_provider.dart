@@ -1,10 +1,17 @@
 import 'package:fitvise/models/message.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-final messageProvider = StateNotifierProvider.family<MessageProvider, Message, String>(
-  (ref, messageId) =>
-      MessageProvider(Message(id: messageId, role: MessageRole.user, text: '', timestamp: DateTime.now())),
-);
+final messageProvider =
+    StateNotifierProvider.family<MessageProvider, Message, String>(
+      (ref, messageId) => MessageProvider(
+        Message(
+          id: messageId,
+          role: MessageRole.user,
+          text: '',
+          timestamp: DateTime.now(),
+        ),
+      ),
+    );
 
 class MessageProvider extends StateNotifier<Message> {
   MessageProvider(super.message);

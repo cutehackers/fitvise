@@ -9,9 +9,6 @@ class ChatScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      appBar: const ChatAppBar(),
-      body: const AiChatWidget(),
-    );
+    return Scaffold(appBar: const ChatAppBar(), body: const AiChatWidget());
   }
 }

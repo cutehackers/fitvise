@@ -10,7 +10,12 @@ class AttachmentOption {
   final String type;
   final VoidCallback? onPressed;
 
-  const AttachmentOption({required this.icon, required this.tooltip, required this.type, this.onPressed});
+  const AttachmentOption({
+    required this.icon,
+    required this.tooltip,
+    required this.type,
+    this.onPressed,
+  });
 }
 
 /// A modern, feature-rich chat input widget
@@ -139,7 +144,8 @@ class MessageComposer extends StatefulWidget {
   State<MessageComposer> createState() => _MessageComposerState();
 }
 
-class _MessageComposerState extends State<MessageComposer> with TickerProviderStateMixin {
+class _MessageComposerState extends State<MessageComposer>
+    with TickerProviderStateMixin {
   late AnimationController _sendButtonController;
   late AnimationController _recordingController;
   late Animation<double> _sendButtonScale;
@@ -151,19 +157,23 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
   void initState() {
     super.initState();
 
-    _sendButtonController = AnimationController(duration: const Duration(milliseconds: 200), vsync: this);
+    _sendButtonController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
 
-    _recordingController = AnimationController(duration: const Duration(milliseconds: 1000), vsync: this);
+    _recordingController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
 
-    _sendButtonScale = Tween<double>(
-      begin: 0.8,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _sendButtonController, curve: Curves.elasticOut));
+    _sendButtonScale = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _sendButtonController, curve: Curves.elasticOut),
+    );
 
-    _recordingPulse = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
-    ).animate(CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut));
+    _recordingPulse = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _recordingController, curve: Curves.easeInOut),
+    );
 
     widget.controller.addListener(_onTextChanged);
     _updateSendButton();
@@ -236,21 +246,29 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
       margin: widget.margin,
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor.withValues(alpha: 0.95),
-        border: Border(top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
+        border: Border(
+          top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3)),
+        ),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -4)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -4),
+          ),
         ],
       ),
       child: Column(
         children: [
           // Attachment options
-          if (widget.enableAttachments) _buildAttachmentOptions(effectiveAttachmentOptions),
+          if (widget.enableAttachments)
+            _buildAttachmentOptions(effectiveAttachmentOptions),
 
           // Main input area
           _buildInputArea(context, theme, effectiveHintText),
 
           // Status and character count
-          if (widget.showStatusText || widget.showCharacterCount) _buildStatusArea(context, theme),
+          if (widget.showStatusText || widget.showCharacterCount)
+            _buildStatusArea(context, theme),
         ],
       ),
     );
@@ -295,7 +313,8 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
             child: _AttachmentButton(
               icon: option.icon,
               tooltip: option.tooltip,
-              onPressed: option.onPressed ?? () => _handleAttachment(option.type),
+              onPressed:
+                  option.onPressed ?? () => _handleAttachment(option.type),
             ),
           );
         }).toList(),
@@ -303,16 +322,27 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
     );
   }
 
-  Widget _buildInputArea(BuildContext context, ThemeData theme, String hintText) {
+  Widget _buildInputArea(
+    BuildContext context,
+    ThemeData theme,
+    String hintText,
+  ) {
     return Container(
       decoration: BoxDecoration(
         gradient:
             widget.gradient ??
             LinearGradient(
-              colors: [AppTheme.primaryBlue.withValues(alpha: 0.1), AppTheme.secondaryPurple.withValues(alpha: 0.1)],
+              colors: [
+                AppTheme.primaryBlue.withValues(alpha: 0.1),
+                AppTheme.secondaryPurple.withValues(alpha: 0.1),
+              ],
             ),
         borderRadius: BorderRadius.circular(widget.borderRadius),
-        border: Border.all(color: widget.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2), width: 1.5),
+        border: Border.all(
+          color:
+              widget.borderColor ?? AppTheme.primaryBlue.withValues(alpha: 0.2),
+          width: 1.5,
+        ),
         boxShadow: widget.shadows,
       ),
       child: Container(
@@ -340,7 +370,9 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                 style:
                     widget.textStyle ??
                     TextStyle(
-                      color: theme.brightness == Brightness.dark ? Colors.white : const Color(0xFF111827),
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.white
+                          : const Color(0xFF111827),
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -348,7 +380,12 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                   hintText: hintText,
                   hintStyle:
                       widget.hintStyle ??
-                      TextStyle(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6), fontSize: 15),
+                      TextStyle(
+                        color: theme.textTheme.bodySmall?.color?.withValues(
+                          alpha: 0.6,
+                        ),
+                        fontSize: 15,
+                      ),
                   filled: true,
                   fillColor: Colors.transparent,
                   focusColor: Colors.transparent,
@@ -386,9 +423,13 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
           scale: widget.isRecording ? _recordingPulse.value : 1.0,
           child: Container(
             decoration: BoxDecoration(
-              color: widget.isRecording ? Colors.red.withValues(alpha: 0.1) : Colors.transparent,
+              color: widget.isRecording
+                  ? Colors.red.withValues(alpha: 0.1)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
-              border: widget.isRecording ? Border.all(color: Colors.red.withValues(alpha: 0.3)) : null,
+              border: widget.isRecording
+                  ? Border.all(color: Colors.red.withValues(alpha: 0.3))
+                  : null,
             ),
             child: Material(
               color: Colors.transparent,
@@ -398,9 +439,13 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                 child: Padding(
                   padding: const EdgeInsets.all(8),
                   child: Icon(
-                    widget.isRecording ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    widget.isRecording
+                        ? Icons.mic_off_rounded
+                        : Icons.mic_rounded,
                     size: 20,
-                    color: widget.isRecording ? Colors.red : theme.iconTheme.color?.withValues(alpha: 0.7),
+                    color: widget.isRecording
+                        ? Colors.red
+                        : theme.iconTheme.color?.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -429,7 +474,9 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                       end: Alignment.bottomRight,
                     )
                   : null,
-              color: !canSend ? Theme.of(context).disabledColor.withValues(alpha: 0.3) : null,
+              color: !canSend
+                  ? Theme.of(context).disabledColor.withValues(alpha: 0.3)
+                  : null,
               borderRadius: BorderRadius.circular(20),
               boxShadow: canSend
                   ? [
@@ -454,13 +501,17 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         )
                       : Icon(
                           Icons.send_rounded,
                           size: 16,
-                          color: canSend ? Colors.white : Theme.of(context).disabledColor,
+                          color: canSend
+                              ? Colors.white
+                              : Theme.of(context).disabledColor,
                         ),
                 ),
               ),
@@ -487,7 +538,9 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
               child: Text(
                 statusText,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
+                  color: theme.textTheme.bodySmall?.color?.withValues(
+                    alpha: 0.6,
+                  ),
                   fontSize: 12,
                 ),
               ),
@@ -502,7 +555,9 @@ class _MessageComposerState extends State<MessageComposer> with TickerProviderSt
                     ? Colors.red
                     : theme.textTheme.bodySmall?.color?.withValues(alpha: 0.6),
                 fontSize: 12,
-                fontWeight: characterCount > maxLength * 0.9 ? FontWeight.w600 : FontWeight.normal,
+                fontWeight: characterCount > maxLength * 0.9
+                    ? FontWeight.w600
+                    : FontWeight.normal,
               ),
             ),
         ],
@@ -537,7 +592,12 @@ class _AttachmentButton extends StatelessWidget {
   final String? tooltip;
   final VoidCallback? onPressed;
 
-  const _AttachmentButton({required this.icon, this.tooltip, this.onPressed, super.key});
+  const _AttachmentButton({
+    required this.icon,
+    this.tooltip,
+    this.onPressed,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -560,7 +620,11 @@ class _AttachmentButton extends StatelessWidget {
             onTap: onPressed,
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: Icon(icon, size: 16, color: theme.iconTheme.color?.withValues(alpha: 0.7)),
+              child: Icon(
+                icon,
+                size: 16,
+                color: theme.iconTheme.color?.withValues(alpha: 0.7),
+              ),
             ),
           ),
         ),

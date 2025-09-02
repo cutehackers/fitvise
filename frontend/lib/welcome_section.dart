@@ -10,12 +10,36 @@ class WelcomeSection extends StatelessWidget {
   final String sessionId;
 
   List<WelcomePrompt> get welcomePrompts => [
-    WelcomePrompt(icon: '🏋️', text: 'Create a personalized workout plan', category: 'Workout'),
-    WelcomePrompt(icon: '🥗', text: 'Get nutrition and meal planning advice', category: 'Nutrition'),
-    WelcomePrompt(icon: '📊', text: 'Track my fitness progress', category: 'Progress'),
-    WelcomePrompt(icon: '💡', text: 'Learn proper exercise techniques', category: 'Education'),
-    WelcomePrompt(icon: '🎯', text: 'Set and achieve fitness goals', category: 'Goals'),
-    WelcomePrompt(icon: '🧘', text: 'Recovery and wellness tips', category: 'Wellness'),
+    WelcomePrompt(
+      icon: '🏋️',
+      text: 'Create a personalized workout plan',
+      category: 'Workout',
+    ),
+    WelcomePrompt(
+      icon: '🥗',
+      text: 'Get nutrition and meal planning advice',
+      category: 'Nutrition',
+    ),
+    WelcomePrompt(
+      icon: '📊',
+      text: 'Track my fitness progress',
+      category: 'Progress',
+    ),
+    WelcomePrompt(
+      icon: '💡',
+      text: 'Learn proper exercise techniques',
+      category: 'Education',
+    ),
+    WelcomePrompt(
+      icon: '🎯',
+      text: 'Set and achieve fitness goals',
+      category: 'Goals',
+    ),
+    WelcomePrompt(
+      icon: '🧘',
+      text: 'Recovery and wellness tips',
+      category: 'Wellness',
+    ),
   ];
 
   @override
@@ -26,7 +50,10 @@ class WelcomeSection extends StatelessWidget {
         children: [
           Text(
             'How can I help you reach your fitness goals?',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
@@ -75,7 +102,8 @@ class _WelcomePromptCard extends StatefulWidget {
   State<_WelcomePromptCard> createState() => _WelcomePromptCardState();
 }
 
-class _WelcomePromptCardState extends State<_WelcomePromptCard> with SingleTickerProviderStateMixin {
+class _WelcomePromptCardState extends State<_WelcomePromptCard>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
   bool _isHovered = false;
@@ -83,7 +111,10 @@ class _WelcomePromptCardState extends State<_WelcomePromptCard> with SingleTicke
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(duration: const Duration(milliseconds: 200), vsync: this);
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
       end: 1.05,
@@ -126,12 +157,16 @@ class _WelcomePromptCardState extends State<_WelcomePromptCard> with SingleTicke
                               ? const Color(0xFF1F2937) // hover:bg-gray-800
                               : const Color(0xFFDEEEFF)) // hover:bg-blue-50
                         : (Theme.of(context).brightness == Brightness.dark
-                              ? const Color(0xFF1F2937).withValues(alpha: .5) // bg-gray-800/50
+                              ? const Color(0xFF1F2937).withValues(
+                                  alpha: .5,
+                                ) // bg-gray-800/50
                               : Colors.white),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
                       color: _isHovered
-                          ? const Color(0xFF3B82F6) // hover:border-fitvise-primary
+                          ? const Color(
+                              0xFF3B82F6,
+                            ) // hover:border-fitvise-primary
                           : (Theme.of(context).brightness == Brightness.dark
                                 ? const Color(0xFF4B5563) // border-gray-600
                                 : const Color(0xFFD1D5DB)), // border-gray-300
@@ -142,11 +177,16 @@ class _WelcomePromptCardState extends State<_WelcomePromptCard> with SingleTicke
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(widget.prompt.icon, style: const TextStyle(fontSize: 32)),
+                      Text(
+                        widget.prompt.icon,
+                        style: const TextStyle(fontSize: 32),
+                      ),
                       const SizedBox(height: 8),
                       Text(
                         widget.prompt.text,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
                         textAlign: TextAlign.left,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -156,11 +196,14 @@ class _WelcomePromptCardState extends State<_WelcomePromptCard> with SingleTicke
                         alignment: Alignment.centerLeft,
                         child: Text(
                           widget.prompt.category,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).brightness == Brightness.dark
-                                ? const Color(0xFF9CA3AF) // text-gray-400
-                                : const Color(0xFF6B7280), // text-gray-500
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? const Color(0xFF9CA3AF) // text-gray-400
+                                    : const Color(0xFF6B7280), // text-gray-500
+                              ),
                           textAlign: TextAlign.left,
                         ),
                       ),

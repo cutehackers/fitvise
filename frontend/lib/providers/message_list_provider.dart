@@ -15,9 +15,10 @@ import '../models/chat_response.dart';
 import '../models/message.dart';
 
 /// Provider for accessing chat functionality
-final messageListProvider = StateNotifierProvider<MessageListNotifier, MessageListState>((ref) {
-  return MessageListNotifier(ref);
-});
+final messageListProvider =
+    StateNotifierProvider<MessageListNotifier, MessageListState>((ref) {
+      return MessageListNotifier(ref);
+    });
 
 /// Chat state containing all chat-related data
 class MessageListState {
@@ -70,7 +71,8 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
   final Ref _ref;
   StreamSubscription? _streamSubscription;
 
-  final LinkedHashMap<String, Message> messageMap = LinkedHashMap<String, Message>();
+  final LinkedHashMap<String, Message> messageMap =
+      LinkedHashMap<String, Message>();
   final Map<String, StringBuffer> _buffers = {};
 
   MessageListNotifier(this._ref)
@@ -105,7 +107,12 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
   //   WelcomePrompt(icon: '🧘', text: 'Recovery and wellness tips', category: 'Wellness'),
   // ];
 
-  Future<void> sendMessage(String sessionId, String text, {bool isEdit = false, String? editId}) async {
+  Future<void> sendMessage(
+    String sessionId,
+    String text, {
+    bool isEdit = false,
+    String? editId,
+  }) async {
     final userQuery = text.trim();
     if (userQuery.isEmpty) return;
 
@@ -123,7 +130,11 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
   Future<void> _doSendMessage(String sessionId, String userQuery) async {
     // Add user message
     _addMessage(
-      Message.user(id: DateTime.now().millisecondsSinceEpoch.toString(), text: userQuery, timestamp: DateTime.now()),
+      Message.user(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        text: userQuery,
+        timestamp: DateTime.now(),
+      ),
     );
 
     // Add ai message. begin streaming response with empty content.
@@ -140,7 +151,12 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
       ),
     );
 
-    state = state.copyWith(isLoading: true, isTyping: true, error: null, streamingMessageId: messageId);
+    state = state.copyWith(
+      isLoading: true,
+      isTyping: true,
+      error: null,
+      streamingMessageId: messageId,
+    );
 
     try {
       // Create an ai message stream
@@ -184,9 +200,13 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
   }
 
   Stream<ChatResponse> _createChatStream(ChatRequest request) async* {
-    final action = http.Request('POST', Uri.parse('${AppConfig.apiBaseUrl}/fitvise/chat'))
-      ..headers.addAll({'Content-Type': 'application/json', 'Accept': 'application/x-ndjson'})
-      ..body = jsonEncode(request.toJson());
+    final action =
+        http.Request('POST', Uri.parse('${AppConfig.apiBaseUrl}/fitvise/chat'))
+          ..headers.addAll({
+            'Content-Type': 'application/json',
+            'Accept': 'application/x-ndjson',
+          })
+          ..body = jsonEncode(request.toJson());
 
     debugPrint('Chat> sending request: ${jsonEncode(request.toJson())}');
 
@@ -223,7 +243,9 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
     final chunk = response.message?.content ?? '';
     buffer.write(chunk);
 
-    _ref.read(messageProvider(messageId).notifier).updateContent(buffer.toString());
+    _ref
+        .read(messageProvider(messageId).notifier)
+        .updateContent(buffer.toString());
   }
 
   void _completeMessageContent(String messageId) {
@@ -235,7 +257,11 @@ class MessageListNotifier extends StateNotifier<MessageListState> {
     }
   }
 
-  void _onChatStreamError(String messageId, dynamic error, StackTrace stackTrace) {
+  void _onChatStreamError(
+    String messageId,
+    dynamic error,
+    StackTrace stackTrace,
+  ) {
     final provider = _ref.read(messageProvider(messageId).notifier);
     provider.update(
       text: '⚠️ $error',

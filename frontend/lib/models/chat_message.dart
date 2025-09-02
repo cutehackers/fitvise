@@ -17,5 +17,6 @@ abstract class ChatMessage with _$ChatMessage {
     @JsonKey(name: 'tool_name') String? toolName,
   }) = _ChatMessage;
 
-  factory ChatMessage.fromJson(Map<String, dynamic> json) => _$ChatMessageFromJson(json);
+  factory ChatMessage.fromJson(Map<String, dynamic> json) =>
+      _$ChatMessageFromJson(json);
 }

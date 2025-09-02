@@ -24,7 +24,11 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.fitness_center, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.fitness_center,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 12),
           // Title and status
@@ -34,22 +38,28 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
               children: [
                 Text(
                   'Fitvise AI',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 Row(
                   children: [
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       'Ready to help you get fit',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).textTheme.bodySmall?.color?.withOpacity(0.7),
                       ),
                     ),
                   ],
@@ -63,7 +73,11 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
         // Theme toggle button
         IconButton(
           onPressed: ref.read(themeModeProvider.notifier).toggleThemeMode,
-          icon: Icon(ref.read(themeModeProvider.notifier).isDarkMode ? Icons.light_mode : Icons.dark_mode),
+          icon: Icon(
+            ref.read(themeModeProvider.notifier).isDarkMode
+                ? Icons.light_mode
+                : Icons.dark_mode,
+          ),
           tooltip: 'Toggle theme',
         ),
         // More options button
@@ -81,7 +95,9 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
   void _showMoreOptions(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (BuildContext context) {
         return Container(
           padding: const EdgeInsets.all(20),
@@ -92,7 +108,10 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
               Container(
                 width: 40,
                 height: 4,
-                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
               const SizedBox(height: 20),
 
@@ -144,9 +163,14 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
           builder: (context, ref, child) {
             return AlertDialog(
               title: const Text('Clear Chat'),
-              content: const Text('Are you sure you want to clear all messages? This action cannot be undone.'),
+              content: const Text(
+                'Are you sure you want to clear all messages? This action cannot be undone.',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);
@@ -183,7 +207,12 @@ class ChatAppBar extends ConsumerWidget implements PreferredSizeWidget {
               ),
             ],
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );

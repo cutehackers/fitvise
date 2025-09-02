@@ -25,7 +25,7 @@ class LoadingConfig {
 }
 
 /// A collection of loading widgets for chat interfaces
-/// 
+///
 /// Features:
 /// - Multiple loading animation styles
 /// - Customizable appearance
@@ -36,13 +36,13 @@ class LoadingConfig {
 class ChatLoadingWidget extends StatefulWidget {
   /// Type of loading animation
   final LoadingType type;
-  
+
   /// Configuration for appearance
   final LoadingConfig? config;
-  
+
   /// Whether the loading animation is active
   final bool isActive;
-  
+
   /// Custom message to display
   final String? message;
 
@@ -66,19 +66,13 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
   @override
   void initState() {
     super.initState();
-    
+
     final config = widget.config ?? const LoadingConfig();
-    _controller = AnimationController(
-      duration: config.duration,
-      vsync: this,
-    );
+    _controller = AnimationController(duration: config.duration, vsync: this);
 
     // Initialize dot controllers for typing animation
     _dotControllers = List.generate(3, (index) {
-      return AnimationController(
-        duration: config.duration,
-        vsync: this,
-      );
+      return AnimationController(duration: config.duration, vsync: this);
     });
 
     if (widget.isActive) {
@@ -89,7 +83,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
   @override
   void didUpdateWidget(ChatLoadingWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
+
     if (oldWidget.isActive != widget.isActive) {
       if (widget.isActive) {
         _startAnimation();
@@ -157,7 +151,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
 
     final theme = Theme.of(context);
     final config = widget.config ?? _getDefaultConfig(theme);
-    
+
     return Container(
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -207,7 +201,10 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
     );
   }
 
-  BoxDecoration _buildContainerDecoration(ThemeData theme, LoadingConfig config) {
+  BoxDecoration _buildContainerDecoration(
+    ThemeData theme,
+    LoadingConfig config,
+  ) {
     return BoxDecoration(
       color: theme.brightness == Brightness.dark
           ? const Color(0xFF374151).withValues(alpha: 0.8)
@@ -255,7 +252,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
             );
             final scale = 0.7 + (0.4 * (0.5 + 0.5 * animationValue));
             final opacity = 0.3 + (0.7 * animationValue);
-            
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 3),
               child: Transform.scale(
@@ -281,7 +278,8 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final scale = 0.8 + (0.4 * Curves.easeInOut.transform(_controller.value));
+        final scale =
+            0.8 + (0.4 * Curves.easeInOut.transform(_controller.value));
         return Transform.scale(
           scale: scale,
           child: Container(
@@ -310,7 +308,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
               (_controller.value + offset) % 1.0,
             );
             final height = config.size * (0.5 + 0.5 * animationValue);
-            
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 1),
               child: Container(
@@ -341,7 +339,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
               (_controller.value + offset) % 1.0,
             );
             final translateY = -15 * animationValue;
-            
+
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2),
               child: Transform.translate(
@@ -374,14 +372,13 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
             height: config.size * 2,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.transparent,
-                width: 2,
-              ),
+              border: Border.all(color: Colors.transparent, width: 2),
               gradient: SweepGradient(
                 colors: [
                   Colors.transparent,
-                  config.gradient?.colors.first ?? config.color ?? AppTheme.primaryBlue,
+                  config.gradient?.colors.first ??
+                      config.color ??
+                      AppTheme.primaryBlue,
                 ],
               ),
             ),
@@ -393,13 +390,7 @@ class _ChatLoadingWidgetState extends State<ChatLoadingWidget>
 }
 
 /// Enum for different loading animation types
-enum LoadingType {
-  typing,
-  pulse,
-  wave,
-  dots,
-  spinner,
-}
+enum LoadingType { typing, pulse, wave, dots, spinner }
 
 /// A simple typing indicator with dots
 class TypingIndicator extends StatelessWidget {
@@ -422,9 +413,7 @@ class TypingIndicator extends StatelessWidget {
           ? ChatLoadingWidget(
               type: LoadingType.typing,
               message: message ?? 'Fitvise AI is typing...',
-              config: LoadingConfig(
-                color: color,
-              ),
+              config: LoadingConfig(color: color),
             )
           : const SizedBox.shrink(),
     );
@@ -449,11 +438,9 @@ class VoiceRecordingIndicator extends StatelessWidget {
       child: isRecording
           ? ChatLoadingWidget(
               type: LoadingType.wave,
-              message: 'Recording${duration != null ? ' ${_formatDuration(duration!)}' : '...'}',
-              config: const LoadingConfig(
-                color: Colors.red,
-                size: 12.0,
-              ),
+              message:
+                  'Recording${duration != null ? ' ${_formatDuration(duration!)}' : '...'}',
+              config: const LoadingConfig(color: Colors.red, size: 12.0),
             )
           : const SizedBox.shrink(),
     );
@@ -496,7 +483,9 @@ class ProcessingIndicator extends StatelessWidget {
                       child: CircularProgressIndicator(
                         value: progress,
                         strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryBlue),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppTheme.primaryBlue,
+                        ),
                       ),
                     )
                   else

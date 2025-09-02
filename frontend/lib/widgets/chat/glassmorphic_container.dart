@@ -51,7 +51,7 @@ class GlassmorphicConfig {
 }
 
 /// A reusable glassmorphic container widget with blur effects
-/// 
+///
 /// Features:
 /// - Customizable blur and opacity
 /// - Gradient support
@@ -63,19 +63,19 @@ class GlassmorphicConfig {
 class GlassmorphicContainer extends StatelessWidget {
   /// The child widget to display inside the container
   final Widget child;
-  
+
   /// Configuration for the glassmorphic effect
   final GlassmorphicConfig config;
-  
+
   /// Width of the container
   final double? width;
-  
+
   /// Height of the container
   final double? height;
-  
+
   /// Alignment of the child widget
   final AlignmentGeometry? alignment;
-  
+
   /// Whether to clip the child widget to the container bounds
   final bool clipBehavior;
 
@@ -113,7 +113,8 @@ class GlassmorphicContainer extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
-        borderRadius: borderRadius ?? const BorderRadius.all(Radius.circular(16)),
+        borderRadius:
+            borderRadius ?? const BorderRadius.all(Radius.circular(16)),
         shadows: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -152,7 +153,8 @@ class GlassmorphicContainer extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
-        borderRadius: borderRadius ?? const BorderRadius.all(Radius.circular(16)),
+        borderRadius:
+            borderRadius ?? const BorderRadius.all(Radius.circular(16)),
         shadows: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -192,7 +194,8 @@ class GlassmorphicContainer extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
-        borderRadius: borderRadius ?? const BorderRadius.all(Radius.circular(16)),
+        borderRadius:
+            borderRadius ?? const BorderRadius.all(Radius.circular(16)),
         shadows: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.15),
@@ -230,7 +233,8 @@ class GlassmorphicContainer extends StatelessWidget {
           color: Colors.white.withValues(alpha: 0.3),
           width: 1.5,
         ),
-        borderRadius: borderRadius ?? const BorderRadius.all(Radius.circular(20)),
+        borderRadius:
+            borderRadius ?? const BorderRadius.all(Radius.circular(20)),
         shadows: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.08),
@@ -261,10 +265,7 @@ class GlassmorphicContainer extends StatelessWidget {
         borderRadius: config.borderRadius,
         clipBehavior: clipBehavior ? Clip.antiAlias : Clip.none,
         child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: config.blur,
-            sigmaY: config.blur,
-          ),
+          filter: ImageFilter.blur(sigmaX: config.blur, sigmaY: config.blur),
           child: Container(
             padding: config.padding,
             decoration: BoxDecoration(
@@ -288,7 +289,9 @@ class GlassmorphicContainer extends StatelessWidget {
       return LinearGradient(
         begin: gradient.begin,
         end: gradient.end,
-        colors: gradient.colors.map((color) => color.withValues(alpha: opacity)).toList(),
+        colors: gradient.colors
+            .map((color) => color.withValues(alpha: opacity))
+            .toList(),
         stops: gradient.stops,
         transform: gradient.transform,
         tileMode: gradient.tileMode,
@@ -297,7 +300,9 @@ class GlassmorphicContainer extends StatelessWidget {
       return RadialGradient(
         center: gradient.center,
         radius: gradient.radius,
-        colors: gradient.colors.map((color) => color.withValues(alpha: opacity)).toList(),
+        colors: gradient.colors
+            .map((color) => color.withValues(alpha: opacity))
+            .toList(),
         stops: gradient.stops,
         transform: gradient.transform,
         tileMode: gradient.tileMode,
@@ -309,13 +314,15 @@ class GlassmorphicContainer extends StatelessWidget {
         center: gradient.center,
         startAngle: gradient.startAngle,
         endAngle: gradient.endAngle,
-        colors: gradient.colors.map((color) => color.withValues(alpha: opacity)).toList(),
+        colors: gradient.colors
+            .map((color) => color.withValues(alpha: opacity))
+            .toList(),
         stops: gradient.stops,
         transform: gradient.transform,
         tileMode: gradient.tileMode,
       );
     }
-    
+
     return gradient;
   }
 }
@@ -343,7 +350,7 @@ class GlassmorphicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    
+
     Widget card = GlassmorphicContainer.frosted(
       padding: padding ?? const EdgeInsets.all(16),
       margin: margin,
@@ -386,7 +393,9 @@ class GlassmorphicModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: dismissible ? (onDismiss ?? () => Navigator.of(context).pop()) : null,
+      onTap: dismissible
+          ? (onDismiss ?? () => Navigator.of(context).pop())
+          : null,
       child: Container(
         color: Colors.black.withValues(alpha: 0.5),
         child: Center(
@@ -429,8 +438,12 @@ class GlassmorphicFAB extends StatelessWidget {
       borderRadius: BorderRadius.circular(size / 2),
       gradient: LinearGradient(
         colors: [
-          (backgroundColor ?? Theme.of(context).primaryColor).withValues(alpha: 0.8),
-          (backgroundColor ?? Theme.of(context).primaryColor).withValues(alpha: 0.6),
+          (backgroundColor ?? Theme.of(context).primaryColor).withValues(
+            alpha: 0.8,
+          ),
+          (backgroundColor ?? Theme.of(context).primaryColor).withValues(
+            alpha: 0.6,
+          ),
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,

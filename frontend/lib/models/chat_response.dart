@@ -30,5 +30,6 @@ abstract class ChatResponse with _$ChatResponse {
     String? error,
   }) = _ChatResponse;
 
-  factory ChatResponse.fromJson(Map<String, dynamic> json) => _$ChatResponseFromJson(json);
+  factory ChatResponse.fromJson(Map<String, dynamic> json) =>
+      _$ChatResponseFromJson(json);
 }

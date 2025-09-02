@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // Provider
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) => ThemeModeNotifier());
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>(
+  (ref) => ThemeModeNotifier(),
+);
 
 // ThemeMode 상태 관리
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
@@ -28,7 +30,8 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
         _ => ThemeMode.system,
       };
     } else {
-      final brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+      final brightness =
+          WidgetsBinding.instance.platformDispatcher.platformBrightness;
       state = brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.system;
     }
   }

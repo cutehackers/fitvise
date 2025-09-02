@@ -12,7 +12,7 @@ class AppConfig {
     if (envBaseUrl.isNotEmpty) {
       return envBaseUrl;
     }
-    
+
     // Default URLs based on build mode
     if (kDebugMode) {
       // Local development URL

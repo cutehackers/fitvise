@@ -22,7 +22,7 @@ from httpx import AsyncClient
 # Add the app directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
 
-from app.core.config import Settings
+from backend.app.core.settings import Settings
 from app.main import app
 
 

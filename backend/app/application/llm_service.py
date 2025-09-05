@@ -15,7 +15,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_ollama.chat_models import ChatOllama
 
-from app.core.config import settings
+from backend.app.core.settings import settings
 from app.domain.entities.message_role import MessageRole
 from app.schemas.chat import ChatMessage, ChatRequest, ChatResponse
 

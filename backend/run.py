@@ -1,7 +1,7 @@
 # run.py - Main entry point for Fitvise Backend API
 import uvicorn
 
-from app.core.config import settings
+from backend.app.core.settings import settings
 
 if __name__ == "__main__":
     print("🌪️  Starting Fitvise backend server...")

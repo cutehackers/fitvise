@@ -9,7 +9,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from backend.app.core.settings import Settings
 from tests.utils.test_helpers import test_env
 
 

@@ -1,191 +1,127 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'app_text_theme.dart';
+import 'palette.dart';
 
 class AppTheme {
-  // Fitvise Color Palette
-  static const Color primaryBlue = Color(0xFF3B82F6);
+  AppTheme._();
+
+  // Color schemes using Material Design 3
+  static final ColorScheme _lightColorScheme =
+      ColorScheme.fromSeed(seedColor: Palette.primaryBlue, brightness: Brightness.light).copyWith(
+        surface: Palette.lightBackground,
+        onSurface: Palette.lightText,
+        surfaceContainer: Palette.lightSurface,
+        outline: Palette.lightBorder,
+        outlineVariant: Palette.lightBorderSecondary,
+        onSurfaceVariant: Palette.lightTextMuted,
+        surfaceContainerLow: Palette.lightSurfaceSecondary,
+        surfaceContainerHigh: Palette.lightDivider,
+      );
+
+  static final ColorScheme _darkColorScheme =
+      ColorScheme.fromSeed(seedColor: Palette.primaryBlue, brightness: Brightness.dark).copyWith(
+        surface: Palette.darkBackground,
+        onSurface: Palette.darkText,
+        surfaceContainer: Palette.darkSurface,
+        outline: Palette.darkBorder,
+        outlineVariant: Palette.darkBorderSecondary,
+        onSurfaceVariant: Palette.darkTextMuted,
+        surfaceContainerLow: Palette.darkSurfaceSecondary,
+        surfaceContainerHigh: Palette.darkDivider,
+      );
+
+  // Static color properties for backward compatibility
+  static const Color primaryColor = Palette.primaryBlue;
+  static const Color primaryBlue = Palette.primaryBlue;
   static const Color secondaryPurple = Color(0xFF8B5CF6);
   static const Color accentGreen = Color(0xFF10B981);
-  static const Color darkGray = Color(0xFF1F2937);
-  static const Color lightGray = Color(0xFFF9FAFB);
 
-  // Text Colors
-  static const Color textPrimary = Color(0xFF111827);
-  static const Color textSecondary = Color(0xFF6B7280);
-  static const Color textInverse = Color(0xFFF9FAFB);
+  // Legacy theme getters for main.dart compatibility
+  static ThemeData get lightTheme => light;
+  static ThemeData get darkTheme => dark;
 
-  // Light Theme
-  static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
-    primarySwatch: MaterialColor(0xFF3B82F6, {
-      50: Color(0xFFEFF6FF),
-      100: Color(0xFFDBEAFE),
-      200: Color(0xFFBFDBFE),
-      300: Color(0xFF93C5FD),
-      400: Color(0xFF60A5FA),
-      500: Color(0xFF3B82F6),
-      600: Color(0xFF2563EB),
-      700: Color(0xFF1D4ED8),
-      800: Color(0xFF1E40AF),
-      900: Color(0xFF1E3A8A),
-    }),
-    colorScheme: const ColorScheme.light(
-      primary: primaryBlue,
-      secondary: secondaryPurple,
-      tertiary: accentGreen,
-      surface: Colors.white,
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onSurface: textPrimary,
-    ),
-    scaffoldBackgroundColor: const Color(0xFFF9FAFB), // bg-gray-50
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.white,
-      foregroundColor: textPrimary,
-      elevation: 1,
-      centerTitle: false,
-    ),
-    cardTheme: CardThemeData(
-      color: Colors.white,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ),
-    textTheme: const TextTheme(
-      headlineLarge: TextStyle(
-        color: textPrimary,
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
-      ),
-      headlineMedium: TextStyle(
-        color: textPrimary,
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-      bodyLarge: TextStyle(color: textPrimary, fontSize: 16),
-      bodyMedium: TextStyle(color: textSecondary, fontSize: 14),
-      bodySmall: TextStyle(color: textSecondary, fontSize: 12),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryBlue,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: primaryBlue,
-        side: const BorderSide(color: primaryBlue),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: Colors.white,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.grey),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.grey),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: primaryBlue, width: 2),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-  );
+  // Legacy color getters for backward compatibility
+  static Color getBackgroundColor(bool darkMode) => darkMode ? _darkColorScheme.surface : _lightColorScheme.surface;
+  static Color getTextColor(bool darkMode) => darkMode ? _darkColorScheme.onSurface : _lightColorScheme.onSurface;
+  static Color getCardBackgroundColor(bool darkMode) =>
+      darkMode ? _darkColorScheme.surfaceContainer : _lightColorScheme.surfaceContainer;
+  static Color getBorderColor(bool darkMode) => darkMode ? _darkColorScheme.outline : _lightColorScheme.outline;
+  static Color getSecondaryBorderColor(bool darkMode) =>
+      darkMode ? _darkColorScheme.outlineVariant : _lightColorScheme.outlineVariant;
+  static Color getMutedTextColor(bool darkMode) =>
+      darkMode ? _darkColorScheme.onSurfaceVariant : _lightColorScheme.onSurfaceVariant;
+  static Color getSecondaryBackgroundColor(bool darkMode) =>
+      darkMode ? _darkColorScheme.surfaceContainerLow : _lightColorScheme.surfaceContainerLow;
+  static Color getDividerColor(bool darkMode) =>
+      darkMode ? _darkColorScheme.surfaceContainerHigh : _lightColorScheme.surfaceContainerHigh;
 
-  // Dark Theme
-  static ThemeData darkTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    primarySwatch: MaterialColor(0xFF3B82F6, {
-      50: Color(0xFF1E3A8A),
-      100: Color(0xFF1E40AF),
-      200: Color(0xFF1D4ED8),
-      300: Color(0xFF2563EB),
-      400: Color(0xFF3B82F6),
-      500: Color(0xFF60A5FA),
-      600: Color(0xFF93C5FD),
-      700: Color(0xFFBFDBFE),
-      800: Color(0xFFDBEAFE),
-      900: Color(0xFFEFF6FF),
-    }),
-    colorScheme: const ColorScheme.dark(
-      primary: primaryBlue,
-      secondary: secondaryPurple,
-      tertiary: accentGreen,
-      surface: Color(0xFF374151),
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onSurface: textInverse,
-    ),
-    scaffoldBackgroundColor: const Color(0xFF111827), // bg-gray-900
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Color(0xFF1F2937),
-      foregroundColor: textInverse,
-      elevation: 1,
-      centerTitle: false,
-    ),
-    cardTheme: CardThemeData(
-      color: const Color(0xFF374151),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    ),
-    textTheme: const TextTheme(
-      headlineLarge: TextStyle(
-        color: textInverse,
-        fontSize: 24,
-        fontWeight: FontWeight.bold,
+  static Color getAppBarBackgroundColor(bool darkMode) => Colors.transparent;
+  static Color getSecondaryColor(bool darkMode) => darkMode ? _darkColorScheme.outline : const Color(0xFFE5F1FF);
+  static Color getSecondaryTextColor(bool darkMode) => darkMode ? const Color(0xFF97C3FF) : const Color(0xFF1366E1);
+
+  /// Status bar theming based on current theme mode
+  static SystemUiOverlayStyle getSystemUiOverlayStyle(bool darkMode) {
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: darkMode ? Brightness.light : Brightness.dark,
+      statusBarBrightness: darkMode ? Brightness.dark : Brightness.light,
+    );
+  }
+
+  static ThemeData get light => _buildTheme(_lightColorScheme);
+
+  static ThemeData get dark => _buildTheme(_darkColorScheme);
+
+  static ThemeData _buildTheme(ColorScheme colorScheme) {
+    final isDark = colorScheme.brightness == Brightness.dark;
+
+    return ThemeData(
+      colorScheme: colorScheme,
+      useMaterial3: true,
+      appBarTheme: AppBarTheme(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
+        elevation: Palette.elevationAppBar,
       ),
-      headlineMedium: TextStyle(
-        color: textInverse,
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Palette.radiusSmall)),
+        ),
       ),
-      bodyLarge: TextStyle(color: textInverse, fontSize: 16),
-      bodyMedium: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-      bodySmall: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: primaryBlue,
-        foregroundColor: Colors.white,
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.primary,
+          side: BorderSide(color: colorScheme.primary),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Palette.radiusSmall)),
+        ),
       ),
-    ),
-    outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: primaryBlue,
-        side: const BorderSide(color: primaryBlue),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      cardTheme: CardThemeData(
+        elevation: Palette.elevationCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(Palette.radiusMedium)),
+        color: colorScheme.surfaceContainer,
       ),
-    ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: const Color(0xFF374151),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF4B5563)),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colorScheme.surfaceContainer,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Palette.radiusMedium),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Palette.radiusMedium),
+          borderSide: BorderSide(color: colorScheme.outline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(Palette.radiusMedium),
+          borderSide: BorderSide(color: colorScheme.primary, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF4B5563)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: primaryBlue, width: 2),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-  );
+      extensions: <ThemeExtension<dynamic>>[AppTextTheme.create(isDark: isDark)],
+    );
+  }
 }

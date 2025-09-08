@@ -119,6 +119,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Python linters and formatters
+.ruff_cache/
+.pytype/
+
 # Spyder project settings
 .spyderproject
 .spyproject

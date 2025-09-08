@@ -152,6 +152,69 @@ class Settings(BaseSettings):
     log_rotation: str
     log_retention: str
 
+    # RAG System Configuration
+    rag_enabled: bool = True
+    rag_data_scan_paths: str = ""  # Comma-separated paths to scan for documents
+    rag_max_scan_depth: int = 5
+    rag_min_file_count: int = 5
+    rag_model_save_path: str = "models"
+    rag_export_path: str = "exports"
+    
+    # RAG Data Source Configuration
+    rag_database_connections: str = ""  # JSON string of database configs
+    rag_api_endpoints: str = ""  # Comma-separated API endpoints
+    rag_include_common_apis: bool = True
+    rag_api_timeout: int = 10
+    rag_api_validation_enabled: bool = True
+    
+    # RAG ML Configuration  
+    rag_ml_model_type: Literal["logistic_regression", "naive_bayes", "random_forest"] = "logistic_regression"
+    rag_ml_max_features: int = 10000
+    rag_ml_ngram_range_min: int = 1
+    rag_ml_ngram_range_max: int = 2
+    rag_ml_min_confidence: float = 0.6
+    rag_ml_target_accuracy: float = 0.85
+    rag_ml_synthetic_data_size: int = 100
+    rag_ml_auto_retrain: bool = False
+    rag_ml_retrain_interval_hours: int = 24
+    
+    # RAG Processing Configuration
+    rag_batch_size: int = 100
+    rag_processing_timeout: int = 300  # seconds
+    rag_max_memory_mb: int = 1024
+    rag_enable_quality_validation: bool = True
+    rag_quality_threshold: float = 0.5
+
+    @property
+    def rag_data_scan_paths_list(self) -> List[str]:
+        """Convert comma-separated scan paths to list"""
+        if not self.rag_data_scan_paths.strip():
+            return []
+        return [path.strip() for path in self.rag_data_scan_paths.split(",") if path.strip()]
+    
+    @property
+    def rag_api_endpoints_list(self) -> List[str]:
+        """Convert comma-separated API endpoints to list"""
+        if not self.rag_api_endpoints.strip():
+            return []
+        return [endpoint.strip() for endpoint in self.rag_api_endpoints.split(",") if endpoint.strip()]
+    
+    @property
+    def rag_database_connections_list(self) -> List[dict]:
+        """Parse JSON database connections"""
+        import json
+        if not self.rag_database_connections.strip():
+            return []
+        try:
+            return json.loads(self.rag_database_connections)
+        except json.JSONDecodeError:
+            return []
+    
+    @property
+    def rag_ml_ngram_range(self) -> tuple:
+        """Get ngram range as tuple"""
+        return (self.rag_ml_ngram_range_min, self.rag_ml_ngram_range_max)
+
 
 # Create a global settings instance
 settings = Settings()

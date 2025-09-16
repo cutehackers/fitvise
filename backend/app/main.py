@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.v1.router import router
 from app.application import llm_service
-from backend.app.core.settings import settings
+from app.core.settings import settings
 
 # Configure logging
 logging.basicConfig(

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.application.llm_service import LlmService, llm_service
-from backend.app.core.settings import settings
+from app.core.settings import settings
 from app.schemas.chat import (
     ApiErrorResponse,
     ChatRequest,

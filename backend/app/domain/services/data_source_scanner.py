@@ -333,6 +333,7 @@ class DataSourceScanner:
     ) -> None:
         """Export data source inventory to CSV file."""
         import csv
+        import io
         
         headers = [
             'ID', 'Name', 'Type', 'Description', 'Is Active', 'Priority',
@@ -340,33 +341,38 @@ class DataSourceScanner:
             'Connection Info', 'Created At'
         ]
         
-        async with aiofiles.open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.writer(csvfile)
-            writer.writerow(headers)
+        # Create CSV content in memory first
+        csv_content = io.StringIO()
+        writer = csv.writer(csv_content)
+        writer.writerow(headers)
+        
+        for ds in data_sources:
+            health = ds.get_health_status()
+            connection_info = f"{ds.source_info.connection_config.host or 'N/A'}"
+            if ds.source_info.connection_config.database_name:
+                connection_info += f"/{ds.source_info.connection_config.database_name}"
+            elif ds.source_info.connection_config.base_url:
+                connection_info = ds.source_info.connection_config.base_url
             
-            for ds in data_sources:
-                health = ds.get_health_status()
-                connection_info = f"{ds.source_info.connection_config.host or 'N/A'}"
-                if ds.source_info.connection_config.database_name:
-                    connection_info += f"/{ds.source_info.connection_config.database_name}"
-                elif ds.source_info.connection_config.base_url:
-                    connection_info = ds.source_info.connection_config.base_url
-                
-                row = [
-                    str(ds.id),
-                    ds.name,
-                    ds.source_type.value,
-                    ds.description,
-                    ds.is_active,
-                    ds.source_info.priority,
-                    ds.source_info.estimated_document_count,
-                    ds.last_scan_time.isoformat() if ds.last_scan_time else 'Never',
-                    ds.current_quality_score,
-                    'Healthy' if health['is_healthy'] else 'Unhealthy',
-                    connection_info,
-                    ds.created_at.isoformat()
-                ]
-                writer.writerow(row)
+            row = [
+                str(ds.id),
+                ds.name,
+                ds.source_type.value,
+                ds.description,
+                ds.is_active,
+                ds.source_info.priority,
+                ds.source_info.estimated_document_count,
+                ds.last_scan_time.isoformat() if ds.last_scan_time else 'Never',
+                ds.current_quality_score,
+                'Healthy' if health['is_healthy'] else 'Unhealthy',
+                connection_info,
+                ds.created_at.isoformat()
+            ]
+            writer.writerow(row)
+        
+        # Write to file asynchronously
+        async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+            await f.write(csv_content.getvalue())
     
     async def export_inventory_to_json(
         self, 

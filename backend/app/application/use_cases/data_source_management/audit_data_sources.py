@@ -43,9 +43,9 @@ class AuditDataSourcesRequest:
             home / "Documents",
             home / "Downloads", 
             home / "Desktop",
-            "/Users/Shared/Documents",  # macOS
-            "/home/shared/documents",   # Linux
-            "C:\\Users\\Public\\Documents"  # Windows
+            Path("/Users/Shared/Documents"),  # macOS
+            Path("/home/shared/documents"),   # Linux
+            Path("C:\\Users\\Public\\Documents")  # Windows
         ]
         
         # Add existing paths

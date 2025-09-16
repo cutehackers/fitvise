@@ -128,11 +128,13 @@ class SklearnDocumentCategorizer:
                 n_jobs=-1
             )
         else:  # Default to logistic regression
-            classifier = LogisticRegression(
-                random_state=42,
-                max_iter=1000,
-                multi_class='ovr',
-                n_jobs=-1
+            from sklearn.multiclass import OneVsRestClassifier
+            classifier = OneVsRestClassifier(
+                LogisticRegression(
+                    random_state=42,
+                    max_iter=1000,
+                    n_jobs=-1
+                )
             )
         
         return Pipeline([

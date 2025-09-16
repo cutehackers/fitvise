@@ -1,0 +1,143 @@
+{
+  "exported_at": "2025-09-08T07:52:43.913258",
+  "total_apis": 7,
+  "apis": [
+    {
+      "name": "GitHub API",
+      "base_url": "https://api.github.com",
+      "description": "Access GitHub repositories, issues, and documentation",
+      "version": null,
+      "auth_methods": [
+        "token",
+        "oauth"
+      ],
+      "rate_limits": {
+        "authenticated": "5000/hour",
+        "unauthenticated": "60/hour"
+      },
+      "endpoints": [],
+      "documentation_url": "https://docs.github.com/en/rest",
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "https://api.github.com/rate_limit",
+      "response_time_ms": 53.081,
+      "status": "error"
+    },
+    {
+      "name": "Confluence API",
+      "base_url": "https://{domain}.atlassian.net/wiki/rest/api",
+      "description": "Access Confluence pages and spaces",
+      "version": null,
+      "auth_methods": [
+        "basic",
+        "oauth2",
+        "api_token"
+      ],
+      "rate_limits": {
+        "standard": "1000/hour"
+      },
+      "endpoints": [],
+      "documentation_url": "https://developer.atlassian.com/cloud/confluence/rest/",
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "https://{domain}.atlassian.net/space",
+      "response_time_ms": null,
+      "status": "error"
+    },
+    {
+      "name": "Slack API",
+      "base_url": "https://slack.com/api",
+      "description": "Access Slack messages, channels, and files",
+      "version": null,
+      "auth_methods": [
+        "oauth2",
+        "bot_token"
+      ],
+      "rate_limits": {
+        "tier1": "1/minute",
+        "tier2": "20/minute",
+        "tier3": "50/minute"
+      },
+      "endpoints": [],
+      "documentation_url": "https://api.slack.com/",
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "https://slack.com/auth.test",
+      "response_time_ms": 327.593,
+      "status": "error"
+    },
+    {
+      "name": "Notion API",
+      "base_url": "https://api.notion.com/v1",
+      "description": "Access Notion pages and databases",
+      "version": null,
+      "auth_methods": [
+        "bearer_token"
+      ],
+      "rate_limits": {
+        "requests": "3/second"
+      },
+      "endpoints": [],
+      "documentation_url": "https://developers.notion.com/reference",
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "https://api.notion.com/users/me",
+      "response_time_ms": 1403.3990000000001,
+      "status": "error"
+    },
+    {
+      "name": "SharePoint API",
+      "base_url": "https://{tenant}.sharepoint.com/_api",
+      "description": "Access SharePoint sites, lists, and documents",
+      "version": null,
+      "auth_methods": [
+        "oauth2",
+        "app_only"
+      ],
+      "rate_limits": {
+        "standard": "2000/minute"
+      },
+      "endpoints": [],
+      "documentation_url": "https://docs.microsoft.com/en-us/sharepoint/dev/",
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "https://{tenant}.sharepoint.com/web",
+      "response_time_ms": null,
+      "status": "error"
+    },
+    {
+      "name": "Custom API: ",
+      "base_url": "://",
+      "description": "Custom API endpoint at ",
+      "version": null,
+      "auth_methods": [
+        "api_key"
+      ],
+      "rate_limits": {},
+      "endpoints": [],
+      "documentation_url": null,
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "api_github_com",
+      "response_time_ms": null,
+      "status": "error"
+    },
+    {
+      "name": "Custom API: ",
+      "base_url": "://",
+      "description": "Custom API endpoint at ",
+      "version": null,
+      "auth_methods": [
+        "api_key"
+      ],
+      "rate_limits": {},
+      "endpoints": [],
+      "documentation_url": null,
+      "openapi_spec_url": null,
+      "requires_key": true,
+      "health_check_url": "slack_com",
+      "response_time_ms": null,
+      "status": "error"
+    }
+  ]
+}

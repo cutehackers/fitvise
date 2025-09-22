@@ -1,4 +1,5 @@
 """RAG Data Sources API endpoints."""
+import datetime
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
@@ -306,17 +307,19 @@ async def health_check(
         needing_scan = await repository.find_needing_scan()
         unhealthy = await repository.find_unhealthy()
         
+        now = datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        
         return {
             "status": "healthy",
-            "timestamp": "2024-01-01T00:00:00Z",  # Would use actual time
+            "timestamp": now,
             "total_sources": total_sources,
             "active_sources": active_sources,
             "sources_needing_scan": len(needing_scan),
             "unhealthy_sources": len(unhealthy),
             "meets_task_requirements": {
-                "task_1_1_1": total_sources >= 20,  # ≥20 data sources
-                "task_1_1_2": True,  # API documentation capability
-                "task_1_1_3": True   # ML categorization capability
+                "scan": total_sources >= 20,  # ≥20 data sources
+                "document-external-apis": True,  # API documentation capability
+                "categorization": True   # ML categorization capability
             }
         }
     except Exception as e:

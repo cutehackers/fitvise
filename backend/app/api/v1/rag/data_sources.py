@@ -5,17 +5,17 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
 from pydantic import BaseModel, Field
 
-from app.application.use_cases.data_source_management.audit_data_sources import (
+from app.application.use_cases.knowledge_sources.audit_data_sources import (
     AuditDataSourcesUseCase,
     AuditDataSourcesRequest,
     AuditDataSourcesResponse
 )
-from app.application.use_cases.data_source_management.document_external_apis import (
+from app.application.use_cases.knowledge_sources.document_external_apis import (
     DocumentExternalApisUseCase,
     DocumentExternalApisRequest, 
     DocumentExternalApisResponse
 )
-from app.application.use_cases.data_source_management.categorize_sources import (
+from app.application.use_cases.knowledge_sources.categorize_sources import (
     CategorizeSourcesUseCase,
     CategorizeSourcesRequest,
     CategorizeSourcesResponse

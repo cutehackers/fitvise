@@ -18,13 +18,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
-from app.application.use_cases.data_source_management.audit_data_sources import (
+from app.application.use_cases.knowledge_sources.audit_data_sources import (
     AuditDataSourcesUseCase, AuditDataSourcesRequest
 )
-from app.application.use_cases.data_source_management.document_external_apis import (
+from app.application.use_cases.knowledge_sources.document_external_apis import (
     DocumentExternalApisUseCase, DocumentExternalApisRequest
 )
-from app.application.use_cases.data_source_management.categorize_sources import (
+from app.application.use_cases.knowledge_sources.categorize_sources import (
     CategorizeSourcesUseCase, CategorizeSourcesRequest
 )
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import (

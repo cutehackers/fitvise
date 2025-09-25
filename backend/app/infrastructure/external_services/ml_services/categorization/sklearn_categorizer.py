@@ -16,6 +16,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import classification_report, f1_score, accuracy_score
+from sklearn.multiclass import OneVsRestClassifier
 
 
 class SklearnDocumentCategorizer:
@@ -216,8 +217,6 @@ class SklearnDocumentCategorizer:
         if self.model_type == "naive_bayes":
             classifier = MultinomialNB(alpha=0.1)
         else:
-            from sklearn.multiclass import OneVsRestClassifier
-
             classifier = OneVsRestClassifier(LogisticRegression(random_state=42, max_iter=1000, n_jobs=-1))
 
         return Pipeline([("vectorizer", preprocessor), ("classifier", classifier)])

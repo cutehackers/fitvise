@@ -21,19 +21,19 @@
 
 ### 1.2 Core Ingestion Infrastructure
 
-- [ ]  **Task 1.2.1**: Set up Apache Airflow environment
+- [x]  **Task 1.2.1**: Set up Apache Airflow environment
     - Deliverable: Dockerized Airflow setup with basic DAG template
     - Acceptance Criteria: Airflow UI accessible, can run hello-world DAG
     - Effort: 5 days
-- [ ]  **Task 1.2.2**: Implement Apache Tika integration service
+- [x]  **Task 1.2.2**: Implement Apache Tika integration service
     - Deliverable: Python service that accepts files and returns parsed text + metadata
     - Acceptance Criteria: Handles PDF, DOCX, HTML, JSON, CSV with 95% success rate
     - Effort: 8 days
-- [ ]  **Task 1.2.3**: Build database connectors module
+- [x]  **Task 1.2.3**: Build database connectors module
     - Deliverable: SQLAlchemy-based connector supporting PostgreSQL, MongoDB, MySQL
     - Acceptance Criteria: Can connect and extract data from each DB type
     - Effort: 10 days
-- [ ]  **Task 1.2.4**: Implement web scraping framework
+- [x]  **Task 1.2.4**: Implement web scraping framework
     - Deliverable: Scrapy-based framework with authentication handling
     - Acceptance Criteria: Can crawl 3 different internal wiki systems
     - Effort: 12 days

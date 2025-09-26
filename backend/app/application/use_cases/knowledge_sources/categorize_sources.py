@@ -346,5 +346,5 @@ class CategorizeSourcesUseCase:
             "source_name": source.name,
             "predictions": predictions,
             "max_confidence": max([p["confidence"] for p in predictions]) if predictions else 0.0,
-            "predicted_at": datetime.utcnow().isoformat()
+            "predicted_at": datetime.now(datetime.timezone.utc).isoformat()
         }

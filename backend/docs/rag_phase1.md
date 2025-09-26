@@ -44,7 +44,7 @@ rag-system-phase1/                        # PHASE 1: Data Acquisition and Prepro
 │   │   ├── use_cases/
 │   │   │   ├── **init**.py
 │   │   │   │
-│   │   │   ├── data_source_management/   # Epic 1.1: Data Source ID & Cataloging
+│   │   │   ├── knowledge_sources/   # Epic 1.1: Data Source ID & Cataloging
 │   │   │   │   ├── **init**.py
 │   │   │   │   ├── audit_data_sources.py      # Task 1.1.1
 │   │   │   │   ├── document_external_apis.py  # Task 1.1.2

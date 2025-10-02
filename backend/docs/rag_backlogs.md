@@ -40,19 +40,19 @@
 
 ### 1.3 Advanced Document Processing
 
-- [ ]  **Task 1.3.1**: Integrate Docling for PDF processing
+- [x]  **Task 1.3.1**: Integrate Docling for PDF processing
     - Deliverable: Service that converts PDFs to structured markdown with tables
     - Acceptance Criteria: Preserves layout, extracts tables as pandas DataFrames
     - Effort: 10 days
-- [ ]  **Task 1.3.2**: Implement spaCy-based text cleaning pipeline
+- [x]  **Task 1.3.2**: Implement spaCy-based text cleaning pipeline
     - Deliverable: Text preprocessing service with typo correction, lemmatization, NER
     - Acceptance Criteria: Processes 1000 docs/hour with consistent formatting
     - Effort: 8 days
-- [ ]  **Task 1.3.3**: Build metadata extraction service
+- [x]  **Task 1.3.3**: Build metadata extraction service
     - Deliverable: Service extracting keywords, entities, dates, authors from documents
     - Acceptance Criteria: Extracts ≥5 metadata fields per document with 90% accuracy
     - Effort: 12 days
-- [ ]  **Task 1.3.4**: Implement data quality validation
+- [x]  **Task 1.3.4**: Implement data quality validation
     - Deliverable: Great Expectations-based validation pipeline
     - Acceptance Criteria: Catches and reports data quality issues automatically
     - Effort: 8 days

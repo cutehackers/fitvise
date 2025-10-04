@@ -59,11 +59,11 @@
 
 ### 1.4 Storage and Data Flow
 
-- [ ]  **Task 1.4.1**: Set up MinIO object storage
+- [x]  **Task 1.4.1**: Set up MinIO object storage
     - Deliverable: S3-compatible storage with bucket organization
     - Acceptance Criteria: Stores processed documents with metadata tagging
     - Effort: 5 days
-- [ ]  **Task 1.4.2**: Build ETL orchestration DAGs
+- [x]  **Task 1.4.2**: Build ETL orchestration DAGs
     - Deliverable: Airflow DAGs for each data source with error handling
     - Acceptance Criteria: Daily incremental updates, failure notifications
     - Effort: 15 days

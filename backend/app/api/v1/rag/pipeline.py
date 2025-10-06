@@ -50,7 +50,7 @@ class PipelineDoc(BaseModel):
         return v
 
 
-class PipelineSimulatePayload(BaseModel):
+class RunPipelinePayload(BaseModel):
     documents: List[PipelineDoc]
     storage_provider: str = Field("local", description="'local' or 'minio'")
     storage_base_dir: Optional[str] = Field(None, description="Local base dir for buckets (dev only)")
@@ -61,16 +61,21 @@ class PipelineSimulatePayload(BaseModel):
     bucket_processed: str = Field("rag-processed", description="Bucket used for processed markdown")
 
 
-class PipelineSimulateResponse(BaseModel):
+class RunPipelineResponse(BaseModel):
     processed: int
     stored_objects: List[str]
     steps: Dict[str, Any]
     storage: Dict[str, Any]
 
 
-@router.post("/simulate", response_model=PipelineSimulateResponse)
-async def simulate_pipeline(
-    payload: PipelineSimulatePayload,
+@router.post(
+    "/run",
+    response_model=RunPipelineResponse,
+    summary="Run Phase 1 pipeline",
+    description="Process documents end-to-end and store results to object storage.",
+)
+async def run_pipeline(
+    payload: RunPipelinePayload,
 ):
     try:
         (
@@ -190,7 +195,7 @@ async def simulate_pipeline(
             "bucket": payload.bucket_processed,
             "key": object_key,
         }
-        return PipelineSimulateResponse(
+        return RunPipelineResponse(
             processed=len(pdf_res.documents),
             stored_objects=[f"{payload.bucket_processed}:{object_key}"],
             steps=steps,

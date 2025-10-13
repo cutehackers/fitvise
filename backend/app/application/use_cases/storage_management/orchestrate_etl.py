@@ -8,121 +8,30 @@ failure logging/notification hooks.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import string
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.infrastructure.orchestration import AirflowEnvironmentManager
 
 
+def _render_template(template_filename: str, mapping: Dict[str, str]) -> str:
+    templates_dir = Path(__file__).parent / "templates"
+    tpl = templates_dir / template_filename
+    text = tpl.read_text(encoding="utf-8")
+    return string.Template(text).substitute(mapping)
+
+
 def _ingestion_dag_source(dag_id: str = "rag_data_ingestion") -> str:
-    return "\n".join(
-        [
-            '"""RAG - Data Ingestion DAG (auto-generated)."""',
-            "from __future__ import annotations",
-            "",
-            "from datetime import datetime, timedelta",
-            "from airflow import DAG",
-            "from airflow.operators.python import PythonOperator",
-            "",
-            "def _fail_handler(context):",
-            '    print(f"[FAIL] Task {context['task_instance'].task_id} failed at {context['ts']}")',
-            '    print("Sending failure notification (simulated)...")',
-            "",
-            "def _discover_sources(**kwargs):",
-            '    print("Scanning registered data sources (simulated)...")',
-            '    return {"discovered": 3}',
-            "",
-            "def _ingest_new_data(**kwargs):",
-            '    print("Ingesting new/changed data (simulated incremental)...")',
-            "",
-            "default_args = {",
-            '    "owner": "fitvise",',
-            '    "depends_on_past": False,',
-            '    "retries": 1,',
-            '    "retry_delay": timedelta(minutes=5),',
-            '    "email_on_failure": True,',
-            '    "email": ["rag-alerts@example.com"],',
-            "}",
-            f"with DAG('{dag_id}', start_date=datetime.utcnow(), schedule_interval='@daily', catchup=False, default_args=default_args, tags=['rag','etl','ingestion']) as dag:",
-            "    discover = PythonOperator(task_id='discover_sources', python_callable=_discover_sources, on_failure_callback=_fail_handler)",
-            "    ingest = PythonOperator(task_id='ingest_incremental', python_callable=_ingest_new_data, on_failure_callback=_fail_handler)",
-            "    discover >> ingest",
-            "",
-        ]
-    )
+    return _render_template("ingestion_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','ingestion']"})
 
 
 def _processing_dag_source(dag_id: str = "rag_document_processing") -> str:
-    return "\n".join(
-        [
-            '"""RAG - Document Processing DAG (auto-generated)."""',
-            "from __future__ import annotations",
-            "",
-            "from datetime import datetime, timedelta",
-            "from airflow import DAG",
-            "from airflow.operators.python import PythonOperator",
-            "",
-            "def _fail_handler(context):",
-            '    print(f"[FAIL] Task {context['task_instance'].task_id} failed at {context['ts']}")',
-            '    print("Sending failure notification (simulated)...")',
-            "",
-            "def _extract_text(**kwargs):",
-            '    print("Extracting text via Docling/Tika (simulated)...")',
-            "",
-            "def _clean_text(**kwargs):",
-            '    print("Running spaCy-based cleaning (simulated)...")',
-            "",
-            "def _enrich_metadata(**kwargs):",
-            '    print("Extracting keywords/entities (simulated)...")',
-            "",
-            "default_args = {",
-            '    "owner": "fitvise",',
-            '    "depends_on_past": False,',
-            '    "retries": 1,',
-            '    "retry_delay": timedelta(minutes=5),',
-            '    "email_on_failure": True,',
-            '    "email": ["rag-alerts@example.com"],',
-            "}",
-            f"with DAG('{dag_id}', start_date=datetime.utcnow(), schedule_interval='@daily', catchup=False, default_args=default_args, tags=['rag','etl','processing']) as dag:",
-            "    extract = PythonOperator(task_id='extract_text', python_callable=_extract_text, on_failure_callback=_fail_handler)",
-            "    clean = PythonOperator(task_id='clean_text', python_callable=_clean_text, on_failure_callback=_fail_handler)",
-            "    metadata = PythonOperator(task_id='enrich_metadata', python_callable=_enrich_metadata, on_failure_callback=_fail_handler)",
-            "    extract >> clean >> metadata",
-            "",
-        ]
-    )
+    return _render_template("processing_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','processing']"})
 
 
 def _quality_dag_source(dag_id: str = "rag_data_quality") -> str:
-    return "\n".join(
-        [
-            '"""RAG - Data Quality Validation DAG (auto-generated)."""',
-            "from __future__ import annotations",
-            "",
-            "from datetime import datetime, timedelta",
-            "from airflow import DAG",
-            "from airflow.operators.python import PythonOperator",
-            "",
-            "def _fail_handler(context):",
-            '    print(f"[FAIL] Task {context['task_instance'].task_id} failed at {context['ts']}")',
-            '    print("Sending failure notification (simulated)...")',
-            "",
-            "def _validate_quality(**kwargs):",
-            '    print("Running Great Expectations checks (simulated)...")',
-            "",
-            "default_args = {",
-            '    "owner": "fitvise",',
-            '    "depends_on_past": False,',
-            '    "retries": 0,',
-            '    "retry_delay": timedelta(minutes=5),',
-            '    "email_on_failure": True,',
-            '    "email": ["rag-alerts@example.com"],',
-            "}",
-            f"with DAG('{dag_id}', start_date=datetime.utcnow(), schedule_interval='@daily', catchup=False, default_args=default_args, tags=['rag','etl','quality']) as dag:",
-            "    validate = PythonOperator(task_id='validate_data_quality', python_callable=_validate_quality, on_failure_callback=_fail_handler)",
-            "",
-        ]
-    )
+    return _render_template("quality_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','quality']"})
 
 
 @dataclass
@@ -171,4 +80,3 @@ class BuildEtlDagsUseCase:
             "quality_exists": str(quality_path.exists()),
         }
         return BuildEtlDagsResponse(success=True, dag_files=dag_files, diagnostics=diagnostics)
-

@@ -10,8 +10,8 @@ from pydantic import BaseModel, Field, validator
 from app.application.use_cases.document_processing import (
     ProcessPdfsUseCase,
     ProcessPdfsRequest,
-    CleanTextUseCase,
-    CleanTextRequest,
+    NormalizeTextUseCase,
+    NormalizeTextRequest,
     ExtractMetadataUseCase,
     ExtractMetadataRequest,
     ValidateQualityUseCase,
@@ -26,8 +26,8 @@ def get_pdf_use_case() -> ProcessPdfsUseCase:
     return ProcessPdfsUseCase()
 
 
-def get_clean_use_case() -> CleanTextUseCase:
-    return CleanTextUseCase()
+def get_normalize_use_case() -> NormalizeTextUseCase:
+    return NormalizeTextUseCase()
 
 
 def get_metadata_use_case() -> ExtractMetadataUseCase:
@@ -91,7 +91,7 @@ async def process_pdfs(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-class CleanTextPayload(BaseModel):
+class NormalizeTextPayload(BaseModel):
     texts: List[str]
     lowercase: bool = False
     correct_typos: bool = False
@@ -99,17 +99,17 @@ class CleanTextPayload(BaseModel):
     extract_entities: bool = True
 
 
-class CleanTextResponseModel(BaseModel):
+class NormalizeTextResponseModel(BaseModel):
     results: List[Dict[str, Any]]
     environment: Dict[str, Any]
 
 
-@router.post("/clean", response_model=CleanTextResponseModel)
-async def clean_text(
-    payload: CleanTextPayload, use_case: CleanTextUseCase = Depends(get_clean_use_case)
+@router.post("/normalize", response_model=NormalizeTextResponseModel)
+async def normalize_text(
+    payload: NormalizeTextPayload, use_case: NormalizeTextUseCase = Depends(get_normalize_use_case)
 ):
     try:
-        request = CleanTextRequest(
+        request = NormalizeTextRequest(
             texts=payload.texts,
             lowercase=payload.lowercase,
             correct_typos=payload.correct_typos,
@@ -117,7 +117,7 @@ async def clean_text(
             extract_entities=payload.extract_entities,
         )
         response = await use_case.execute(request)
-        return CleanTextResponseModel(
+        return NormalizeTextResponseModel(
             results=[r.as_dict() for r in response.results], environment=response.environment
         )
     except Exception as exc:  # pragma: no cover

@@ -12,8 +12,8 @@ from pydantic import BaseModel, Field, validator
 from app.application.use_cases.document_processing import (
     ProcessPdfsUseCase,
     ProcessPdfsRequest,
-    CleanTextUseCase,
-    CleanTextRequest,
+    NormalizeTextUseCase,
+    NormalizeTextRequest,
     ExtractMetadataUseCase,
     ExtractMetadataRequest,
     ValidateQualityUseCase,
@@ -29,7 +29,7 @@ router = APIRouter(prefix="/rag/pipeline", tags=["RAG Pipeline"])
 def get_use_cases():
     return (
         ProcessPdfsUseCase(),
-        CleanTextUseCase(),
+        NormalizeTextUseCase(),
         ExtractMetadataUseCase(),
         ValidateQualityUseCase(),
         SetupObjectStorageUseCase(),
@@ -103,8 +103,8 @@ async def run_pipeline(
         first_doc = pdf_res.documents[0]
         markdown_text = first_doc.markdown
 
-        # 2) Clean text
-        clean_req = CleanTextRequest(texts=[markdown_text])
+        # 2) Normalize text
+        clean_req = NormalizeTextRequest(texts=[markdown_text])
         clean_res = await clean_uc.execute(clean_req)
         cleaned_text = clean_res.results[0].cleaned_text if clean_res.results else markdown_text
 

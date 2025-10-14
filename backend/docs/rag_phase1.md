@@ -60,7 +60,7 @@ rag-system-phase1/                        # PHASE 1: Data Acquisition and Prepro
 │   │   │   ├── document_processing/      # Epic 1.3: Advanced Processing
 │   │   │   │   ├── **init**.py
 │   │   │   │   ├── process_pdfs.py            # Task 1.3.1
-│   │   │   │   ├── clean_text.py              # Task 1.3.2
+│   │   │   │   ├── normalize_text.py              # Task 1.3.2
 │   │   │   │   ├── extract_metadata.py        # Task 1.3.3
 │   │   │   │   └── validate_quality.py        # Task 1.3.4
 │   │   │   │

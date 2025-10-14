@@ -16,10 +16,10 @@ from .process_pdfs import (
     PdfDocumentResult,
     ProcessPdfsUseCase,
 )
-from .clean_text import (
-    CleanTextRequest,
-    CleanTextResponse,
-    CleanTextUseCase,
+from .normalize_text import (
+    NormalizeTextRequest,
+    NormalizeTextResponse,
+    NormalizeTextUseCase,
 )
 from .extract_metadata import (
     ExtractMetadataRequest,
@@ -37,9 +37,9 @@ __all__ = [
     "ProcessPdfsResponse",
     "PdfDocumentResult",
     "ProcessPdfsUseCase",
-    "CleanTextRequest",
-    "CleanTextResponse",
-    "CleanTextUseCase",
+    "NormalizeTextRequest",
+    "NormalizeTextResponse",
+    "NormalizeTextUseCase",
     "ExtractMetadataRequest",
     "ExtractMetadataResponse",
     "ExtractMetadataUseCase",

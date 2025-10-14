@@ -6,8 +6,8 @@ from .tika_processor import (
 )
 from .base_processor import (
     FileProcessingResult,
-    CleanTextOptions,
-    CleanTextResult,
+    NormalizeTextOptions,
+    NormalizeTextResult,
     MetadataExtractionResult,
     PdfProcessorBase,
     TextCleanerBase,
@@ -21,8 +21,8 @@ __all__ = [
     "TikaExtractionResult",
     "TikaIntegrationService",
     "FileProcessingResult",
-    "CleanTextOptions",
-    "CleanTextResult",
+    "NormalizeTextOptions",
+    "NormalizeTextResult",
     "MetadataExtractionResult",
     "PdfProcessorBase",
     "TextCleanerBase",

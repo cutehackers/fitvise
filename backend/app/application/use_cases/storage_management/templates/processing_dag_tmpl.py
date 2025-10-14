@@ -40,15 +40,15 @@ def _extract_text(**kwargs):
 
 def _clean_text(**kwargs):
     try:
-        from app.application.use_cases.document_processing import CleanTextUseCase, CleanTextRequest
+        from app.application.use_cases.document_processing import NormalizeTextUseCase, NormalizeTextRequest
     except Exception:
-        print("CleanTextUseCase unavailable; skipping.")
+        print("NormalizeTextUseCase unavailable; skipping.")
         return {"cleaned": 0}
     texts = ["placeholder text for cleaning"]
 
     async def _run():
-        uc = CleanTextUseCase()
-        res = await uc.execute(CleanTextRequest(texts=texts))
+        uc = NormalizeTextUseCase()
+        res = await uc.execute(NormalizeTextRequest(texts=texts))
         return len(res.results)
 
     n = asyncio.run(_run())
@@ -102,4 +102,3 @@ with DAG(
         task_id="enrich_metadata", python_callable=_enrich_metadata, on_failure_callback=_fail_handler
     )
     extract >> clean >> metadata
-

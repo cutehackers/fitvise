@@ -40,8 +40,8 @@ def _build_pipeline_functions():  # Localize imports to avoid Airflow dependency
 
     def clean_text_callable(**context):
         md = context["ti"].xcom_pull(key="markdown") or ""
-        cleaned = processor_text.clean_text(md)
-        context["ti"].xcom_push(key="cleaned_text", value=cleaned.cleaned)
+        cleaned = processor_text.normalize_text(md)
+        context["ti"].xcom_push(key="cleaned_text", value=cleaned.normalized)
         return {"ok": True, "tokens": len(cleaned.tokens)}
 
     def metadata_callable(**context):

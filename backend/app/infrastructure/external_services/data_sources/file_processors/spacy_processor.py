@@ -1,6 +1,6 @@
 """spaCy-based text processor (Task 1.3.2/1.3.3).
 
-Provides cleaning, lemmatization, and NER via spaCy (when present) with
+Provides normalization, lemmatization, and NER via spaCy (when present) with
 typo correction via TextBlob (optional). Includes TF-IDF-based keyword
 extraction with a fallback word-frequency approach.
 """
@@ -11,8 +11,8 @@ import unicodedata
 from typing import Any, Dict, List, Optional, Sequence
 
 from .base_processor import (
-    CleanTextOptions,
-    CleanTextResult,
+    NormalizeTextOptions,
+    NormalizeTextResult,
     MetadataExtractionResult,
     MetadataExtractorBase,
     TextCleanerBase,
@@ -118,8 +118,8 @@ class SpacyTextProcessor(TextCleanerBase, MetadataExtractorBase):
         self._textblob = _try_import_textblob()
         self._langdetect = _try_import_langdetect()
 
-    def clean_text(self, text: str, options: Optional[CleanTextOptions] = None) -> CleanTextResult:
-        options = options or CleanTextOptions()
+    def normalize_text(self, text: str, options: Optional[NormalizeTextOptions] = None) -> NormalizeTextResult:
+        options = options or NormalizeTextOptions()
         normalized = _normalize_text(text)
         if options.lowercase:
             normalized = normalized.lower()
@@ -144,10 +144,10 @@ class SpacyTextProcessor(TextCleanerBase, MetadataExtractorBase):
                 if options.extract_entities and hasattr(doc, "ents"):
                     for ent in doc.ents:
                         entities.append({"text": ent.text, "label": ent.label_})
-                return CleanTextResult(
+                return NormalizeTextResult(
                     success=True,
                     original=text,
-                    cleaned=normalized,
+                    normalized=normalized,
                     tokens=tokens,
                     lemmas=lemmas,
                     entities=entities,
@@ -157,8 +157,8 @@ class SpacyTextProcessor(TextCleanerBase, MetadataExtractorBase):
 
         tokens = _basic_tokens(normalized)
         lemmas = tokens if options.lemmatize else tokens
-        return CleanTextResult(
-            success=True, original=text, cleaned=normalized, tokens=tokens, lemmas=lemmas, entities=[]
+        return NormalizeTextResult(
+            success=True, original=text, normalized=normalized, tokens=tokens, lemmas=lemmas, entities=[]
         )
 
     def extract(self, texts: Sequence[str], top_k_keywords: int = 10) -> List[MetadataExtractionResult]:

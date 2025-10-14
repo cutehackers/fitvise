@@ -23,15 +23,15 @@ def _render_template(template_filename: str, mapping: Dict[str, str]) -> str:
 
 
 def _ingestion_dag_source(dag_id: str = "rag_data_ingestion") -> str:
-    return _render_template("ingestion_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','ingestion']"})
+    return _render_template("ingestion_dag_tmpl.py", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','ingestion']"})
 
 
 def _processing_dag_source(dag_id: str = "rag_document_processing") -> str:
-    return _render_template("processing_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','processing']"})
+    return _render_template("processing_dag_tmpl.py", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','processing']"})
 
 
 def _quality_dag_source(dag_id: str = "rag_data_quality") -> str:
-    return _render_template("quality_dag.py.tmpl", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','quality']"})
+    return _render_template("quality_dag_tmpl.py", {"dag_id": dag_id, "schedule": "@daily", "tags": "['rag','etl','quality']"})
 
 
 @dataclass

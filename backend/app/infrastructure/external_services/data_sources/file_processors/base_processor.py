@@ -39,7 +39,7 @@ class FileProcessingResult:
 
 
 @dataclass
-class CleanTextOptions:
+class NormalizeTextOptions:
     lowercase: bool = False
     correct_typos: bool = False
     lemmatize: bool = True
@@ -47,10 +47,10 @@ class CleanTextOptions:
 
 
 @dataclass
-class CleanTextResult:
+class NormalizeTextResult:
     success: bool
     original: str
-    cleaned: str
+    normalized: str
     tokens: List[str]
     lemmas: List[str]
     entities: List[Dict[str, Any]]
@@ -61,7 +61,7 @@ class CleanTextResult:
         return {
             "success": self.success,
             "original": self.original,
-            "cleaned": self.cleaned,
+            "cleaned": self.normalized,
             "tokens": self.tokens,
             "lemmas": self.lemmas,
             "entities": self.entities,
@@ -109,7 +109,7 @@ class PdfProcessorBase(Protocol):
 class TextCleanerBase(Protocol):
     """Text cleaning/NER contract."""
 
-    def clean_text(self, text: str, options: Optional[CleanTextOptions] = None) -> CleanTextResult:
+    def normalize_text(self, text: str, options: Optional[NormalizeTextOptions] = None) -> NormalizeTextResult:
         ...
 
 

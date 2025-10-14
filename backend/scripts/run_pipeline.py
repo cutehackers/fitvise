@@ -29,8 +29,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # add backend/ to 
 from app.application.use_cases.document_processing import (
     ProcessPdfsUseCase,
     ProcessPdfsRequest,
-    CleanTextUseCase,
-    CleanTextRequest,
+    NormalizeTextUseCase,
+    NormalizeTextRequest,
     ExtractMetadataUseCase,
     ExtractMetadataRequest,
     ValidateQualityUseCase,
@@ -87,7 +87,7 @@ async def main() -> int:
 
     # Use cases
     pdf_uc = ProcessPdfsUseCase()
-    clean_uc = CleanTextUseCase()
+    clean_uc = NormalizeTextUseCase()
     meta_uc = ExtractMetadataUseCase()
     qual_uc = ValidateQualityUseCase()
     storage_uc = SetupObjectStorageUseCase()
@@ -129,7 +129,7 @@ async def main() -> int:
         markdown = d.markdown
 
         # 2) Clean
-        clean_res = await clean_uc.execute(CleanTextRequest(texts=[markdown]))
+        clean_res = await clean_uc.execute(NormalizeTextRequest(texts=[markdown]))
         cleaned = clean_res.results[0].cleaned_text if clean_res.results else markdown
 
         # 3) Metadata
@@ -160,4 +160,3 @@ async def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-

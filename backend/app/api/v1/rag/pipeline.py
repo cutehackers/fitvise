@@ -106,7 +106,7 @@ async def run_pipeline(
         # 2) Normalize text
         clean_req = NormalizeTextRequest(texts=[markdown_text])
         clean_res = await clean_uc.execute(clean_req)
-        cleaned_text = clean_res.results[0].cleaned_text if clean_res.results else markdown_text
+        cleaned_text = clean_res.results[0].normalized if clean_res.results else markdown_text
 
         # 3) Extract metadata
         meta_req = ExtractMetadataRequest(texts=[cleaned_text], top_k_keywords=10)

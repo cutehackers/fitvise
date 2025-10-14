@@ -130,7 +130,7 @@ async def main() -> int:
 
         # 2) Clean
         clean_res = await clean_uc.execute(NormalizeTextRequest(texts=[markdown]))
-        cleaned = clean_res.results[0].cleaned_text if clean_res.results else markdown
+        cleaned = clean_res.results[0].normalized if clean_res.results else markdown
 
         # 3) Metadata
         meta_res = await meta_uc.execute(ExtractMetadataRequest(texts=[cleaned], top_k_keywords=10))

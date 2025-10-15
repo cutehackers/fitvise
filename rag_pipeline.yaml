@@ -1,0 +1,23 @@
+inputs:
+  path: ./data/pdfs
+  recurse: true
+  include: ["*.pdf"]
+storage:
+  provider: local
+  base_dir: ./storage
+  bucket: rag-processed
+  metadata_base: rag-metadata
+schedule:
+  mode: manual
+  cron: "0 3 1 * *"
+processors:
+  pdf: docling
+  non_pdf: tika
+  normalize: spacy
+limits:
+  since: null
+  max_files: 1000
+dedupe:
+  strategy: content_hash
+  manifest_path: rag-metadata/runs
+

@@ -337,3 +337,32 @@ rag-system-phase1/                        # PHASE 1: Data Acquisition and Prepro
 ├── [data-source-examples.md](http://data-source-examples.md/)
 ├── [processing-examples.md](http://processing-examples.md/)
 └── [quality-validation-examples.md](http://quality-validation-examples.md/)
+
+### Orchestrator Configuration (`rag_pipeline.yaml`)
+
+Phase 1 now ships with a unified orchestrator that reads `rag_pipeline.yaml`.
+Key sections:
+
+- `inputs`: file-system discovery rules (path, glob patterns, recursion).
+- `storage`: object storage provider (local/MinIO) plus credentials.
+- `schedule`: denotes whether runs are manual, cron-triggered, or Airflow-managed.
+- `processors`: selects the PDF/non-PDF/text cleaning stack.
+- `limits` and `dedupe`: throughput caps and manifest handling.
+- `sources`: optional ingestion lanes (audit, categorization, database connectors,
+  web crawls, and external API documentation) that feed additional documents into
+  the pipeline before processing.
+
+Example snippet:
+
+```
+sources:
+  audit:
+    enabled: true
+    scan_paths:
+      - ./data/pdfs
+  databases: []
+  web: []
+```
+
+See `backend/scripts/run_pipeline.py` for extended examples covering manual,
+cron, and Airflow execution patterns.

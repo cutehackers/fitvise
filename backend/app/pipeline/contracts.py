@@ -11,6 +11,7 @@ class DocumentSource:
     path: Optional[str] = None
     content_bytes: Optional[bytes] = None
     content_type: Optional[str] = None  # e.g. "application/pdf", "text/markdown"
+    origin: str = "file"
 
     def as_dict(self) -> Dict[str, Any]:
         d = asdict(self)

@@ -28,6 +28,7 @@ class PdfDocumentResult:
     source: str
     success: bool
     markdown: str
+    text: str
     tables: List[Dict[str, Any]]
     warnings: List[str]
     error: Optional[str] = None
@@ -37,6 +38,7 @@ class PdfDocumentResult:
             "source": self.source,
             "success": self.success,
             "markdown": self.markdown,
+            "text": self.text,
             "tables": self.tables,
             "warnings": self.warnings,
             "error": self.error,
@@ -94,13 +96,20 @@ class ProcessPdfsUseCase:
     async def _process_path(self, path: Path, request: ProcessPdfsRequest) -> PdfDocumentResult:
         if not path.exists():
             return PdfDocumentResult(
-                source=str(path), success=False, markdown="", tables=[], warnings=[], error=f"File not found: {path}"
+                source=str(path),
+                success=False,
+                markdown="",
+                text="",
+                tables=[],
+                warnings=[],
+                error=f"File not found: {path}",
             )
         result = self._processor.process_pdf_from_path(path)
         return PdfDocumentResult(
             source=str(path),
             success=result.success,
             markdown=result.markdown or result.text,
+            text=result.text,
             tables=result.tables,
             warnings=result.warnings,
             error=result.error,
@@ -112,6 +121,7 @@ class ProcessPdfsUseCase:
             source=name,
             success=result.success,
             markdown=result.markdown or result.text,
+            text=result.text,
             tables=result.tables,
             warnings=result.warnings,
             error=result.error,

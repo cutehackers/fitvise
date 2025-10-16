@@ -1,5 +1,5 @@
-inputs:
-  path: ./data/pdfs
+documents:
+  path: ../rag
   recurse: true
   include: ["*.pdf"]
 storage:
@@ -26,35 +26,42 @@ dedupe:
 sources:
   audit:
     enabled: true
-    scan_paths:
-      - ./data/pdfs
-    database_configs: []
-    api_endpoints: []
-    max_scan_depth: 3
-    min_file_count: 1
-    export_csv: null
-    export_json: null
-    save_to_repository: true
-  categorize:
-    enabled: false
-    train_model: false
-    use_synthetic_data: true
-    synthetic_data_size: 100
-    categorize_sources: false
-    source_ids: null
-    min_confidence: 0.6
-    model_type: logistic_regression
-    save_model: true
-    model_path: null
-  document_apis:
-    enabled: false
-    api_endpoints: []
-    api_discovery_urls: []
-    include_common_apis: true
-    validate_endpoints: true
-    rate_limit_test: false
-    timeout_seconds: 10
-    export_documentation: null
-    save_to_repository: true
+    scan_paths: ["../rag"]
   databases: []
   web: []
+  document_apis:
+    enabled: false
+# sources:
+#   audit:
+#     enabled: true
+#     scan_paths: ["~/workspace/rag"]
+#     database_configs: []
+#     api_endpoints: []
+#     max_scan_depth: 3
+#     min_file_count: 1
+#     export_csv: null
+#     export_json: null
+#     save_to_repository: true
+#   categorize:
+#     enabled: false
+#     train_model: false
+#     use_synthetic_data: true
+#     synthetic_data_size: 100
+#     categorize_sources: false
+#     source_ids: null
+#     min_confidence: 0.6
+#     model_type: logistic_regression
+#     save_model: true
+#     model_path: null
+#   document_apis:
+#     enabled: false
+#     api_endpoints: []
+#     api_discovery_urls: []
+#     include_common_apis: true
+#     validate_endpoints: true
+#     rate_limit_test: false
+#     timeout_seconds: 10
+#     export_documentation: null
+#     save_to_repository: true
+#   databases: []
+#   web: []

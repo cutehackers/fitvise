@@ -20,6 +20,10 @@ class DocumentOption(BaseModel):
     recurse: bool = Field(True, description="Recurse into subdirectories")
     include: List[str] = Field(default_factory=lambda: ["*.pdf"], description="Glob patterns to include")
 
+    @model_validator(mode="after")
+    def _expand_path(self):  # type: ignore[override]
+        self.path = self.path.expanduser()
+        return self
 
 class StorageOptions(BaseModel):
     provider: Literal["local", "minio"] = "local"

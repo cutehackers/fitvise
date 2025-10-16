@@ -22,7 +22,7 @@ such as audits, categorisation, DB/web/API pulls.
 Example `rag_pipeline.yaml` files
 
   # Manual run (on-demand)
-  inputs:
+  documents:
     path: ./data/manual
     recurse: true
     include: ["*.pdf"]
@@ -40,7 +40,7 @@ Example `rag_pipeline.yaml` files
     web: []
 
   # Cron-based monthly run (trigger cron separately, e.g. crontab)
-  inputs:
+  documents:
     path: /var/rag/monthly
     include: ["*.pdf", "*.md"]
   schedule:
@@ -77,7 +77,7 @@ Example `rag_pipeline.yaml` files
       enabled: false
 
   # Airflow-managed run (DAG calls the orchestrator)
-  inputs:
+  documents:
     path: s3://rag/raw
     recurse: true
   schedule:

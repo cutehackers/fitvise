@@ -11,6 +11,18 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.pipeline.config import PipelineSpec
+from app.domain.exceptions import (
+    ContentExtractionError,
+    DocumentError,
+    DocumentPathNotFoundError,
+    MetadataEnrichmentError,
+    NormalizationError,
+    ProcessingError,
+    QualityValidationError,
+    SourceConfigurationError,
+    SourceNotReachableError,
+    StorageWriteError,
+)
 from app.pipeline.contracts import (
     DocumentSource,
     MetadataAnnotation,
@@ -119,8 +131,10 @@ def _guess_content_type(path: Path) -> Optional[str]:
 def _discover_file_documents(spec: PipelineSpec) -> List[DocumentSource]:
     root = spec.documents.path
     if not root.exists():
-        logger.warning("Input path does not exist: %s", root)
-        return []
+        raise DocumentPathNotFoundError(
+            f"Input path does not exist: {root}",
+            document=str(root),
+        )
     patterns = spec.documents.include or ["*.pdf"]
     paths: List[Path] = []
     for pattern in patterns:
@@ -145,7 +159,11 @@ def _discover_file_documents(spec: PipelineSpec) -> List[DocumentSource]:
     return documents
 
 
-async def _discover_database_documents(spec: PipelineSpec, use_cases: UseCaseBundle) -> List[DocumentSource]:
+async def _discover_database_documents(
+    spec: PipelineSpec,
+    use_cases: UseCaseBundle,
+    errors: Optional[List[Dict[str, object]]] = None,
+) -> List[DocumentSource]:
     documents: List[DocumentSource] = []
     for option in spec.sources.databases:
         config = DatabaseConnectionConfig(
@@ -166,9 +184,20 @@ async def _discover_database_documents(spec: PipelineSpec, use_cases: UseCaseBun
             sample_collection=option.sample_collection,
             sample_limit=option.sample_limit,
         )
-        response = await use_cases.connect_databases.execute(
-            ConnectDatabasesRequest(connectors=[spec_obj], fetch_samples=option.fetch_samples)
-        )
+        try:
+            response = await use_cases.connect_databases.execute(
+                ConnectDatabasesRequest(connectors=[spec_obj], fetch_samples=option.fetch_samples)
+            )
+        except Exception as exc:
+            logger.warning("Database connector '%s' failed: %s", option.name, exc)
+            if errors is not None:
+                err = SourceNotReachableError(
+                    f"Failed to connect to database source '{option.name}'",
+                    source=option.name,
+                    detail=str(exc),
+                )
+                errors.append(err.to_dict())
+            continue
         for result in response.results:
             sample = result.sample
             if sample and sample.rows:
@@ -188,10 +217,21 @@ async def _discover_database_documents(spec: PipelineSpec, use_cases: UseCaseBun
                 )
             elif result.error:
                 logger.warning("Database connector '%s' failed: %s", option.name, result.error)
+                if errors is not None:
+                    err = SourceNotReachableError(
+                        f"Database connector '{option.name}' reported an error",
+                        source=option.name,
+                        detail=str(result.error),
+                    )
+                    errors.append(err.to_dict())
     return documents
 
 
-async def _discover_web_documents(spec: PipelineSpec, use_cases: UseCaseBundle) -> List[DocumentSource]:
+async def _discover_web_documents(
+    spec: PipelineSpec,
+    use_cases: UseCaseBundle,
+    errors: Optional[List[Dict[str, object]]] = None,
+) -> List[DocumentSource]:
     documents: List[DocumentSource] = []
     for option in spec.sources.web:
         request = SetupWebScrapingRequest(
@@ -208,7 +248,18 @@ async def _discover_web_documents(spec: PipelineSpec, use_cases: UseCaseBundle) 
             cookies=option.cookies,
             follow_external_links=option.follow_external_links,
         )
-        response = await use_cases.web_scraping.execute(request)
+        try:
+            response = await use_cases.web_scraping.execute(request)
+        except Exception as exc:
+            logger.warning("Web scraping setup failed for start_urls=%s: %s", option.start_urls, exc)
+            if errors is not None:
+                err = SourceNotReachableError(
+                    "Failed to initialize web scraping source",
+                    source=", ".join(option.start_urls),
+                    detail=str(exc),
+                )
+                errors.append(err.to_dict())
+            continue
         for page in response.result.pages:
             if not page.content:
                 continue
@@ -225,7 +276,11 @@ async def _discover_web_documents(spec: PipelineSpec, use_cases: UseCaseBundle) 
     return documents
 
 
-async def _document_external_apis(spec: PipelineSpec, use_cases: UseCaseBundle) -> List[DocumentSource]:
+async def _document_external_apis(
+    spec: PipelineSpec,
+    use_cases: UseCaseBundle,
+    errors: Optional[List[Dict[str, object]]] = None,
+) -> List[DocumentSource]:
     options = spec.sources.document_apis
     if not options.enabled:
         return []
@@ -239,7 +294,18 @@ async def _document_external_apis(spec: PipelineSpec, use_cases: UseCaseBundle) 
         save_to_repository=options.save_to_repository,
         export_documentation=options.export_documentation,
     )
-    response = await use_cases.document_apis.execute(request)
+    try:
+        response = await use_cases.document_apis.execute(request)
+    except Exception as exc:
+        logger.warning("External API documentation failed: %s", exc)
+        if errors is not None:
+            err = SourceConfigurationError(
+                "Failed to document external APIs",
+                source="document_apis",
+                detail=str(exc),
+            )
+            errors.append(err.to_dict())
+        return []
     documents: List[DocumentSource] = []
     for api in response.documented_apis:
         payload = {
@@ -333,126 +399,192 @@ def _storage_client(spec: PipelineSpec) -> ObjectStorageClient:
 
 
 async def _extract_content(doc: DocumentSource, spec: PipelineSpec, use_cases: UseCaseBundle) -> SourceContent:
-    content_type = doc.content_type
-    if doc.path:
-        path = Path(doc.path)
-        content_type = content_type or _guess_content_type(path)
-        if content_type == "application/pdf":
-            response = await use_cases.process_pdfs.execute(ProcessPdfsRequest(file_paths=[str(path)]))
+    try:
+        content_type = doc.content_type
+        if doc.path:
+            path = Path(doc.path)
+            content_type = content_type or _guess_content_type(path)
+            if content_type == "application/pdf":
+                response = await use_cases.process_pdfs.execute(ProcessPdfsRequest(file_paths=[str(path)]))
+                record = response.documents[0] if response.documents else None
+                if record is None:
+                    return SourceContent(
+                        text="",
+                        markdown="",
+                        tables=[],
+                        metadata={},
+                        content_type=content_type,
+                        language=None,
+                    )
+                return SourceContent(
+                    text=record.markdown or record.text or "",
+                    markdown=record.markdown,
+                    tables=record.tables,
+                    metadata={"processor": "docling", "source": str(path)},
+                    content_type=content_type,
+                    language=None,
+                    warnings=record.warnings,
+                )
+            # Non-PDF path -> Tika
+            response = await use_cases.tika.execute(IntegrateTikaRequest(file_paths=[str(path)]))
             record = response.documents[0] if response.documents else None
             if record is None:
-                return SourceContent(text="", markdown="", tables=[], metadata={}, content_type=content_type, language=None)
+                return SourceContent(
+                    text="",
+                    markdown="",
+                    tables=[],
+                    metadata={},
+                    content_type=content_type,
+                    language=None,
+                )
+            result = record.result
+            return SourceContent(
+                text=result.text or "",
+                markdown=None,
+                tables=[],
+                metadata=result.metadata or {},
+                content_type=result.content_type or content_type,
+                language=result.language,
+                warnings=result.warnings,
+            )
+
+        # Inline bytes
+        filename = doc.uri or "document"
+        if doc.content_type == "application/pdf":
+            response = await use_cases.process_pdfs.execute(
+                ProcessPdfsRequest(raw_pdfs=[(doc.content_bytes or b"", filename + ".pdf")])
+            )
+            record = response.documents[0] if response.documents else None
+            if record is None:
+                return SourceContent(
+                    text="",
+                    markdown="",
+                    tables=[],
+                    metadata={},
+                    content_type=doc.content_type,
+                    language=None,
+                )
             return SourceContent(
                 text=record.markdown or record.text or "",
                 markdown=record.markdown,
                 tables=record.tables,
-                metadata={"processor": "docling", "source": str(path)},
-                content_type=content_type,
+                metadata={"processor": "docling", "source": filename},
+                content_type=doc.content_type,
                 language=None,
                 warnings=record.warnings,
             )
-        # Non-PDF path -> Tika
-        response = await use_cases.tika.execute(IntegrateTikaRequest(file_paths=[str(path)]))
+
+        response = await use_cases.tika.execute(
+            IntegrateTikaRequest(raw_documents=[(doc.content_bytes or b"", filename)])
+        )
         record = response.documents[0] if response.documents else None
         if record is None:
-            return SourceContent(text="", markdown="", tables=[], metadata={}, content_type=content_type, language=None)
+            return SourceContent(
+                text="",
+                markdown="",
+                tables=[],
+                metadata={},
+                content_type=doc.content_type,
+                language=None,
+            )
         result = record.result
         return SourceContent(
             text=result.text or "",
             markdown=None,
             tables=[],
             metadata=result.metadata or {},
-            content_type=result.content_type or content_type,
+            content_type=result.content_type or doc.content_type,
             language=result.language,
             warnings=result.warnings,
         )
-
-    # Inline bytes
-    filename = (doc.uri or "document")
-    if doc.content_type == "application/pdf":
-        response = await use_cases.process_pdfs.execute(
-            ProcessPdfsRequest(raw_pdfs=[(doc.content_bytes or b"", filename + ".pdf")])
-        )
-        record = response.documents[0] if response.documents else None
-        if record is None:
-            return SourceContent(text="", markdown="", tables=[], metadata={}, content_type=doc.content_type, language=None)
-        return SourceContent(
-            text=record.markdown or record.text or "",
-            markdown=record.markdown,
-            tables=record.tables,
-            metadata={"processor": "docling", "source": filename},
-            content_type=doc.content_type,
-            language=None,
-            warnings=record.warnings,
-        )
-
-    response = await use_cases.tika.execute(
-        IntegrateTikaRequest(raw_documents=[(doc.content_bytes or b"", filename)])
-    )
-    record = response.documents[0] if response.documents else None
-    if record is None:
-        return SourceContent(text="", markdown="", tables=[], metadata={}, content_type=doc.content_type, language=None)
-    result = record.result
-    return SourceContent(
-        text=result.text or "",
-        markdown=None,
-        tables=[],
-        metadata=result.metadata or {},
-        content_type=result.content_type or doc.content_type,
-        language=result.language,
-        warnings=result.warnings,
-    )
+    except ContentExtractionError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        source_label = doc.uri or doc.path or "inline"
+        raise ContentExtractionError(
+            f"Failed to extract content for {source_label}",
+            stage="extract_content",
+            source=source_label,
+            detail=str(exc),
+        ) from exc
 
 
 async def _normalize_content(text: str, use_cases: UseCaseBundle) -> StandardSourceContent:
-    response = await use_cases.normalize_text.execute(
-        NormalizeTextRequest(texts=[text], lowercase=False, correct_typos=False)
-    )
-    record = response.results[0] if response.results else None
-    if record is None:
-        return StandardSourceContent(normalized=text, tokens=[], lemmas=[], entities=[], warnings=[])
-    return StandardSourceContent(
-        normalized=record.normalized,
-        tokens=record.tokens,
-        lemmas=record.lemmas,
-        entities=record.entities,
-        warnings=[],
-    )
+    try:
+        response = await use_cases.normalize_text.execute(
+            NormalizeTextRequest(texts=[text], lowercase=False, correct_typos=False)
+        )
+        record = response.results[0] if response.results else None
+        if record is None:
+            return StandardSourceContent(normalized=text, tokens=[], lemmas=[], entities=[], warnings=[])
+        return StandardSourceContent(
+            normalized=record.normalized,
+            tokens=record.tokens,
+            lemmas=record.lemmas,
+            entities=record.entities,
+            warnings=[],
+        )
+    except NormalizationError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise NormalizationError(
+            "Failed to normalize content",
+            stage="normalize_content",
+            detail=str(exc),
+        ) from exc
 
 
 async def _enrich_content(text: str, use_cases: UseCaseBundle) -> MetadataAnnotation:
-    response = await use_cases.extract_metadata.execute(ExtractMetadataRequest(texts=[text], top_k_keywords=10))
-    record = response.results[0] if response.results else None
-    if record is None:
-        return MetadataAnnotation(keywords=[], entities=[], dates=[], authors=[], language=None)
-    return MetadataAnnotation(
-        keywords=record.keywords,
-        entities=record.entities,
-        dates=record.dates,
-        authors=record.authors,
-        language=record.language,
-        warnings=[],
-    )
+    try:
+        response = await use_cases.extract_metadata.execute(ExtractMetadataRequest(texts=[text], top_k_keywords=10))
+        record = response.results[0] if response.results else None
+        if record is None:
+            return MetadataAnnotation(keywords=[], entities=[], dates=[], authors=[], language=None)
+        return MetadataAnnotation(
+            keywords=record.keywords,
+            entities=record.entities,
+            dates=record.dates,
+            authors=record.authors,
+            language=record.language,
+            warnings=[],
+        )
+    except MetadataEnrichmentError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise MetadataEnrichmentError(
+            "Failed to extract metadata annotations",
+            stage="metadata_enrichment",
+            detail=str(exc),
+        ) from exc
 
 
 async def _validate_content(text: str, use_cases: UseCaseBundle) -> QualityReport:
-    response = await use_cases.validate_quality.execute(ValidateQualityRequest(texts=[text]))
-    record = response.reports[0] if response.reports else None
-    if record is None:
+    try:
+        response = await use_cases.validate_quality.execute(ValidateQualityRequest(texts=[text]))
+        record = response.reports[0] if response.reports else None
+        if record is None:
+            return QualityReport(
+                overall_score=0.0,
+                quality_level="unknown",
+                metrics={},
+                validations=[],
+                ge_report=None,
+            )
         return QualityReport(
-            overall_score=0.0,
-            quality_level="unknown",
-            metrics={},
-            validations=[],
-            ge_report=None,
+            overall_score=record.overall_score,
+            quality_level=record.quality_level,
+            metrics=record.metrics,
+            validations=record.validations,
+            ge_report=record.ge_report,
         )
-    return QualityReport(
-        overall_score=record.overall_score,
-        quality_level=record.quality_level,
-        metrics=record.metrics,
-        validations=record.validations,
-        ge_report=record.ge_report,
-    )
+    except QualityValidationError:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive
+        raise QualityValidationError(
+            "Failed to validate content quality",
+            stage="quality_validation",
+            detail=str(exc),
+        ) from exc
 
 
 def _content_hash(payload: bytes) -> str:
@@ -460,25 +592,147 @@ def _content_hash(payload: bytes) -> str:
 
 
 async def run_pipeline(spec: PipelineSpec) -> RunSummary:
+    """
+    Main data ingestion orchestration pipeline.
+    
+    Coordinates the complete RAG data ingestion workflow by:
+    1. Preparing object storage infrastructure
+    2. Auditing and categorizing data sources (optional)
+    3. Discovering documents from multiple origins (files, databases, web, APIs)
+    4. Extracting content using appropriate processors (Docling for PDFs, Tika for others)
+    5. Normalizing text and enriching with metadata (keywords, entities, dates)
+    6. Validating content quality and computing quality scores
+    7. Storing processed documents in object storage with metadata and tags
+    
+    Pipeline Execution Sequence:
+        Phase 1 - Infrastructure Setup:
+            → _build_use_cases(): Initialize all use case handlers
+            → _prepare_storage(): Setup object storage (MinIO/local)
+            → _maybe_audit_sources(): Optional source auditing
+            → _maybe_categorize_sources(): Optional ML-based categorization
+        
+        Phase 2 - Document Discovery:
+            → _discover_file_documents(): Scan filesystem paths
+            → _discover_database_documents(): Query databases (Postgres, MongoDB, etc.)
+            → _discover_web_documents(): Scrape web pages
+            → _document_external_apis(): Document external APIs
+            → Apply max_files limit if configured
+        
+        Phase 3 - Per-Document Processing Loop:
+            For each discovered document:
+                → _extract_content(): Extract text (Docling for PDFs, Tika for others)
+                → _normalize_content(): Normalize, tokenize, extract entities
+                → _enrich_content(): Extract keywords, dates, authors
+                → _validate_content(): Compute quality scores and validations
+                → _content_hash(): Generate SHA256 hash for deduplication
+                → client.put_object(): Store in object storage with metadata/tags
+        
+        Phase 4 - Summary Generation:
+            → Aggregate counters (discovered, processed, skipped, failed)
+            → Return RunSummary with statistics and stored objects
+    
+    Args:
+        spec: Pipeline configuration specifying sources, storage, and processing options
+        
+    Returns:
+        RunSummary containing processing statistics, stored objects, and any errors
+        
+    Example:
+        >>> from pathlib import Path
+        >>> from app.pipeline.config import PipelineSpec
+        >>> 
+        >>> # Load configuration from YAML
+        >>> spec = PipelineSpec.from_file("rag_pipeline.yaml")
+        >>> 
+        >>> # Execute pipeline
+        >>> summary = await run_pipeline(spec)
+        >>> 
+        >>> # Check results
+        >>> print(f"Processed: {summary.processed}")
+        >>> print(f"Skipped: {summary.skipped}")
+        >>> print(f"Failed: {summary.failed}")
+        >>> print(f"By origin: {summary.counters['by_origin']}")
+        >>> # Output: {'file': 45, 'database': 12, 'web': 8, 'api': 3}
+        >>> 
+        >>> # Access stored objects
+        >>> for obj in summary.stored:
+        ...     print(f"{obj.bucket}/{obj.key} - {obj.size} bytes")
+        ...     print(f"  Quality: {obj.metadata['quality_level']}")
+        ...     print(f"  Keywords: {obj.metadata['keywords']}")
+    """
     use_cases = _build_use_cases()
     await _prepare_storage(spec, use_cases)
     await _maybe_audit_sources(spec, use_cases)
     await _maybe_categorize_sources(spec, use_cases)
 
     documents: List[DocumentSource] = []
-    documents.extend(_discover_file_documents(spec))
-    documents.extend(await _discover_database_documents(spec, use_cases))
-    documents.extend(await _discover_web_documents(spec, use_cases))
-    documents.extend(await _document_external_apis(spec, use_cases))
+    errors: List[Dict[str, object]] = []
+
+    try:
+        documents.extend(_discover_file_documents(spec))
+    except DocumentError as exc:
+        logger.warning("Document discovery error: %s", exc)
+        errors.append(exc.to_dict())
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Unexpected file discovery error")
+        errors.append(
+            {
+                "error_type": "UnexpectedDocumentDiscoveryError",
+                "message": str(exc),
+                "detail": repr(exc),
+            }
+        )
+
+    try:
+        documents.extend(await _discover_database_documents(spec, use_cases, errors))
+    except SourceNotReachableError as exc:
+        logger.warning("Database discovery error: %s", exc)
+        errors.append(exc.to_dict())
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Unexpected database discovery error")
+        err = SourceNotReachableError(
+            "Unexpected database discovery failure",
+            source="databases",
+            detail=str(exc),
+        )
+        errors.append(err.to_dict())
+
+    try:
+        documents.extend(await _discover_web_documents(spec, use_cases, errors))
+    except SourceNotReachableError as exc:
+        logger.warning("Web discovery error: %s", exc)
+        errors.append(exc.to_dict())
+    except Exception as exc:  # pragma: no cover
+        logger.exception("Unexpected web discovery error")
+        err = SourceNotReachableError(
+            "Unexpected web discovery failure",
+            source="web",
+            detail=str(exc),
+        )
+        errors.append(err.to_dict())
+
+    try:
+        documents.extend(await _document_external_apis(spec, use_cases, errors))
+    except SourceConfigurationError as exc:
+        logger.warning("API discovery error: %s", exc)
+        errors.append(exc.to_dict())
+    except Exception as exc:  # pragma: no cover
+        logger.exception("Unexpected API discovery error")
+        err = SourceConfigurationError(
+            "Unexpected API documentation failure",
+            source="document_apis",
+            detail=str(exc),
+        )
+        errors.append(err.to_dict())
 
     if spec.limits.max_files is not None:
         documents = documents[: spec.limits.max_files]
 
     client = _storage_client(spec)
     stored_objects: List[StorageObject] = []
-    errors: List[Dict[str, object]] = []
     origin_counts: Dict[str, int] = {}
     skipped = 0
+    discovery_error_count = len(errors)
 
     for doc in documents:
         try:
@@ -508,14 +762,22 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
                 "quality_level": quality.quality_level,
             }
 
-            result = client.put_object(
-                spec.storage.bucket,
-                object_key,
-                payload,
-                content_type="text/markdown",
-                metadata=metadata,
-                tags=tags,
-            )
+            try:
+                result = client.put_object(
+                    spec.storage.bucket,
+                    object_key,
+                    payload,
+                    content_type="text/markdown",
+                    metadata=metadata,
+                    tags=tags,
+                )
+            except Exception as exc:
+                raise StorageWriteError(
+                    "Failed to write processed document to storage",
+                    stage="storage",
+                    source=doc.uri or doc.path,
+                    detail=str(exc),
+                ) from exc
             stored_objects.append(
                 StorageObject(
                     bucket=result.bucket,
@@ -526,21 +788,40 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
                 )
             )
             origin_counts[doc.origin] = origin_counts.get(doc.origin, 0) + 1
+        except ProcessingError as exc:
+            logger.error(
+                "Processing error at stage '%s' for %s: %s",
+                exc.stage or "unknown",
+                doc.uri or doc.path or "inline",
+                exc,
+            )
+            errors.append(exc.to_record())
         except Exception as exc:  # pragma: no cover
-            logger.exception("Failed to process document: %s", doc.uri or doc.path)
-            errors.append({"source": doc.uri or doc.path, "error": str(exc)})
+            source_label = doc.uri or doc.path or "inline"
+            logger.exception("Unexpected failure while processing: %s", source_label)
+            errors.append(
+                {
+                    "error_type": "UnexpectedProcessingError",
+                    "message": str(exc),
+                    "source": source_label,
+                    "detail": repr(exc),
+                }
+            )
 
+    processing_failures = max(len(errors) - discovery_error_count, 0)
     counters = {
         "discovered": len(documents),
         "processed": len(stored_objects),
         "skipped": skipped,
-        "failed": len(errors),
+        "failed": processing_failures,
         "by_origin": origin_counts,
+        "discovery_errors": discovery_error_count,
+        "total_errors": len(errors),
     }
     return RunSummary(
         processed=len(stored_objects),
         skipped=skipped,
-        failed=len(errors),
+        failed=processing_failures,
         stored=stored_objects,
         errors=errors,
         counters=counters,

@@ -31,7 +31,7 @@ Example `rag_pipeline.yaml` files
   storage:
     provider: local
     base_dir: ./storage
-    bucket: rag-processed
+    bucket: rag-source
   sources:
     audit:
       enabled: true
@@ -51,7 +51,7 @@ Example `rag_pipeline.yaml` files
     endpoint: localhost:9000
     access_key: minioadmin
     secret_key: minioadmin
-    bucket: rag-processed
+    bucket: rag-source
   sources:
     databases:
       - name: finance
@@ -88,7 +88,7 @@ Example `rag_pipeline.yaml` files
     endpoint: airflow-minio:9000
     access_key: airflow
     secret_key: airflowsecret
-    bucket: rag-processed
+    bucket: rag-source
     secure: true
   sources:
     web:

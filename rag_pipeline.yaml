@@ -1,14 +1,14 @@
 documents:
-  path: ../rag
+  path: ../DATA
   recurse: true
   include: ["*.pdf"]
 storage:
   provider: local
-  base_dir: ./storage
+  base_dir: ../STORAGE
   access_key: null
   secret_key: null
   secure: false
-  bucket: rag-processed
+  bucket: rag-source
   metadata_base: rag-metadata
 schedule:
   mode: manual
@@ -27,10 +27,10 @@ sources:
   audit:
     enabled: true
     scan_paths: ["../rag"]
-  databases: []
-  web: []
   document_apis:
     enabled: false
+  databases: []
+  web: []
 # sources:
 #   audit:
 #     enabled: true

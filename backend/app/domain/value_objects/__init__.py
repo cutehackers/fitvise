@@ -1,5 +1,6 @@
 # Domain value objects for RAG system
 from .document_metadata import DocumentMetadata, DocumentFormat, DocumentStatus
+from .chunk_metadata import ChunkMetadata
 from .source_info import (
     SourceInfo, 
     SourceType, 
@@ -22,6 +23,7 @@ __all__ = [
     "DocumentMetadata",
     "DocumentFormat", 
     "DocumentStatus",
+    "ChunkMetadata",
     "SourceInfo",
     "SourceType",
     "AuthType",

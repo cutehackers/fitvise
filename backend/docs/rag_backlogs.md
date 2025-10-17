@@ -76,7 +76,7 @@
 
 ### 2.1 Chunking and Text Processing
 
-- [ ]  **Task 2.1.1**: Implement semantic chunking service
+- [x]  **Task 2.1.1**: Implement semantic chunking service
     - Deliverable: LlamaIndex-based chunking with configurable strategies
     - Acceptance Criteria: Handles different document types, maintains context
     - Effort: 8 days

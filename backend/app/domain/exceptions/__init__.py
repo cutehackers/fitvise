@@ -30,6 +30,13 @@ from .processing_exceptions import (
     StorageWriteError,
     PipelineConfigurationError,
 )
+from .chunking_exceptions import (
+    ChunkingError,
+    ChunkingDependencyError,
+    ChunkGenerationError,
+    ChunkValidationError,
+    ChunkPersistenceError,
+)
 
 __all__ = [
     # Document
@@ -52,4 +59,10 @@ __all__ = [
     "QualityValidationError",
     "StorageWriteError",
     "PipelineConfigurationError",
+    # Chunking
+    "ChunkingError",
+    "ChunkingDependencyError",
+    "ChunkGenerationError",
+    "ChunkValidationError",
+    "ChunkPersistenceError",
 ]

@@ -108,6 +108,8 @@ class UseCaseBundle:
 
 
 def _build_use_cases() -> UseCaseBundle:
+    """Instantiate repositories and use cases required for a single pipeline run."""
+
     repository = InMemoryDataSourceRepository()
     document_repository = InMemoryDocumentRepository()
     return UseCaseBundle(
@@ -129,6 +131,8 @@ def _build_use_cases() -> UseCaseBundle:
 
 
 def _guess_content_type(path: Path) -> Optional[str]:
+    """Map a file extension to a best-effort MIME type."""
+
     suf = path.suffix.lower()
     return {
         ".pdf": "application/pdf",
@@ -144,6 +148,8 @@ def _guess_content_type(path: Path) -> Optional[str]:
 
 
 def _infer_document_format(content_type: Optional[str], path: Optional[str]) -> DocumentFormat:
+    """Determine the domain DocumentFormat from content-type metadata or file path."""
+
     if content_type:
         mapping = {
             "application/pdf": DocumentFormat.PDF,
@@ -188,6 +194,8 @@ def _build_document_entity(
     payload_size: int,
     run_id: str,
 ) -> Document:
+    """Construct the domain `Document` with metadata and structured content payloads."""
+
     file_path = doc.path or doc.uri or f"object://{object_key}"
     if doc.path:
         file_name = Path(doc.path).name
@@ -232,6 +240,8 @@ def _build_document_entity(
 
 
 def _discover_file_documents(spec: PipelineSpec) -> List[DocumentSource]:
+    """Scan the configured filesystem path(s) and wrap matching files as sources."""
+
     root = spec.documents.path
     if not root.exists():
         raise DocumentPathNotFoundError(
@@ -267,6 +277,8 @@ async def _discover_database_documents(
     use_cases: UseCaseBundle,
     errors: Optional[List[Dict[str, object]]] = None,
 ) -> List[DocumentSource]:
+    """Run each configured database connector and capture sample exports as sources."""
+
     documents: List[DocumentSource] = []
     for option in spec.sources.databases:
         config = DatabaseConnectionConfig(
@@ -335,6 +347,8 @@ async def _discover_web_documents(
     use_cases: UseCaseBundle,
     errors: Optional[List[Dict[str, object]]] = None,
 ) -> List[DocumentSource]:
+    """Execute web scraping setups and translate crawled pages into document sources."""
+
     documents: List[DocumentSource] = []
     for option in spec.sources.web:
         request = SetupWebScrapingRequest(
@@ -384,6 +398,8 @@ async def _document_external_apis(
     use_cases: UseCaseBundle,
     errors: Optional[List[Dict[str, object]]] = None,
 ) -> List[DocumentSource]:
+    """Document external APIs and produce JSON payloads representing each API surface."""
+
     options = spec.sources.document_apis
     if not options.enabled:
         return []
@@ -439,6 +455,14 @@ async def _document_external_apis(
 
 
 async def _maybe_audit_sources(spec: PipelineSpec, use_cases: UseCaseBundle) -> None:
+    """Optionally scan configured sources and persist audit artifacts.
+
+    When `spec.sources.audit.enabled` is true, this step expands the audit options
+    into an `AuditDataSourcesRequest`, triggering directory crawls, database metadata
+    sampling, and API endpoint checks. Results can be exported to CSV/JSON and
+    optionally written into the shared repository for later inspection.
+    """
+
     options = spec.sources.audit
     if not options.enabled:
         return
@@ -456,6 +480,13 @@ async def _maybe_audit_sources(spec: PipelineSpec, use_cases: UseCaseBundle) -> 
 
 
 async def _maybe_categorize_sources(spec: PipelineSpec, use_cases: UseCaseBundle) -> None:
+    """Optionally train or run the document source categorization workflow.
+
+    Builds a `CategorizeSourcesRequest` with model hyperparameters, synthetic data
+    flags, and target source IDs so the categorization use case can label sources and
+    persist trained models when requested.
+    """
+
     options = spec.sources.categorize
     if not options.enabled:
         return
@@ -474,6 +505,13 @@ async def _maybe_categorize_sources(spec: PipelineSpec, use_cases: UseCaseBundle
 
 
 async def _prepare_storage(spec: PipelineSpec, use_cases: UseCaseBundle) -> None:
+    """Provision object storage buckets and credentials prior to ingestion.
+
+    Converts the storage section of the spec into a `SetupObjectStorageRequest`,
+    ensuring credentials are valid, buckets exist (creating them if necessary), and
+    optional local base directories are prepared.
+    """
+
     storage_base = str(spec.storage.base_dir) if spec.storage.base_dir else None
     request = SetupObjectStorageRequest(
         provider=spec.storage.provider,
@@ -489,6 +527,8 @@ async def _prepare_storage(spec: PipelineSpec, use_cases: UseCaseBundle) -> None
 
 
 def _storage_client(spec: PipelineSpec) -> ObjectStorageClient:
+    """Instantiate an object storage client using pipeline configuration values."""
+
     return ObjectStorageClient(
         ObjectStorageConfig(
             provider=spec.storage.provider,
@@ -502,6 +542,8 @@ def _storage_client(spec: PipelineSpec) -> ObjectStorageClient:
 
 
 async def _extract_content(doc: DocumentSource, spec: PipelineSpec, use_cases: UseCaseBundle) -> SourceContent:
+    """Pull raw text/markdown from a document source using Docling for PDFs or Tika otherwise."""
+
     try:
         content_type = doc.content_type
         if doc.path:
@@ -613,6 +655,8 @@ async def _extract_content(doc: DocumentSource, spec: PipelineSpec, use_cases: U
 
 
 async def _normalize_content(text: str, use_cases: UseCaseBundle) -> StandardSourceContent:
+    """Apply text normalization to produce consistent tokens, lemmas, and entity stubs."""
+
     try:
         response = await use_cases.normalize_text.execute(
             NormalizeTextRequest(texts=[text], lowercase=False, correct_typos=False)
@@ -638,6 +682,8 @@ async def _normalize_content(text: str, use_cases: UseCaseBundle) -> StandardSou
 
 
 async def _enrich_content(text: str, use_cases: UseCaseBundle) -> MetadataAnnotation:
+    """Extract metadata annotations such as keywords, entities, and authors from text."""
+
     try:
         response = await use_cases.extract_metadata.execute(ExtractMetadataRequest(texts=[text], top_k_keywords=10))
         record = response.results[0] if response.results else None
@@ -662,6 +708,8 @@ async def _enrich_content(text: str, use_cases: UseCaseBundle) -> MetadataAnnota
 
 
 async def _validate_content(text: str, use_cases: UseCaseBundle) -> QualityReport:
+    """Score normalized text against quality heuristics and validation rules."""
+
     try:
         response = await use_cases.validate_quality.execute(ValidateQualityRequest(texts=[text]))
         record = response.reports[0] if response.reports else None
@@ -691,89 +739,56 @@ async def _validate_content(text: str, use_cases: UseCaseBundle) -> QualityRepor
 
 
 def _content_hash(payload: bytes) -> str:
+    """Generate a SHA256 digest used for deterministic storage keys."""
+
     return hashlib.sha256(payload).hexdigest()
 
 
-async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
-    """
-    Main data ingestion orchestration pipeline.
-    
-    Coordinates the complete RAG data ingestion workflow by:
-    1. Preparing object storage infrastructure
-    2. Auditing and categorizing data sources (optional)
-    3. Discovering documents from multiple origins (files, databases, web, APIs)
-    4. Extracting content using appropriate processors (Docling for PDFs, Tika for others)
-    5. Normalizing text and enriching with metadata (keywords, entities, dates)
-    6. Validating content quality and computing quality scores
-    7. Storing processed documents in object storage with metadata and tags
-    8. Generating semantic chunks for processed documents (Task 2.1.1)
-    
-    Pipeline Execution Sequence:
-        Phase 1 - Infrastructure Setup:
-            → _build_use_cases(): Initialize all use case handlers
-            → _prepare_storage(): Setup object storage (MinIO/local)
-            → _maybe_audit_sources(): Optional source auditing
-            → _maybe_categorize_sources(): Optional ML-based categorization
-        
-        Phase 2 - Document Discovery:
-            → _discover_file_documents(): Scan filesystem paths
-            → _discover_database_documents(): Query databases (Postgres, MongoDB, etc.)
-            → _discover_web_documents(): Scrape web pages
-            → _document_external_apis(): Document external APIs
-            → Apply max_files limit if configured
-        
-        Phase 3 - Per-Document Processing Loop:
-            For each discovered document:
-                → _extract_content(): Extract text (Docling for PDFs, Tika for others)
-                → _normalize_content(): Normalize, tokenize, extract entities
-                → _enrich_content(): Extract keywords, dates, authors
-                → _validate_content(): Compute quality scores and validations
-                → _content_hash(): Generate SHA256 hash for deduplication
-                → client.put_object(): Store in object storage with metadata/tags
-        
-        Phase 4 - Summary Generation:
-            → Aggregate counters (discovered, processed, skipped, failed)
-            → Return RunSummary with statistics and stored objects
-    
-    Args:
-        spec: Pipeline configuration specifying sources, storage, and processing options
-        dry_run: When True, skip persisting chunk output and route storage to a dry-run bucket
+async def _init_pipeline(spec: PipelineSpec) -> UseCaseBundle:
+    """Initialize pipeline dependencies and run infrastructure setup steps.
 
-    Returns:
-        RunSummary containing processing statistics, stored objects, chunking stats, and any errors
-        
+    Phase alignment: Infrastructure Preparation. The function builds the
+    `UseCaseBundle`, provisions storage buckets, and executes optional audits or
+    categorization so downstream stages can assume foundational services exist.
+
     Example:
-        >>> from pathlib import Path
-        >>> from app.pipeline.config import PipelineSpec
-        >>> 
-        >>> # Load configuration from YAML
         >>> spec = PipelineSpec.from_file("rag_pipeline.yaml")
-        >>> 
-        >>> # Execute pipeline
-        >>> summary = await run_pipeline(spec, dry_run=False)
-        >>> 
-        >>> # Check results
-        >>> print(f"Processed: {summary.processed}")
-        >>> print(f"Skipped: {summary.skipped}")
-        >>> print(f"Failed: {summary.failed}")
-        >>> print(f"By origin: {summary.counters['by_origin']}")
-        >>> # Output: {'file': 45, 'database': 12, 'web': 8, 'api': 3}
-        >>> 
-        >>> # Access stored objects
-        >>> for obj in summary.stored:
-        ...     print(f"{obj.bucket}/{obj.key} - {obj.size} bytes")
-        ...     print(f"  Quality: {obj.metadata['quality_level']}")
-        ...     print(f"  Keywords: {obj.metadata['keywords']}")
+        >>> use_cases = await _init_pipeline(spec)
+        >>> sorted(use_cases.repository.list_all())
+        []
+        The example highlights that initialization completes without
+        ingesting documents while ensuring repositories and storage clients are ready.
     """
+
     use_cases = _build_use_cases()
     await _prepare_storage(spec, use_cases)
     await _maybe_audit_sources(spec, use_cases)
     await _maybe_categorize_sources(spec, use_cases)
+    return use_cases
 
-    run_id = datetime.now(timezone.utc).isoformat()
+
+async def _discover_documents(
+    spec: PipelineSpec,
+    use_cases: UseCaseBundle,
+) -> tuple[List[DocumentSource], List[Dict[str, object]]]:
+    """Aggregate documents from configured sources while recording discovery issues.
+
+    Phase alignment: Discovery. Each configured connector contributes
+    `DocumentSource` entries, and recoverable failures are translated into structured
+    error dictionaries so that the overall pipeline can surface precise diagnostics
+    without aborting the run.
+
+    Example:
+        >>> documents, errors = await _discover_documents(spec, use_cases)
+        >>> summary = (len(documents), [err["source"] for err in errors])
+        >>> summary
+        (42, ['marketing-db'])
+        The snapshot shows forty-two documents ready for processing and
+        a single discovery error attributed to the `marketing-db` source.
+    """
+
     documents: List[DocumentSource] = []
     errors: List[Dict[str, object]] = []
-    processed_document_ids: List[UUID] = []
 
     try:
         documents.extend(_discover_file_documents(spec))
@@ -835,11 +850,36 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
     if spec.limits.max_files is not None:
         documents = documents[: spec.limits.max_files]
 
-    client = _storage_client(spec)
+    return documents, errors
+
+
+async def _process_documents(
+    documents: List[DocumentSource],
+    spec: PipelineSpec,
+    use_cases: UseCaseBundle,
+    client: ObjectStorageClient,
+    run_id: str,
+    errors: List[Dict[str, object]],
+) -> tuple[List[StorageObject], Dict[str, int], int, List[UUID]]:
+    """Execute extraction, normalization, enrichment, validation, and persistence.
+
+    Phase alignment: Processing. Every `DocumentSource` that yields content
+    is transformed into normalized markdown, enriched metadata, quality scores, and a
+    stored object. Stage-specific failures are appended to `errors` with rich context
+    so later summaries can distinguish processing issues from discovery issues.
+
+    Example:
+        >>> stored, by_origin, skipped, ids = await _process_documents(docs, spec, use_cases, client, run_id, [])
+        >>> by_origin
+        {'file': 30, 'web': 5}
+        In this excerpt, thirty-five documents produced stored objects while
+        any empty-bodied sources increased the `skipped` counter instead of raising.
+    """
+
     stored_objects: List[StorageObject] = []
     origin_counts: Dict[str, int] = {}
     skipped = 0
-    discovery_error_count = len(errors)
+    processed_document_ids: List[UUID] = []
 
     for doc in documents:
         try:
@@ -867,8 +907,8 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
                 "keywords": ",".join(enriched.keywords[:10]) if enriched.keywords else "",
                 "overall_score": str(quality.overall_score),
                 "quality_level": quality.quality_level,
+                "run_id": run_id,
             }
-            metadata["run_id"] = run_id
 
             try:
                 result = client.put_object(
@@ -886,6 +926,7 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
                     source=doc.uri or doc.path,
                     detail=str(exc),
                 ) from exc
+
             stored_objects.append(
                 StorageObject(
                     bucket=result.bucket,
@@ -895,6 +936,7 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
                     tags=tags,
                 )
             )
+
             document_entity = _build_document_entity(
                 doc=doc,
                 normalized=normalized,
@@ -928,12 +970,35 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
                 }
             )
 
-    chunk_options = getattr(spec, "chunking", None)
-    chunk_enabled = True
-    if chunk_options is not None:
-        chunk_enabled = getattr(chunk_options, "enabled", True)
+    return stored_objects, origin_counts, skipped, processed_document_ids
 
-    chunk_summary: Dict[str, Any] = {
+
+async def _maybe_chunk_documents(
+    processed_document_ids: List[UUID],
+    use_cases: UseCaseBundle,
+    spec: PipelineSpec,
+    run_id: str,
+    dry_run: bool,
+    errors: List[Dict[str, object]],
+) -> Dict[str, Any]:
+    """Apply semantic chunking to processed documents when chunking is enabled.
+
+    Phase alignment: Post-processing. The function respects chunking presets
+    and overrides from the spec, enriches chunks with run metadata, and appends any
+    chunking errors to the shared list without interrupting prior results.
+
+    Example:
+        >>> summary = await _maybe_chunk_documents(ids, use_cases, spec, run_id, dry_run=False, errors=[])
+        >>> summary["documents"], summary["total_chunks"]
+        (12, 220)
+        The outcome demonstrates that twelve documents expanded into two
+        hundred twenty chunks with dry-run disabled.
+    """
+
+    chunk_options = getattr(spec, "chunking", None)
+    chunk_enabled = True if chunk_options is None else getattr(chunk_options, "enabled", True)
+
+    summary: Dict[str, Any] = {
         "documents": 0,
         "total_chunks": 0,
         "dry_run": dry_run,
@@ -941,47 +1006,115 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
         "preset": getattr(chunk_options, "preset", None) or "balanced",
     }
 
-    if chunk_enabled and processed_document_ids:
-        try:
-            chunk_config = get_chunking_config(getattr(chunk_options, "preset", None))
-            overrides = getattr(chunk_options, "overrides", {}) if chunk_options else {}
-            if overrides:
-                chunk_config.update(overrides)
+    if not (chunk_enabled and processed_document_ids):
+        return summary
 
-            metadata_overrides = {"run_id": run_id}
-            extra_metadata = getattr(chunk_options, "metadata_overrides", {}) if chunk_options else {}
-            metadata_overrides.update(extra_metadata)
+    try:
+        chunk_config = get_chunking_config(getattr(chunk_options, "preset", None))
+        overrides = getattr(chunk_options, "overrides", {}) if chunk_options else {}
+        if overrides:
+            chunk_config.update(overrides)
 
-            replace_existing = getattr(chunk_options, "replace_existing_chunks", True) if chunk_options else True
+        metadata_overrides = {"run_id": run_id}
+        extra_metadata = getattr(chunk_options, "metadata_overrides", {}) if chunk_options else {}
+        metadata_overrides.update(extra_metadata)
 
-            chunk_response = await use_cases.chunk_documents.execute(
-                SemanticChunkingRequest(
-                    document_ids=processed_document_ids,
-                    replace_existing_chunks=replace_existing,
-                    dry_run=dry_run,
-                    chunker_config=chunk_config,
-                    metadata_overrides=metadata_overrides,
-                )
+        replace_existing = getattr(chunk_options, "replace_existing_chunks", True) if chunk_options else True
+
+        chunk_response = await use_cases.chunk_documents.execute(
+            SemanticChunkingRequest(
+                document_ids=processed_document_ids,
+                replace_existing_chunks=replace_existing,
+                dry_run=dry_run,
+                chunker_config=chunk_config,
+                metadata_overrides=metadata_overrides,
             )
-            chunk_summary.update(
-                {
-                    "documents": len(chunk_response.results),
-                    "total_chunks": chunk_response.total_chunks,
-                    "dry_run": chunk_response.dry_run,
-                }
-            )
-        except ChunkingError as exc:
-            logger.error("Chunking error: %s", exc)
-            errors.append(exc.to_dict())
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.exception("Unexpected chunking failure")
-            errors.append(
-                {
-                    "error_type": "UnexpectedChunkingError",
-                    "message": str(exc),
-                    "detail": repr(exc),
-                }
-            )
+        )
+        summary.update(
+            {
+                "documents": len(chunk_response.results),
+                "total_chunks": chunk_response.total_chunks,
+                "dry_run": chunk_response.dry_run,
+            }
+        )
+    except ChunkingError as exc:
+        logger.error("Chunking error: %s", exc)
+        errors.append(exc.to_dict())
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception("Unexpected chunking failure")
+        errors.append(
+            {
+                "error_type": "UnexpectedChunkingError",
+                "message": str(exc),
+                "detail": repr(exc),
+            }
+        )
+
+    return summary
+
+
+async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
+    """Coordinate the RAG ingestion workflow across the aligned phases.
+
+    Phase timeline:
+        1. Infrastructure – `_init_pipeline`
+           • Build the `UseCaseBundle` so every downstream step shares repositories,
+             storage handlers, and processing use cases.
+           • Provision object storage buckets and credentials via `_prepare_storage`.
+           • Run optional audit / categorization passes to warm supporting datasets.
+
+        2. Discovery – `_discover_documents`
+           • Aggregate filesystem matches (`_discover_file_documents`).
+           • Execute database connectors and capture samples (`_discover_database_documents`).
+           • Run configured scrapers to turn crawled pages into sources (`_discover_web_documents`).
+           • Document external APIs into JSON payloads (`_document_external_apis`).
+           • Apply any input limits (for example `spec.limits.max_files`).
+
+        3. Processing – `_process_documents`
+           • Extract raw content using Docling/Tika (`_extract_content`).
+           • Normalize text tokens and structure (`_normalize_content`).
+           • Enrich metadata (keywords, entities, authors) (`_enrich_content`).
+           • Validate content quality / scores (`_validate_content`).
+           • Persist normalized payloads in object storage and the in-memory repository.
+
+        4. Post-processing – `_maybe_chunk_documents`
+           • Load chunking preset/overrides and attach run metadata.
+           • Execute semantic chunking against processed document IDs.
+           • Capture chunk counts and append recoverable errors without failing the run.
+
+    Example:
+        >>> spec = PipelineSpec.from_file("rag_pipeline.yaml")
+        >>> summary = await run_pipeline(spec)
+        >>> summary.counters["chunking"]
+        {'documents': 12, 'total_chunks': 220, 'dry_run': False, 'enabled': True, 'preset': 'balanced'}
+        The narrative shows the end-to-end orchestration with chunking metrics
+        surfaced in the returned `RunSummary`.
+    """
+
+    use_cases = await _init_pipeline(spec)
+    run_id = datetime.now(timezone.utc).isoformat()
+
+    documents, errors = await _discover_documents(spec, use_cases)
+    discovery_error_count = len(errors)
+
+    client = _storage_client(spec)
+    stored_objects, origin_counts, skipped, processed_document_ids = await _process_documents(
+        documents=documents,
+        spec=spec,
+        use_cases=use_cases,
+        client=client,
+        run_id=run_id,
+        errors=errors,
+    )
+
+    chunk_summary = await _maybe_chunk_documents(
+        processed_document_ids=processed_document_ids,
+        use_cases=use_cases,
+        spec=spec,
+        run_id=run_id,
+        dry_run=dry_run,
+        errors=errors,
+    )
 
     processing_failures = max(len(errors) - discovery_error_count, 0)
     counters = {
@@ -995,6 +1128,7 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
         "total_errors": len(errors),
         "chunking": chunk_summary,
     }
+
     return RunSummary(
         processed=len(stored_objects),
         skipped=skipped,

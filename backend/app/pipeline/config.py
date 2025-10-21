@@ -47,6 +47,14 @@ class ProcessorOptions(BaseModel):
     normalize: Literal["spacy"] = "spacy"
 
 
+class ChunkingOptions(BaseModel):
+    enabled: bool = True
+    preset: Optional[str] = Field(None, description="Chunking preset name (balanced, short_form, long_form)")
+    overrides: Dict[str, Any] = Field(default_factory=dict, description="Override chunker config values")
+    replace_existing_chunks: bool = True
+    metadata_overrides: Dict[str, Any] = Field(default_factory=dict)
+
+
 class LimitOptions(BaseModel):
     since: Optional[date] = None
     max_files: Optional[int] = None
@@ -139,6 +147,7 @@ class PipelineSpec(BaseModel):
     storage: StorageOptions = Field(default_factory=StorageOptions)
     schedule: ScheduleOptions = Field(default_factory=ScheduleOptions)
     processors: ProcessorOptions = Field(default_factory=ProcessorOptions)
+    chunking: ChunkingOptions = Field(default_factory=ChunkingOptions)
     limits: LimitOptions = Field(default_factory=LimitOptions)
     dedupe: DedupeOptions = Field(default_factory=DedupeOptions)
     sources: SourcesOptions = Field(default_factory=SourcesOptions)

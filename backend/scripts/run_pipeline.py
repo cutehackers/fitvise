@@ -153,7 +153,7 @@ async def main() -> int:
         data["storage"]["provider"] = "local"
         spec = PipelineSpec.model_validate(data)
 
-    summary = await run_pipeline(spec)
+    summary = await run_pipeline(spec, dry_run=args.dry_run)
     print(json.dumps(summary.as_dict(), indent=2))
     return 0
 

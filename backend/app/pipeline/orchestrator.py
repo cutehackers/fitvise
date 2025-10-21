@@ -8,7 +8,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from uuid import UUID, uuid4
 
 from app.pipeline.config import PipelineSpec
 from app.domain.exceptions import (
@@ -22,6 +23,13 @@ from app.domain.exceptions import (
     SourceConfigurationError,
     SourceNotReachableError,
     StorageWriteError,
+    ChunkingError,
+)
+from app.domain.entities.document import Document
+from app.domain.value_objects.document_metadata import DocumentMetadata, DocumentFormat
+from app.application.use_cases.chunking import (
+    SemanticChunkingRequest,
+    SemanticChunkingUseCase,
 )
 from app.pipeline.contracts import (
     DocumentSource,
@@ -72,8 +80,10 @@ from app.application.use_cases.storage_management import (
 )
 from app.infrastructure.external_services.data_sources.database_connectors import DatabaseConnectionConfig
 from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
+from app.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
+from app.config.ml_models import get_chunking_config
 
 
 logger = logging.getLogger(__name__)
@@ -82,6 +92,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class UseCaseBundle:
     repository: InMemoryDataSourceRepository
+    document_repository: InMemoryDocumentRepository
     storage: SetupObjectStorageUseCase
     process_pdfs: ProcessPdfsUseCase
     normalize_text: NormalizeTextUseCase
@@ -93,12 +104,15 @@ class UseCaseBundle:
     audit_sources: AuditDataSourcesUseCase
     categorize_sources: CategorizeSourcesUseCase
     document_apis: DocumentExternalApisUseCase
+    chunk_documents: SemanticChunkingUseCase
 
 
 def _build_use_cases() -> UseCaseBundle:
     repository = InMemoryDataSourceRepository()
+    document_repository = InMemoryDocumentRepository()
     return UseCaseBundle(
         repository=repository,
+        document_repository=document_repository,
         storage=SetupObjectStorageUseCase(),
         process_pdfs=ProcessPdfsUseCase(),
         normalize_text=NormalizeTextUseCase(),
@@ -110,6 +124,7 @@ def _build_use_cases() -> UseCaseBundle:
         audit_sources=AuditDataSourcesUseCase(repository),
         categorize_sources=CategorizeSourcesUseCase(repository, SklearnDocumentCategorizer()),
         document_apis=DocumentExternalApisUseCase(repository),
+        chunk_documents=SemanticChunkingUseCase(document_repository=document_repository),
     )
 
 
@@ -126,6 +141,94 @@ def _guess_content_type(path: Path) -> Optional[str]:
         ".doc": "application/msword",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }.get(suf)
+
+
+def _infer_document_format(content_type: Optional[str], path: Optional[str]) -> DocumentFormat:
+    if content_type:
+        mapping = {
+            "application/pdf": DocumentFormat.PDF,
+            "text/markdown": DocumentFormat.MD,
+            "text/plain": DocumentFormat.TXT,
+            "text/html": DocumentFormat.HTML,
+            "application/json": DocumentFormat.JSON,
+            "text/csv": DocumentFormat.CSV,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": DocumentFormat.DOCX,
+        }
+        mapped = mapping.get(content_type)
+        if mapped:
+            return mapped
+
+    if path:
+        ext_mapping = {
+            ".pdf": DocumentFormat.PDF,
+            ".md": DocumentFormat.MD,
+            ".txt": DocumentFormat.TXT,
+            ".html": DocumentFormat.HTML,
+            ".htm": DocumentFormat.HTML,
+            ".json": DocumentFormat.JSON,
+            ".csv": DocumentFormat.CSV,
+            ".docx": DocumentFormat.DOCX,
+            ".doc": DocumentFormat.DOCX,
+        }
+        ext = Path(path).suffix.lower()
+        mapped = ext_mapping.get(ext)
+        if mapped:
+            return mapped
+
+    return DocumentFormat.TXT
+
+
+def _build_document_entity(
+    doc: DocumentSource,
+    normalized: StandardSourceContent,
+    enriched: MetadataAnnotation,
+    quality: QualityReport,
+    content: SourceContent,
+    object_key: str,
+    payload_size: int,
+    run_id: str,
+) -> Document:
+    file_path = doc.path or doc.uri or f"object://{object_key}"
+    if doc.path:
+        file_name = Path(doc.path).name
+    elif doc.uri:
+        file_name = doc.uri.rstrip("/").split("/")[-1] or object_key.split("/")[-1]
+    else:
+        file_name = object_key.split("/")[-1]
+
+    doc_format = _infer_document_format(content.content_type, doc.path or doc.uri)
+
+    metadata = DocumentMetadata(
+        file_name=file_name,
+        file_path=file_path,
+        file_size=payload_size,
+        format=doc_format,
+        language=content.language or enriched.language,
+        keywords=enriched.keywords or [],
+        word_count=len(normalized.tokens) if normalized.tokens else None,
+        custom_fields={
+            "object_key": object_key,
+            "origin": doc.origin,
+            "quality_level": quality.quality_level,
+            "overall_score": f"{quality.overall_score:.4f}",
+            "run_id": run_id,
+        },
+    )
+
+    document = Document(
+        source_id=uuid4(),
+        metadata=metadata,
+        content=normalized.normalized,
+    )
+    document.complete_processing(
+        extracted_text=normalized.normalized,
+        structured_content={
+            "entities": enriched.entities,
+            "tables": content.tables,
+            "metadata": content.metadata,
+        },
+    )
+    return document
 
 
 def _discover_file_documents(spec: PipelineSpec) -> List[DocumentSource]:
@@ -591,7 +694,7 @@ def _content_hash(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-async def run_pipeline(spec: PipelineSpec) -> RunSummary:
+async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
     """
     Main data ingestion orchestration pipeline.
     
@@ -603,6 +706,7 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
     5. Normalizing text and enriching with metadata (keywords, entities, dates)
     6. Validating content quality and computing quality scores
     7. Storing processed documents in object storage with metadata and tags
+    8. Generating semantic chunks for processed documents (Task 2.1.1)
     
     Pipeline Execution Sequence:
         Phase 1 - Infrastructure Setup:
@@ -633,9 +737,10 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
     
     Args:
         spec: Pipeline configuration specifying sources, storage, and processing options
-        
+        dry_run: When True, skip persisting chunk output and route storage to a dry-run bucket
+
     Returns:
-        RunSummary containing processing statistics, stored objects, and any errors
+        RunSummary containing processing statistics, stored objects, chunking stats, and any errors
         
     Example:
         >>> from pathlib import Path
@@ -645,7 +750,7 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
         >>> spec = PipelineSpec.from_file("rag_pipeline.yaml")
         >>> 
         >>> # Execute pipeline
-        >>> summary = await run_pipeline(spec)
+        >>> summary = await run_pipeline(spec, dry_run=False)
         >>> 
         >>> # Check results
         >>> print(f"Processed: {summary.processed}")
@@ -665,8 +770,10 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
     await _maybe_audit_sources(spec, use_cases)
     await _maybe_categorize_sources(spec, use_cases)
 
+    run_id = datetime.now(timezone.utc).isoformat()
     documents: List[DocumentSource] = []
     errors: List[Dict[str, object]] = []
+    processed_document_ids: List[UUID] = []
 
     try:
         documents.extend(_discover_file_documents(spec))
@@ -761,6 +868,7 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
                 "overall_score": str(quality.overall_score),
                 "quality_level": quality.quality_level,
             }
+            metadata["run_id"] = run_id
 
             try:
                 result = client.put_object(
@@ -787,6 +895,18 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
                     tags=tags,
                 )
             )
+            document_entity = _build_document_entity(
+                doc=doc,
+                normalized=normalized,
+                enriched=enriched,
+                quality=quality,
+                content=content,
+                object_key=object_key,
+                payload_size=result.size,
+                run_id=run_id,
+            )
+            await use_cases.document_repository.save(document_entity)
+            processed_document_ids.append(document_entity.id)
             origin_counts[doc.origin] = origin_counts.get(doc.origin, 0) + 1
         except ProcessingError as exc:
             logger.error(
@@ -808,8 +928,64 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
                 }
             )
 
+    chunk_options = getattr(spec, "chunking", None)
+    chunk_enabled = True
+    if chunk_options is not None:
+        chunk_enabled = getattr(chunk_options, "enabled", True)
+
+    chunk_summary: Dict[str, Any] = {
+        "documents": 0,
+        "total_chunks": 0,
+        "dry_run": dry_run,
+        "enabled": chunk_enabled,
+        "preset": getattr(chunk_options, "preset", None) or "balanced",
+    }
+
+    if chunk_enabled and processed_document_ids:
+        try:
+            chunk_config = get_chunking_config(getattr(chunk_options, "preset", None))
+            overrides = getattr(chunk_options, "overrides", {}) if chunk_options else {}
+            if overrides:
+                chunk_config.update(overrides)
+
+            metadata_overrides = {"run_id": run_id}
+            extra_metadata = getattr(chunk_options, "metadata_overrides", {}) if chunk_options else {}
+            metadata_overrides.update(extra_metadata)
+
+            replace_existing = getattr(chunk_options, "replace_existing_chunks", True) if chunk_options else True
+
+            chunk_response = await use_cases.chunk_documents.execute(
+                SemanticChunkingRequest(
+                    document_ids=processed_document_ids,
+                    replace_existing_chunks=replace_existing,
+                    dry_run=dry_run,
+                    chunker_config=chunk_config,
+                    metadata_overrides=metadata_overrides,
+                )
+            )
+            chunk_summary.update(
+                {
+                    "documents": len(chunk_response.results),
+                    "total_chunks": chunk_response.total_chunks,
+                    "dry_run": chunk_response.dry_run,
+                }
+            )
+        except ChunkingError as exc:
+            logger.error("Chunking error: %s", exc)
+            errors.append(exc.to_dict())
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Unexpected chunking failure")
+            errors.append(
+                {
+                    "error_type": "UnexpectedChunkingError",
+                    "message": str(exc),
+                    "detail": repr(exc),
+                }
+            )
+
     processing_failures = max(len(errors) - discovery_error_count, 0)
     counters = {
+        "run_id": run_id,
         "discovered": len(documents),
         "processed": len(stored_objects),
         "skipped": skipped,
@@ -817,6 +993,7 @@ async def run_pipeline(spec: PipelineSpec) -> RunSummary:
         "by_origin": origin_counts,
         "discovery_errors": discovery_error_count,
         "total_errors": len(errors),
+        "chunking": chunk_summary,
     }
     return RunSummary(
         processed=len(stored_objects),

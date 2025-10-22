@@ -13,10 +13,22 @@ from app.api.v1.router import router
 from app.application import llm_service
 from app.core.settings import settings
 
-# Configure logging
+# Configure logging with structured format
+class LogFormatter(logging.Formatter):
+    def format(self, record):
+        timestamp = self.formatTime(record, "%Y-%m-%dT%H:%M:%SZ")
+        level = record.levelname
+        module = record.name.split('.')[-1]
+        func = record.funcName or "unknown"
+        line = record.lineno
+        msg = record.getMessage()
+        return f"time={timestamp} | level={level} | module={module} | func={func} | line={line} | msg={msg}"
+
+handler = logging.StreamHandler()
+handler.setFormatter(LogFormatter())
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[handler],
 )
 logger = logging.getLogger(__name__)
 

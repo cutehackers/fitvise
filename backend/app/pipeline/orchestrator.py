@@ -586,7 +586,7 @@ async def _extract_content(doc: DocumentSource, spec: PipelineSpec, use_cases: U
             return SourceContent(
                 text=result.text or "",
                 markdown=None,
-                tables=[],
+                tabes=[],
                 metadata=result.metadata or {},
                 content_type=result.content_type or content_type,
                 language=result.language,
@@ -1091,12 +1091,29 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
         surfaced in the returned `RunSummary`.
     """
 
+    # 1. Setup pipeline
+    #  - Build the `UseCaseBundle` so every downstream step shares repositories,
+    #  - Provision object storage buckets and credentials via `_prepare_storage`.
+    #  - Run optional audit / categorization passes to warm supporting datasets.    
+    logger.info("pipeline initialization started | phase=setup")    
     use_cases = await _init_pipeline(spec)
     run_id = datetime.now(timezone.utc).isoformat()
 
+    # 2. Discover documents
+    #  - Aggregate filesystem matches (`_discover_file_documents`).
+    #  - Execute database connectors and capture samples (`_discover_database_documents`).
+    #  - Run configured scrapers to turn crawled pages into sources (`_discover_web_documents`).
+    #  - Document external APIs into JSON payloads (`_document_external_apis`).
+    #  - Apply any input limits (for example `spec.limits.max_files`).
     documents, errors = await _discover_documents(spec, use_cases)
     discovery_error_count = len(errors)
 
+    # 3. Process documents
+    #  - Extract raw content using Docling/Tika (`_extract_content`).
+    #  - Normalize text tokens and structure using spaCy (`_normalize_content`).
+    #  - Enrich metadata (keywords, entities, authors) using spaCy (`_enrich_content`).
+    #  - Validate content quality / scores using great_expectations (`_validate_content`).
+    #  - Persist normalized payloads in object storage and the in-memory repository.
     client = _storage_client(spec)
     stored_objects, origin_counts, skipped, processed_document_ids = await _process_documents(
         documents=documents,
@@ -1106,15 +1123,19 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
         run_id=run_id,
         errors=errors,
     )
-
-    chunk_summary = await _maybe_chunk_documents(
-        processed_document_ids=processed_document_ids,
-        use_cases=use_cases,
-        spec=spec,
-        run_id=run_id,
-        dry_run=dry_run,
-        errors=errors,
-    )
+    
+    # 4. Post-processing
+    #  - Load chunking preset/overrides and attach run metadata.
+    #  - Execute semantic chunking against processed document IDs.
+    #  - Capture chunk counts and append recoverable errors without failing the run.
+    # chunk_summary = await _maybe_chunk_documents(
+    #     processed_document_ids=processed_document_ids,
+    #     use_cases=use_cases,
+    #     spec=spec,
+    #     run_id=run_id,
+    #     dry_run=dry_run,
+    #     errors=errors,
+    # )
 
     processing_failures = max(len(errors) - discovery_error_count, 0)
     counters = {

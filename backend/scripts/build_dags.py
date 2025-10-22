@@ -15,11 +15,8 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # add backend/ to path
-
-from app.application.use_cases.storage_management import (
-    BuildEtlDagsUseCase,
-    BuildEtlDagsRequest,
-)
+# CLI helper that simply delegates to the BuildEtlDags use case.```
+from app.application.use_cases.storage_management import BuildEtlDagsUseCase, BuildEtlDagsRequest
 
 
 async def main() -> int:
@@ -45,4 +42,3 @@ async def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(asyncio.run(main()))
-

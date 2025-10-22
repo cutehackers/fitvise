@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, validator
 
 from app.application.use_cases.data_ingestion import (
     SetupAirflowEnvironmentUseCase,
-    SetupAirflowEnvironmentRequest,
+    SetupAirflowRequest,
     IntegrateTikaUseCase,
     IntegrateTikaRequest,
     ConnectDatabasesUseCase,
@@ -166,7 +166,7 @@ async def create_airflow_environment(
 ):
     """Generate Airflow support artefacts (env file, docker-compose and hello-world DAG)."""
     try:
-        request = SetupAirflowEnvironmentRequest(
+        request = SetupAirflowRequest(
             base_path=payload.base_path,
             env_overrides=payload.env_overrides,
             compose_overrides=payload.compose_overrides,

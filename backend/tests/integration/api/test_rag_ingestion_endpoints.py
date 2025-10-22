@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.api.v1.rag import ingestion
 from app.application.use_cases.data_ingestion.setup_airflow import (
-    SetupAirflowEnvironmentResponse,
+    SetupAirflowResponse,
 )
 from app.application.use_cases.data_ingestion.integrate_tika import (
     IntegrateTikaResponse,
@@ -53,7 +53,7 @@ class _StubAirflowUseCase:
             created_directories=[Path("/tmp/dags"), Path("/tmp/logs")],
         )
         diagnostics: Dict[str, Any] = {"env_file_exists": True}
-        return SetupAirflowEnvironmentResponse(success=True, report=report, diagnostics=diagnostics)
+        return SetupAirflowResponse(success=True, report=report, diagnostics=diagnostics)
 
 
 class _StubTikaUseCase:

@@ -1,7 +1,7 @@
 """Use cases covering core ingestion infrastructure (Task 1.2.*)."""
 from .setup_airflow import (
-    SetupAirflowEnvironmentRequest,
-    SetupAirflowEnvironmentResponse,
+    SetupAirflowRequest,
+    SetupAirflowResponse,
     SetupAirflowEnvironmentUseCase,
 )
 from .integrate_tika import (
@@ -22,8 +22,8 @@ from .setup_web_scraping import (
 )
 
 __all__ = [
-    "SetupAirflowEnvironmentRequest",
-    "SetupAirflowEnvironmentResponse",
+    "SetupAirflowRequest",
+    "SetupAirflowResponse",
     "SetupAirflowEnvironmentUseCase",
     "IntegrateTikaRequest",
     "IntegrateTikaResponse",

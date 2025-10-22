@@ -1,16 +1,16 @@
 """Orchestration utilities for managing Airflow and related schedulers."""
 from .airflow_manager import (
-    AirflowEnvironmentManager,
+    AirflowManager,
     AirflowDockerConfig,
     AirflowEnvConfig,
-    AirflowDAGTemplate,
+    AirflowDagTemplate,
     AirflowSetupReport,
 )
 
 __all__ = [
-    "AirflowEnvironmentManager",
+    "AirflowManager",
     "AirflowDockerConfig",
     "AirflowEnvConfig",
-    "AirflowDAGTemplate",
+    "AirflowDagTemplate",
     "AirflowSetupReport",
 ]

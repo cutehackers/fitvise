@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from app.infrastructure.orchestration import (
-    AirflowEnvironmentManager,
-    AirflowDAGTemplate,
+    AirflowManager,
+    AirflowDagTemplate,
     AirflowSetupReport,
 )
 
 
-class SetupAirflowEnvironmentRequest:
+class SetupAirflowRequest:
     """Request payload used to configure the environment generation."""
 
     def __init__(
@@ -19,7 +19,7 @@ class SetupAirflowEnvironmentRequest:
         base_path: Optional[str] = None,
         env_overrides: Optional[Dict[str, str]] = None,
         compose_overrides: Optional[Dict[str, Any]] = None,
-        dag_id: str = "rag_hello_world",
+        dag_id: str = "rag_id",
         schedule: str = "@daily",
         tags: Optional[List[str]] = None,
     ) -> None:
@@ -31,7 +31,7 @@ class SetupAirflowEnvironmentRequest:
         self.tags = tags or ["rag", "ingestion", "phase1"]
 
 
-class SetupAirflowEnvironmentResponse:
+class SetupAirflowResponse:
     """Response containing generated artefacts and diagnostics."""
 
     def __init__(
@@ -65,20 +65,20 @@ class SetupAirflowEnvironmentResponse:
         return self.report.warnings
 
 
-class SetupAirflowEnvironmentUseCase:
+class SetupAirflowUseCase:
     """Creates docker-compose, env file, folders and hello-world DAG for Airflow."""
 
-    def __init__(self, manager: Optional[AirflowEnvironmentManager] = None) -> None:
-        self.manager = manager or AirflowEnvironmentManager()
+    def __init__(self, manager: Optional[AirflowManager] = None) -> None:
+        self.manager = manager or AirflowManager()
 
-    async def execute(self, request: SetupAirflowEnvironmentRequest) -> SetupAirflowEnvironmentResponse:
+    async def execute(self, request: SetupAirflowRequest) -> SetupAirflowResponse:
         if request.base_path:
             self.manager.base_path = request.base_path
             self.manager.dags_dir = self.manager.base_path / "dags"
             self.manager.logs_dir = self.manager.base_path / "logs"
             self.manager.plugins_dir = self.manager.base_path / "plugins"
 
-        dag_template = AirflowDAGTemplate(
+        dag_template = AirflowDagTemplate(
             dag_id=request.dag_id,
             schedule=request.schedule,
             tags=request.tags,
@@ -90,4 +90,4 @@ class SetupAirflowEnvironmentUseCase:
         )
         diagnostics = self.manager.validate_generated_files(report)
         success = report.success
-        return SetupAirflowEnvironmentResponse(success=success, report=report, diagnostics=diagnostics)
+        return SetupAirflowResponse(success=success, report=report, diagnostics=diagnostics)

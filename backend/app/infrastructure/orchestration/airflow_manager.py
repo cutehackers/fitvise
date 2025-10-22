@@ -217,10 +217,10 @@ class AirflowDockerConfig:
 
 
 @dataclass
-class AirflowDAGTemplate:
+class AirflowDagTemplate:
     """Template for generating a hello-world DAG proving the stack works."""
 
-    dag_id: str = "rag_hello_world"
+    dag_id: str = "rag_id"
     schedule: str = "@daily"
     catchup: bool = False
     tags: List[str] = field(default_factory=lambda: ["rag", "ingestion", "phase1"])
@@ -314,7 +314,7 @@ class AirflowSetupReport:
         }
 
 
-class AirflowEnvironmentManager:
+class AirflowManager:
     """High-level helper for provisioning the Airflow ingestion environment."""
 
     def __init__(
@@ -370,9 +370,9 @@ class AirflowEnvironmentManager:
     def write_hello_world_dag(
         self,
         dag_filename: Optional[str] = None,
-        dag_template: Optional[AirflowDAGTemplate] = None,
+        dag_template: Optional[AirflowDagTemplate] = None,
     ) -> Path:
-        dag_template = dag_template or AirflowDAGTemplate()
+        dag_template = dag_template or AirflowDagTemplate()
         dag_filename = dag_filename or f"{dag_template.dag_id}.py"
         dag_path = self.dags_dir / dag_filename
         if not dag_path.parent.exists():
@@ -388,7 +388,7 @@ class AirflowEnvironmentManager:
         output_dir: Optional[Path | str] = None,
         env_overrides: Optional[Dict[str, str]] = None,
         compose_overrides: Optional[Dict[str, Any]] = None,
-        dag_template: Optional[AirflowDAGTemplate] = None,
+        dag_template: Optional[AirflowDagTemplate] = None,
     ) -> AirflowSetupReport:
         """Create folders and configuration artefacts for the Airflow stack."""
         if output_dir:

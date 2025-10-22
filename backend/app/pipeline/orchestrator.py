@@ -1128,14 +1128,14 @@ async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
     #  - Load chunking preset/overrides and attach run metadata.
     #  - Execute semantic chunking against processed document IDs.
     #  - Capture chunk counts and append recoverable errors without failing the run.
-    # chunk_summary = await _maybe_chunk_documents(
-    #     processed_document_ids=processed_document_ids,
-    #     use_cases=use_cases,
-    #     spec=spec,
-    #     run_id=run_id,
-    #     dry_run=dry_run,
-    #     errors=errors,
-    # )
+    chunk_summary = await _maybe_chunk_documents(
+        processed_document_ids=processed_document_ids,
+        use_cases=use_cases,
+        spec=spec,
+        run_id=run_id,
+        dry_run=dry_run,
+        errors=errors,
+    )
 
     processing_failures = max(len(errors) - discovery_error_count, 0)
     counters = {

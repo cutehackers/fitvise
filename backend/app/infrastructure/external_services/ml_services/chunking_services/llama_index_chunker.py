@@ -9,6 +9,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
 from app.domain.exceptions import ChunkingDependencyError, ChunkGenerationError
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -194,8 +195,12 @@ class LlamaIndexChunker:
                 threshold = self.config.semantic_breakpoint_threshold
                 threshold_int = int(threshold * 100) if threshold <= 1.0 else int(threshold)
 
+                # embedding model: all-MiniLM-L6-v2 
+                embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
                 semantic_parser = _SemanticSplitter.from_defaults(  # type: ignore[attr-defined]
                     breakpoint_percentile_threshold=threshold_int,
+                    embed_model=embed_model,
                 )
                 nodes = semantic_parser.get_nodes_from_documents([document])
             except Exception as exc:  # pragma: no cover - semantic splitter optional

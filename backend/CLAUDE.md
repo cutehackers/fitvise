@@ -28,16 +28,54 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Testing and Validation
+
+**Test Structure**:
+All tests are located in the `/backend/tests/` directory following this structure:
+```
+tests/
+├── unit/                    # Unit tests for individual components
+│   ├── table_serialization/ # Table serialization module tests
+│   │   ├── fixtures/        # Test data fixtures
+│   │   │   └── sample_tables.py
+│   │   ├── conftest.py      # Local test configuration
+│   │   └── test_serializers.py
+│   └── ...
+├── integration/             # Integration tests
+├── e2e/                     # End-to-end tests
+├── fixtures/                # Shared test fixtures
+├── utils/                   # Test utilities
+└── conftest.py             # Global pytest configuration
+```
+
+**Running Tests**:
 ```bash
-# Test configuration loading
+# Run all tests
+pytest tests/
+
+# Run specific test module
+pytest tests/unit/table_serialization/
+
+# Run with verbose output
+pytest tests/unit/table_serialization/test_serializers.py -v
+
+# Run with coverage
+pytest tests/ --cov=app --cov-report=html
+
+# Test configuration loading (legacy)
 python test_settings.py
 
-# Test API endpoints
+# Test API endpoints (legacy)
 python api_example.py
 
-# Test LLM service directly
+# Test LLM service directly (legacy)
 python example_usage.py
 ```
+
+**Test Organization Rules**:
+- ✅ **Unit tests**: `/tests/unit/` - Test individual components in isolation
+- ✅ **Integration tests**: `/tests/integration/` - Test component interactions
+- ✅ **E2E tests**: `/tests/e2e/` - Test complete user workflows
+- ❌ **Never** place tests inside `app/` directory - they belong in `/tests/`
 
 ### Environment Configuration
 The service requires a comprehensive `.env` file. Copy the existing `.env` and modify as needed. Key configuration areas:

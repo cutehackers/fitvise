@@ -80,7 +80,7 @@
     - Deliverable: LlamaIndex-based chunking with configurable strategies
     - Acceptance Criteria: Handles different document types, maintains context
     - Effort: 8 days
-- [ ]  **Task 2.1.2**: Build table serialization module
+- [x]  **Task 2.1.2**: Build table serialization module
     - Deliverable: Converter for tables to markdown/JSON with header preservation
     - Acceptance Criteria: Handles complex tables from financial reports
     - Effort: 6 days

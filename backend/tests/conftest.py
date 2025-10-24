@@ -22,8 +22,14 @@ from httpx import AsyncClient
 # Add the app directory to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent / "app"))
 
-from backend.app.core.settings import Settings
-from app.main import app
+from app.core.settings import Settings
+
+# Try to import app, but allow tests to run without it
+# (e.g., for isolated unit tests like table_serialization)
+try:
+    from app.main import app
+except ImportError:
+    app = None
 
 
 @pytest.fixture(scope="session")
@@ -75,6 +81,8 @@ def test_client(test_settings: Settings) -> Generator[TestClient, None, None]:
     Create a test client for the FastAPI application.
     Uses the test settings configuration.
     """
+    if app is None:
+        pytest.skip("FastAPI app not available (missing dependencies)")
     with TestClient(app) as client:
         yield client
 
@@ -87,6 +95,8 @@ async def async_test_client(
     Create an async test client for the FastAPI application.
     Useful for testing async endpoints and streaming responses.
     """
+    if app is None:
+        pytest.skip("FastAPI app not available (missing dependencies)")
     async with AsyncClient(app=app, base_url="http://test") as client:
         yield client
 

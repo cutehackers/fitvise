@@ -40,6 +40,7 @@ dependencies = [
     "requests>=2.32.5",
     "aiohttp>=3.12.15",
     "openpyxl>=3.1.5",
+    "llama-index>=0.12.52",
 ]
 
 [tool.isort]

@@ -30,7 +30,19 @@ sources:
   document_apis:
     enabled: false
   databases: []
-  web: []
+  web:
+    - start_urls:
+        - "https://ods.od.nih.gov/factsheets/ExerciseAndAthleticPerformance-HealthProfessional"
+      allowed_domains:
+        - "ods.od.nih.gov"
+      max_depth: 2
+      max_pages: 100
+    - start_urls:
+        - "https://www.cdc.gov/physical-activity-basics/about/index.html"
+      allowed_domains:
+        - "www.cdc.gov"
+      max_depth: 2
+      max_pages: 100
 # sources:
 #   audit:
 #     enabled: true

@@ -2,7 +2,7 @@
 from .setup_airflow import (
     SetupAirflowRequest,
     SetupAirflowResponse,
-    SetupAirflowEnvironmentUseCase,
+    SetupAirflowUseCase,
 )
 from .integrate_tika import (
     IntegrateTikaRequest,
@@ -24,7 +24,7 @@ from .setup_web_scraping import (
 __all__ = [
     "SetupAirflowRequest",
     "SetupAirflowResponse",
-    "SetupAirflowEnvironmentUseCase",
+    "SetupAirflowUseCase",
     "IntegrateTikaRequest",
     "IntegrateTikaResponse",
     "IntegrateTikaUseCase",

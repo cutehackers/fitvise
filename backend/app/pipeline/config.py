@@ -99,7 +99,7 @@ class DatabaseConnectorOptions(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     database: Optional[str] = None
-    schema: Optional[str] = None
+    db_schema: Optional[str] = None
     params: Dict[str, Any] = Field(default_factory=dict)
     use_ssl: bool = False
     sample_collection: Optional[str] = None

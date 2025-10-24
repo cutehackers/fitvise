@@ -56,6 +56,13 @@ class InMemoryDocumentRepository(DocumentRepository):
     async def find_needing_reprocessing(self) -> List[Document]:
         return []
 
+    async def find_by_quality_score_range(self, min_score: float, max_score: float) -> List[Document]:
+        return [
+            doc
+            for doc in self._documents.values()
+            if doc.quality_metrics and min_score <= doc.quality_metrics.overall_score <= max_score
+        ]
+
     async def delete(self, document_id: UUID) -> bool:
         return self._documents.pop(document_id, None) is not None
 

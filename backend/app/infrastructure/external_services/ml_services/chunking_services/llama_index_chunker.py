@@ -189,10 +189,13 @@ class LlamaIndexChunker:
 
         if self.config.enable_semantic and _SemanticSplitter is not None:
             try:
+                # SemanticSplitterNodeParser expects breakpoint_percentile_threshold as an integer (0-100)
+                # Convert from float (0-1) to integer (0-100) if needed
+                threshold = self.config.semantic_breakpoint_threshold
+                threshold_int = int(threshold * 100) if threshold <= 1.0 else int(threshold)
+
                 semantic_parser = _SemanticSplitter.from_defaults(  # type: ignore[attr-defined]
-                    breakpoint_percentile_threshold=self.config.semantic_breakpoint_threshold,
-                    chunk_size=self.config.chunk_size,
-                    chunk_overlap=self.config.chunk_overlap,
+                    breakpoint_percentile_threshold=threshold_int,
                 )
                 nodes = semantic_parser.get_nodes_from_documents([document])
             except Exception as exc:  # pragma: no cover - semantic splitter optional

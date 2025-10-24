@@ -5,7 +5,7 @@ from .setup_object_storage import (
     SetupObjectStorageResponse,
     SetupObjectStorageUseCase,
 )
-from .orchestrate_etl import (
+from .build_etl_dags import (
     BuildEtlDagsRequest,
     BuildEtlDagsResponse,
     BuildEtlDagsUseCase,

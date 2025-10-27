@@ -84,10 +84,11 @@
     - Deliverable: Converter for tables to markdown/JSON with header preservation
     - Acceptance Criteria: Handles complex tables from financial reports
     - Effort: 6 days
-- [ ]  **Task 2.1.3**: Implement recursive chunking for hierarchical documents
-    - Deliverable: LangChain-based recursive chunker respecting document structure
+- [x]  **Task 2.1.3**: Implement recursive chunking for hierarchical documents
+    - Deliverable: llama_index HierarchicalNodeParser-based chunker respecting document structure
     - Acceptance Criteria: Preserves policy hierarchies (policy > section > paragraph)
     - Effort: 10 days
+    - Implementation: Used llama_index for consistency with Task 2.1.1, includes LangChain conversion layer
 
 ### 2.2 Embedding Model Pipeline
 

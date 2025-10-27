@@ -18,9 +18,10 @@ class ChunkingPreset:
     metadata_passthrough: Iterable[str] = field(
         default_factory=lambda: ("document_id", "source_id", "file_name", "doc_type")
     )
+    chunk_sizes: Iterable[int] | None = None  # For hierarchical chunking (Task 2.1.3)
 
-    def as_dict(self) -> Dict[str, int | List[str] | str]:
-        return {
+    def as_dict(self) -> Dict[str, int | List[str] | List[int] | str]:
+        result = {
             "preset": self.name,
             "description": self.description,
             "chunk_size": self.chunk_size,
@@ -29,6 +30,9 @@ class ChunkingPreset:
             "max_chunk_chars": self.max_chunk_chars,
             "metadata_passthrough_fields": list(self.metadata_passthrough),
         }
+        if self.chunk_sizes is not None:
+            result["chunk_sizes"] = list(self.chunk_sizes)
+        return result
 
 
 _PRESETS: Dict[str, ChunkingPreset] = {
@@ -55,6 +59,15 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         chunk_overlap=256,
         min_chunk_chars=160,
         max_chunk_chars=3072,
+    ),
+    "hierarchical": ChunkingPreset(
+        name="hierarchical",
+        description="Recursive chunking preserving policy/section/paragraph hierarchy.",
+        chunk_size=2048,  # Largest level (root/document context)
+        chunk_overlap=200,
+        min_chunk_chars=100,
+        max_chunk_chars=2048,
+        chunk_sizes=[2048, 512, 128],  # Multi-level: document → section → paragraph
     ),
 }
 

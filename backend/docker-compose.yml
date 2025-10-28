@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Weaviate Vector Database for Embeddings (Task 2.2.1)
+  weaviate:
+    image: semitechnologies/weaviate:1.24.1
+    container_name: fitvise-weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051"  # gRPC endpoint
+    environment:
+      # Basic Configuration
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+
+      # Performance & Resources
+      DEFAULT_VECTORIZER_MODULE: 'none'  # We provide embeddings
+      ENABLE_MODULES: ''
+
+      # Cluster Configuration
+      CLUSTER_HOSTNAME: 'node1'
+
+      # Performance Tuning
+      LIMIT_RESOURCES: 'false'
+      GOMEMLIMIT: '2GiB'
+
+      # Logging
+      LOG_LEVEL: 'info'
+
+      # HNSW Index Configuration (Optimized for Performance)
+      # These match our WeaviateSchema settings
+      VECTOR_INDEX_TYPE: 'hnsw'
+
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    networks:
+      - fitvise-network
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fitvise-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # API Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      ENVIRONMENT: development
+
+      # Weaviate Configuration
+      WEAVIATE_HOST: weaviate
+      WEAVIATE_PORT: 8080
+      WEAVIATE_SCHEME: http
+
+      # Embedding Model Configuration
+      EMBEDDING_MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
+      EMBEDDING_MODEL_DIMENSION: 384
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_BATCH_SIZE: 32
+
+      # CORS Configuration
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+      CORS_ALLOW_CREDENTIALS: 'true'
+
+    volumes:
+      - ./app:/app/app
+      - model_cache:/root/.cache/torch/sentence_transformers
+    depends_on:
+      weaviate:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - fitvise-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  weaviate_data:
+    driver: local
+  model_cache:
+    driver: local
+
+networks:
+  fitvise-network:
+    driver: bridge

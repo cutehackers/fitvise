@@ -2,14 +2,16 @@
 from .data_source import DataSource
 from .document import Document
 from .chunk import Chunk
+from .embedding import Embedding
 from .processing_job import ProcessingJob, JobType, JobStatus, JobPriority
 
 __all__ = [
     "DataSource",
-    "Document", 
+    "Document",
     "Chunk",
+    "Embedding",
     "ProcessingJob",
     "JobType",
-    "JobStatus", 
+    "JobStatus",
     "JobPriority"
 ]

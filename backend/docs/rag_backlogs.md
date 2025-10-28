@@ -92,7 +92,7 @@
 
 ### 2.2 Embedding Model Pipeline
 
-- [ ]  **Task 2.2.1**: Set up base Sentence-Transformers infrastructure
+- [x]  **Task 2.2.1**: Set up base Sentence-Transformers infrastructure
     - Deliverable: Embedding service using all-MiniLM-L6-v2
     - Acceptance Criteria: Can embed 1000 chunks/minute
     - Effort: 5 days

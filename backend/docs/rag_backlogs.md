@@ -115,10 +115,12 @@
     - Deliverable: Production-ready Weaviate with backup/restore
     - Acceptance Criteria: Handles 1M+ vectors, 99.9% uptime
     - Effort: 8 days
-- [ ]  **Task 2.3.2**: Design and implement schema for metadata
+- [x]  **Task 2.3.2**: Design and implement schema for metadata
     - Deliverable: Weaviate schema supporting all document types and metadata
     - Acceptance Criteria: Enables efficient filtering on doc_type, date, department
     - Effort: 5 days
+    - Status: ✅ Complete - 21 properties including department, category, tags, quality scores
+    - Implementation: Enhanced schema with hierarchical context, quality metrics, and comprehensive metadata
 - [ ]  **Task 2.3.3**: Build embedding ingestion pipeline
     - Deliverable: Service that embeds chunks and stores in Weaviate with metadata
     - Acceptance Criteria: Processes 10K chunks/hour with deduplication
@@ -321,14 +323,19 @@
 
 ## Progress Tracking
 
-**Epic 1 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/12 tasks completed)
-**Epic 2 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/13 tasks completed)
-**Epic 3 Progress**: ⬜⬜⬜⬜⬜⬜⬜ (0/7 tasks completed)
-**Epic 4 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜ (0/8 tasks completed)
-**Epic 5 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/13 tasks completed)
-**Cross-Epic Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/16 tasks completed)
+**Epic 1 Progress**: ✅✅✅✅✅✅✅✅✅✅✅✅ (12/12 tasks completed) - 100% ✅
+**Epic 2 Progress**: ✅✅✅✅✅⬜⬜⬜⬜⬜⬜⬜⬜ (5/13 tasks completed) - 38%
+  - ✅ Task 2.1.1: Semantic chunking service
+  - ✅ Task 2.1.2: Table serialization module
+  - ✅ Task 2.1.3: Recursive chunking for hierarchical documents
+  - ✅ Task 2.2.1: Base Sentence-Transformers infrastructure
+  - ✅ Task 2.3.2: Weaviate schema for metadata (just completed)
+**Epic 3 Progress**: ⬜⬜⬜⬜⬜⬜⬜ (0/7 tasks completed) - 0%
+**Epic 4 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜ (0/8 tasks completed) - 0%
+**Epic 5 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/13 tasks completed) - 0%
+**Cross-Epic Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/16 tasks completed) - 0%
 
-**Overall Progress**: 0/69 tasks completed (0%)
+**Overall Progress**: 17/69 tasks completed (25%)
 
 ## Sprint Planning
 

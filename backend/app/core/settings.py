@@ -121,10 +121,20 @@ class Settings(BaseSettings):
     database_echo: bool  # Set to True for SQL query logging
 
     # Vector Store Configuration
-    vector_store_type: Literal["chromadb", "faiss"]
+    vector_store_type: Literal["chromadb", "faiss", "weaviate"]
     vector_store_path: str
     embedding_model: str
     vector_dimension: int  # MiniLM embedding dimension
+    weaviate_url: str
+    weaviate_api_key: str
+
+    # Search Configuration
+    search_max_top_k: int = 1000  # Maximum results per search
+    search_default_top_k: int = 10  # Default results per search
+    search_min_similarity: float = 0.0  # Minimum similarity threshold
+    search_batch_size: int = 100  # Batch size for operations
+    search_timeout_ms: int = 30000  # Search timeout in milliseconds
+    search_cache_ttl_seconds: int = 3600  # Cache TTL for search results
 
     # Security Configuration
     secret_key: str

@@ -121,7 +121,7 @@
     - Effort: 5 days
     - Status: ✅ Complete - 21 properties including department, category, tags, quality scores
     - Implementation: Enhanced schema with hierarchical context, quality metrics, and comprehensive metadata
-- [ ]  **Task 2.3.3**: Build embedding ingestion pipeline
+- [x]  **Task 2.3.3**: Build embedding ingestion pipeline
     - Deliverable: Service that embeds chunks and stores in Weaviate with metadata
     - Acceptance Criteria: Processes 10K chunks/hour with deduplication
     - Effort: 10 days

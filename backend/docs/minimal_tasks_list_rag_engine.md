@@ -144,8 +144,9 @@
           vector=query_embedding,
           limit=5
       )
-
-      # 3. Generate answer with LLM (existing fitness LLM service)
+      # 3. Serving relevant chunks to LLM service (existing LLM service)
+      #  This is not goting to be included in RAG workflow as it is not part of the RAG pipeline.
+      #  It's just a part of entire flow to serve relevant chunks to LLM service.
       context = "\n".join([chunk.content for chunk in relevant_chunks])
       answer = await llm_service.generate(
           prompt=f"Context: {context}\n\nQuestion: {user_query}"

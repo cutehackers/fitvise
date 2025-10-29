@@ -37,6 +37,16 @@ from .chunking_exceptions import (
     ChunkValidationError,
     ChunkPersistenceError,
 )
+from .embedding_exceptions import (
+    EmbeddingException,
+    EmbeddingGenerationError,
+    EmbeddingStorageError,
+    ModelLoadError,
+    DimensionMismatchError,
+    VectorSearchError,
+    IngestionPipelineError,
+    DeduplicationError,
+)
 
 __all__ = [
     # Document
@@ -65,4 +75,13 @@ __all__ = [
     "ChunkGenerationError",
     "ChunkValidationError",
     "ChunkPersistenceError",
+    # Embedding
+    "EmbeddingException",
+    "EmbeddingGenerationError",
+    "EmbeddingStorageError",
+    "ModelLoadError",
+    "DimensionMismatchError",
+    "VectorSearchError",
+    "IngestionPipelineError",
+    "DeduplicationError",
 ]

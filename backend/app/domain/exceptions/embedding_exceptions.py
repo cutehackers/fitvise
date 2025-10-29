@@ -179,3 +179,71 @@ class VectorSearchError(EmbeddingException):
         if self.details:
             parts.append(f"details: {self.details}")
         return ", ".join(parts)
+
+
+class IngestionPipelineError(EmbeddingException):
+    """Exception raised when ingestion pipeline operations fail."""
+
+    def __init__(
+        self,
+        message: str = "Ingestion pipeline operation failed",
+        stage: Optional[str] = None,
+        document_count: Optional[int] = None,
+        details: Optional[str] = None,
+    ) -> None:
+        """Initialize ingestion pipeline error.
+
+        Args:
+            message: Error message
+            stage: Pipeline stage where error occurred (chunking, deduplication, embedding, storage)
+            document_count: Number of documents being processed
+            details: Additional error details
+        """
+        self.stage = stage
+        self.document_count = document_count
+        super().__init__(message, details)
+
+    def __str__(self) -> str:
+        """String representation of error."""
+        parts = [self.message]
+        if self.stage:
+            parts.append(f"stage={self.stage}")
+        if self.document_count is not None:
+            parts.append(f"documents={self.document_count}")
+        if self.details:
+            parts.append(f"details: {self.details}")
+        return ", ".join(parts)
+
+
+class DeduplicationError(EmbeddingException):
+    """Exception raised during content deduplication operations."""
+
+    def __init__(
+        self,
+        message: str = "Content deduplication failed",
+        chunks_processed: Optional[int] = None,
+        duplicates_found: Optional[int] = None,
+        details: Optional[str] = None,
+    ) -> None:
+        """Initialize deduplication error.
+
+        Args:
+            message: Error message
+            chunks_processed: Number of chunks processed before failure
+            duplicates_found: Number of duplicates found before failure
+            details: Additional error details
+        """
+        self.chunks_processed = chunks_processed
+        self.duplicates_found = duplicates_found
+        super().__init__(message, details)
+
+    def __str__(self) -> str:
+        """String representation of error."""
+        parts = [self.message]
+        if self.chunks_processed is not None:
+            parts.append(f"chunks_processed={self.chunks_processed}")
+        if self.duplicates_found is not None:
+            parts.append(f"duplicates_found={self.duplicates_found}")
+        if self.details:
+            parts.append(f"details: {self.details}")
+        return ", ".join(parts)

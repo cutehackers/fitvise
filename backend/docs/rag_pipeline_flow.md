@@ -182,9 +182,9 @@
 │                           INTEGRATION POINTS                                    │
 │                                                                                 │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │   LLM       │  │   Chat      │  │ Analytics   │  | Content    │              │
-│  │ Services    │  │ Interfaces  │  │   Systems   │  | Recommender│              │
-│  │             │  │             │  │             │  |   Engines  │              │
+│  │   LLM       │  │   Chat      │  │ Analytics   │  | Content     │             │
+│  │ Services    │  │ Interfaces  │  │   Systems   │  | Recommender │             │
+│  │             │  │             │  │             │  |   Engines   │             │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘             │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```

@@ -1,0 +1,41 @@
+# Sample RAG Pipeline Configuration
+# This file demonstrates the configuration structure for the RAG build pipeline
+
+# Document sources configuration
+documents:
+  path: ./data/sample  # Directory containing documents to process
+  recurse: true         # Search subdirectories
+  include:             # File patterns to include
+    - "*.pdf"
+    - "*.md"
+    - "*.txt"
+    - "*.docx"
+
+# Schedule configuration (not used in build pipeline but required by spec)
+schedule:
+  mode: manual
+
+# Storage configuration
+storage:
+  provider: local     # Options: local, minio, s3
+  base_dir: ./storage # Base directory for local storage
+  bucket: rag-source   # Storage bucket name
+
+# Chunking configuration
+chunking:
+  enabled: true
+  preset: balanced    # Options: minimal, balanced, comprehensive
+  overrides: {}       # Optional chunking parameter overrides
+
+# Infrastructure limits
+limits:
+  max_files: 50       # Maximum number of documents to process
+
+# Optional sources (for future expansion)
+sources:
+  audit:
+    enabled: false
+  databases: []
+  web: []
+  document_apis:
+    enabled: false

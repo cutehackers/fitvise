@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, validator
 
 from app.application.use_cases.data_ingestion import (
-    SetupAirflowEnvironmentUseCase,
+    SetupAirflowUseCase,
     SetupAirflowRequest,
     IntegrateTikaUseCase,
     IntegrateTikaRequest,
@@ -30,8 +30,8 @@ router = APIRouter(prefix="/rag/ingestion", tags=["RAG Ingestion"])
 # Dependency factories (provide override hooks for tests)
 # ---------------------------------------------------------------------------
 
-def get_airflow_use_case() -> SetupAirflowEnvironmentUseCase:
-    return SetupAirflowEnvironmentUseCase()
+def get_airflow_use_case() -> SetupAirflowUseCase:
+    return SetupAirflowUseCase()
 
 
 def get_tika_use_case() -> IntegrateTikaUseCase:
@@ -162,7 +162,7 @@ class WebScrapingResponseModel(BaseModel):
 @router.post("/airflow/setup", response_model=AirflowSetupResponseModel, status_code=status.HTTP_201_CREATED)
 async def create_airflow_environment(
     payload: AirflowSetupPayload,
-    use_case: SetupAirflowEnvironmentUseCase = Depends(get_airflow_use_case),
+    use_case: SetupAirflowUseCase = Depends(get_airflow_use_case),
 ):
     """Generate Airflow support artefacts (env file, docker-compose and hello-world DAG)."""
     try:

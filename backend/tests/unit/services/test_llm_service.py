@@ -25,11 +25,10 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_chat_validation_missing_message(self, llm_service):
         """Test chat validation when message is missing."""
-        request = ChatRequest(message=None, session_id="test_session_123")
+        from pydantic import ValidationError
 
-        with pytest.raises(ValueError, match="Message is required in the request"):
-            async for _ in llm_service.chat(request):
-                pass
+        with pytest.raises(ValidationError):
+            request = ChatRequest(message=None, session_id="test_session_123")
 
     @pytest.mark.asyncio
     async def test_chat_validation_empty_message_content(self, llm_service):
@@ -213,23 +212,36 @@ class TestLlmService:
     @pytest.mark.asyncio
     async def test_health_check_success(self, llm_service):
         """Test successful health check."""
-        with patch.object(llm_service.llm, "ainvoke", new_callable=AsyncMock) as mock_ainvoke:
-            mock_ainvoke.return_value = "Health check response"
+        # Mock the entire LLM object instead of trying to patch a method
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.return_value = "Health check response"
 
+        original_llm = llm_service.llm
+        llm_service.llm = mock_llm
+
+        try:
             result = await llm_service.health()
-
             assert result is True
-            mock_ainvoke.assert_called_once_with("Health check")
+            mock_llm.ainvoke.assert_called_once_with("Health check")
+        finally:
+            llm_service.llm = original_llm
 
     @pytest.mark.asyncio
     async def test_health_check_failure(self, llm_service):
         """Test health check with service failure."""
-        with patch.object(llm_service.llm, "ainvoke", new_callable=AsyncMock) as mock_ainvoke:
-            mock_ainvoke.side_effect = Exception("LLM service unavailable")
+        # Mock the entire LLM object instead of trying to patch a method
+        mock_llm = AsyncMock()
+        mock_llm.ainvoke.side_effect = Exception("LLM service unavailable")
 
+        original_llm = llm_service.llm
+        llm_service.llm = mock_llm
+
+        try:
             result = await llm_service.health()
-
             assert result is False
+            mock_llm.ainvoke.assert_called_once_with("Health check")
+        finally:
+            llm_service.llm = original_llm
 
     # Test the _parse_chat_stream_chunk method
     def test_parse_chat_stream_chunk(self, llm_service):

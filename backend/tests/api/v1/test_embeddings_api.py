@@ -73,7 +73,7 @@ class TestEmbedQueryEndpoint:
 
             async def mock_embed_query(query, use_cache=True):
                 from app.domain.value_objects.embedding_vector import EmbeddingVector
-                return EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+                return EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
             async def mock_cache_stats():
                 return {"cache_size": 0, "cache_hits": 0}
@@ -95,7 +95,7 @@ class TestEmbedQueryEndpoint:
             data = response.json()
             assert data["success"] is True
             assert "query_id" in data
-            assert data["vector_dimension"] == 384
+            assert data["vector_dimension"] == 768
 
     def test_embed_query_empty_text(self, client):
         """Test embedding empty query returns validation error."""
@@ -137,7 +137,7 @@ class TestEmbedChunksEndpoint:
             async def mock_embed_batch(texts, batch_size=32, show_progress=True):
                 from app.domain.value_objects.embedding_vector import EmbeddingVector
                 return [
-                    EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+                    EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
                     for _ in texts
                 ]
 
@@ -198,7 +198,7 @@ class TestBatchEmbedEndpoint:
             async def mock_embed_batch(texts, batch_size=32, show_progress=True):
                 from app.domain.value_objects.embedding_vector import EmbeddingVector
                 return [
-                    EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+                    EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
                     for _ in texts
                 ]
 
@@ -247,7 +247,7 @@ class TestSearchEndpoint:
 
             async def mock_embed_query(query, use_cache=True):
                 from app.domain.value_objects.embedding_vector import EmbeddingVector
-                return EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+                return EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
             async def mock_cache_stats():
                 return {"cache_size": 0}
@@ -308,7 +308,7 @@ class TestSetupEndpoint:
     def test_setup_infrastructure(self, client):
         """Test setup infrastructure endpoint."""
         payload = {
-            "vector_dimension": 384,
+            "vector_dimension": 768,
             "recreate_schema": False,
         }
 
@@ -336,7 +336,7 @@ class TestAPIValidation:
 
             async def mock_embed_query(query, use_cache=True):
                 from app.domain.value_objects.embedding_vector import EmbeddingVector
-                return EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+                return EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
             async def mock_cache_stats():
                 return {"cache_size": 0, "cache_hits": 0}

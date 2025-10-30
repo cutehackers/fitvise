@@ -39,7 +39,7 @@ class BatchEmbedRequest:
 
     texts: Optional[Sequence[str]] = None
     text_items: Optional[Sequence[TextItem]] = None
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name: str = "Alibaba-NLP/gte-multilingual-base"
     model_version: str = "1.0"
     batch_size: int = 32
     show_progress: bool = True

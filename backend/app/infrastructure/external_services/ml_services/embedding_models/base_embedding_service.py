@@ -43,7 +43,7 @@ class BaseEmbeddingService(ABC):
         >>> # Single embedding
         >>> vector = await service.embed("Hello world")
         >>> len(vector)
-        384
+        768
 
         >>> # Batch embedding
         >>> vectors = await service.embed_batch(["text1", "text2", "text3"])

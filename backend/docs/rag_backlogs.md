@@ -93,9 +93,10 @@
 ### 2.2 Embedding Model Pipeline
 
 - [x]  **Task 2.2.1**: Set up base Sentence-Transformers infrastructure
-    - Deliverable: Embedding service using all-MiniLM-L6-v2
-    - Acceptance Criteria: Can embed 1000 chunks/minute
+    - Deliverable: Embedding service using Alibaba-NLP/gte-multilingual-base (768-dim, multilingual)
+    - Acceptance Criteria: Can embed 600-800 chunks/minute with multilingual support
     - Effort: 5 days
+    - Status: ✅ Migrated to multilingual model for cross-lingual retrieval
 - [ ]  **Task 2.2.2**: Create domain-specific fine-tuning pipeline
     - Deliverable: Training pipeline using Hugging Face Trainer API
     - Acceptance Criteria: Improves retrieval accuracy by 15% on internal data

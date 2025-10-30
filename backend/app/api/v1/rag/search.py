@@ -260,7 +260,7 @@ async def find_similar_chunks(
                 processing_time_ms=0.0,
                 embedding_time_ms=0.0,
                 search_time_ms=0.0,
-                query_vector_dimension=384,  # Default dimension
+                query_vector_dimension=768,  # Default dimension
                 avg_similarity_score=result.similarity_score.score,
             )
             grouped_results[str(result.chunk_id)] = similar_response
@@ -543,7 +543,7 @@ async def batch_search(
             processing_time_ms=300.0,  # Placeholder processing time
             embedding_time_ms=100.0,
             search_time_ms=150.0,
-            query_vector_dimension=384,
+            query_vector_dimension=768,
             avg_similarity_score=avg_score,
             metadata={
                 "aggregation_method": request.aggregation_method,
@@ -616,7 +616,7 @@ async def search_within_documents(
             processing_time_ms=200.0,  # Placeholder processing time
             embedding_time_ms=0.0,
             search_time_ms=150.0,
-            query_vector_dimension=384,
+            query_vector_dimension=768,
             avg_similarity_score=avg_score,
             metadata={
                 "search_type": "document_search",

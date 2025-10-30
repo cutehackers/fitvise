@@ -29,7 +29,7 @@ class EmbedQueryRequest:
     """
 
     query: str
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name: str = "Alibaba-NLP/gte-multilingual-base"
     model_version: str = "1.0"
     use_cache: bool = True
     store_embedding: bool = False

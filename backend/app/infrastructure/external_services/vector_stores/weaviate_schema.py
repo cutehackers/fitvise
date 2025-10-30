@@ -40,7 +40,7 @@ class WeaviateSchema:
 
     Examples:
         >>> schema = WeaviateSchema(client)
-        >>> await schema.create_chunk_class(dimension=384)
+        >>> await schema.create_chunk_class(dimension=768)
         >>> exists = await schema.class_exists("Chunk")
         >>> exists
         True
@@ -61,7 +61,7 @@ class WeaviateSchema:
 
     async def create_chunk_class(
         self,
-        dimension: int = 384,
+        dimension: int = 768,
         distance_metric: str = "cosine",
         description: str = "Document chunks with embeddings for RAG system",
     ) -> None:
@@ -182,7 +182,7 @@ class WeaviateSchema:
 
 
 def create_chunk_class_schema(
-    dimension: int = 384,
+    dimension: int = 768,
     distance_metric: str = "cosine",
     description: str = "Document chunks with embeddings for RAG system",
 ) -> Dict[str, Any]:
@@ -238,7 +238,7 @@ def create_chunk_class_schema(
         Weaviate class schema dictionary
 
     Examples:
-        >>> schema = create_chunk_class_schema(dimension=384)
+        >>> schema = create_chunk_class_schema(dimension=768)
         >>> schema["class"]
         'Chunk'
         >>> len(schema["properties"])
@@ -483,7 +483,7 @@ def create_chunk_metadata_template(
     document_id: UUID,
     text: str,
     sequence: int = 0,
-    model_name: str = "all-MiniLM-L6-v2",
+    model_name: str = "Alibaba-NLP/gte-multilingual-base",
     model_version: str = "1.0",
     **kwargs: Any,
 ) -> Dict[str, Any]:

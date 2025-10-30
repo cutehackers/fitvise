@@ -61,7 +61,7 @@ class TestEmbeddingCreation:
     def test_created_at_auto_set(self):
         """Test that created_at is automatically set."""
         vector = EmbeddingVector.from_list([1.0, 2.0, 3.0])
-        before = datetime.now()
+        before = datetime.utcnow()
 
         embedding = Embedding(
             vector=vector,
@@ -69,7 +69,7 @@ class TestEmbeddingCreation:
             dimension=3,
         )
 
-        after = datetime.now()
+        after = datetime.utcnow()
         assert before <= embedding.created_at <= after
 
     def test_default_metadata_empty_dict(self):
@@ -289,28 +289,26 @@ class TestEmbeddingValidation:
     """Test validation and error handling."""
 
     def test_dimension_matches_vector(self):
-        """Test that dimension should match vector dimension."""
+        """Test that dimension auto-syncs with vector dimension."""
         vector = EmbeddingVector.from_list([1.0, 2.0, 3.0])
 
         # Creating with matching dimension
         embedding = Embedding(vector=vector, model_name="test", dimension=3)
         assert embedding.dimension == 3
 
-        # Creating with mismatched dimension (allowed but inconsistent)
+        # Creating with mismatched dimension (auto-corrected to match vector)
         embedding2 = Embedding(vector=vector, model_name="test", dimension=5)
-        assert embedding2.dimension == 5  # Stores what's provided
+        assert embedding2.dimension == 3  # Auto-synced to vector length
         assert embedding2.vector.dimension == 3  # But vector has actual dimension
 
-    def test_none_vector_allowed(self):
-        """Test that None vector is allowed for placeholder entities."""
-        embedding = Embedding(
-            vector=None,
-            model_name="test-model",
-            dimension=384,
-        )
-
-        assert embedding.vector is None
-        assert embedding.dimension == 384
+    def test_none_vector_not_allowed(self):
+        """Test that None vector raises validation error."""
+        with pytest.raises(ValueError, match="vector cannot be None"):
+            Embedding(
+                vector=None,
+                model_name="test-model",
+                dimension=768,
+            )
 
 
 class TestEmbeddingSourceTypes:
@@ -369,16 +367,15 @@ class TestEmbeddingEdgeCases:
         assert embedding.dimension == 4096
         assert embedding.vector.dimension == 4096
 
-    def test_empty_model_name(self):
-        """Test that empty model name is allowed but not recommended."""
+    def test_empty_model_name_not_allowed(self):
+        """Test that empty model name raises validation error."""
         vector = EmbeddingVector.from_list([1.0, 2.0, 3.0])
-        embedding = Embedding(
-            vector=vector,
-            model_name="",
-            dimension=3,
-        )
-
-        assert embedding.model_name == ""
+        with pytest.raises(ValueError, match="model_name cannot be empty"):
+            Embedding(
+                vector=vector,
+                model_name="",
+                dimension=3,
+            )
 
     def test_special_characters_in_metadata(self):
         """Test metadata with special characters and unicode."""
@@ -405,8 +402,8 @@ class TestEmbeddingRealisticScenarios:
 
     def test_create_document_chunk_embedding(self):
         """Test creating embedding for document chunk (realistic scenario)."""
-        # Simulate all-MiniLM-L6-v2 output
-        vector = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        # Simulate Alibaba-NLP/gte-multilingual-base output
+        vector = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
         chunk_id = uuid4()
         doc_id = uuid4()
 
@@ -414,7 +411,7 @@ class TestEmbeddingRealisticScenarios:
             vector=vector,
             chunk_id=chunk_id,
             document_id=doc_id,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name="Alibaba-NLP/gte-multilingual-base",
             model_version="1.0",
             metadata={
                 "text": "Exercise routine for lower back pain",
@@ -424,7 +421,7 @@ class TestEmbeddingRealisticScenarios:
             },
         )
 
-        assert embedding.dimension == 384
+        assert embedding.dimension == 768
         assert embedding.chunk_id == chunk_id
         assert embedding.document_id == doc_id
         assert embedding.metadata["doc_type"] == "pdf"
@@ -433,13 +430,13 @@ class TestEmbeddingRealisticScenarios:
     def test_create_user_query_embedding(self):
         """Test creating embedding for user query (realistic scenario)."""
         # Simulate query embedding
-        vector = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        vector = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
         query_id = uuid4()
 
         embedding = Embedding.for_query(
             vector=vector,
             query_id=query_id,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name="Alibaba-NLP/gte-multilingual-base",
             model_version="1.0",
             metadata={
                 "query_text": "What exercises help with lower back pain?",
@@ -448,7 +445,7 @@ class TestEmbeddingRealisticScenarios:
             },
         )
 
-        assert embedding.dimension == 384
+        assert embedding.dimension == 768
         assert embedding.query_id == query_id
         assert "query_text" in embedding.metadata
         assert embedding.source_type == "query"
@@ -456,7 +453,7 @@ class TestEmbeddingRealisticScenarios:
     def test_compare_query_to_chunks(self):
         """Test comparing query embedding to chunk embeddings."""
         # Query embedding
-        query_vector = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        query_vector = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
         query_emb = Embedding.for_query(
             vector=query_vector,
             query_id=uuid4(),
@@ -467,7 +464,7 @@ class TestEmbeddingRealisticScenarios:
         chunk_embeddings = []
         for i in range(5):
             chunk_vector = EmbeddingVector.from_numpy(
-                np.random.rand(384).astype(np.float32)
+                np.random.rand(768).astype(np.float32)
             )
             chunk_emb = Embedding.for_chunk(
                 vector=chunk_vector,

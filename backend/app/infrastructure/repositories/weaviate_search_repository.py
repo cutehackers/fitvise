@@ -137,7 +137,7 @@ class WeaviateSearchRepository(SearchRepository):
                 # Convert similarity to SimilarityScore
                 similarity_score = SimilarityScore.from_weaviate_certainty(
                     certainty=similarity,
-                    vector_dimension=query_vector.dimension if hasattr(query_vector, 'dimension') else 384,
+                    vector_dimension=query_vector.dimension if hasattr(query_vector, 'dimension') else 768,
                 ).with_rank(rank)
 
                 # Create SearchResult
@@ -224,7 +224,7 @@ class WeaviateSearchRepository(SearchRepository):
 
                         similarity_score = SimilarityScore.from_weaviate_certainty(
                             certainty=similarity,
-                            vector_dimension=embedding.vector.dimension if hasattr(embedding.vector, 'dimension') else 384,
+                            vector_dimension=embedding.vector.dimension if hasattr(embedding.vector, 'dimension') else 768,
                         ).with_rank(rank)
 
                         search_result = SearchResult.create(

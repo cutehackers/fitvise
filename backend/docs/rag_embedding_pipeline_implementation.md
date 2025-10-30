@@ -63,8 +63,8 @@ The implementation follows Clean Architecture principles with 4 distinct layers:
 
 ### Technology Stack
 
-- **Embedding Model**: Sentence-Transformers (all-MiniLM-L6-v2)
-  - Dimension: 384
+- **Embedding Model**: Sentence-Transformers (Alibaba-NLP/gte-multilingual-base)
+  - Dimension: 768
   - Device: CPU (optimized with asyncio)
   - Framework: PyTorch
 
@@ -109,7 +109,7 @@ embedding = Embedding.for_chunk(
     vector=vector,
     chunk_id=chunk_id,
     document_id=doc_id,
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
+    model_name="Alibaba-NLP/gte-multilingual-base"
 )
 ```
 
@@ -310,8 +310,8 @@ Content-Type: application/json
   "success": true,
   "embedding_service": {
     "is_loaded": true,
-    "model_name": "sentence-transformers/all-MiniLM-L6-v2",
-    "model_dimension": 384
+    "model_name": "Alibaba-NLP/gte-multilingual-base",
+    "model_dimension": 768
   },
   "weaviate": {
     "connected": true,
@@ -523,8 +523,8 @@ See `.env` file for complete configuration. Key variables:
 - `WEAVIATE_SCHEME=http`
 
 **Embedding Model**:
-- `SENTENCE_TRANSFORMER_MODEL=sentence-transformers/all-MiniLM-L6-v2`
-- `SENTENCE_TRANSFORMER_DIMENSION=384`
+- `SENTENCE_TRANSFORMER_MODEL=Alibaba-NLP/gte-multilingual-base`
+- `SENTENCE_TRANSFORMER_DIMENSION=768`
 - `SENTENCE_TRANSFORMER_DEVICE=AUTO`
 - `SENTENCE_TRANSFORMER_BATCH_SIZE=32`
 

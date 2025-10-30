@@ -28,7 +28,7 @@ class SetupInfrastructureRequest(BaseModel):
         description="Optional Weaviate connection configuration",
     )
     vector_dimension: int = Field(
-        default=384,
+        default=768,
         ge=1,
         le=4096,
         description="Embedding vector dimension",
@@ -78,7 +78,7 @@ class EmbedChunksRequest(BaseModel):
         description="Chunks to embed",
     )
     model_name: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default="Alibaba-NLP/gte-multilingual-base",
         description="Embedding model name",
     )
     model_version: str = Field(default="1.0", description="Model version")
@@ -132,7 +132,7 @@ class EmbedQueryRequest(BaseModel):
         description="Query text to embed",
     )
     model_name: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default="Alibaba-NLP/gte-multilingual-base",
         description="Embedding model name",
     )
     model_version: str = Field(default="1.0", description="Model version")
@@ -197,7 +197,7 @@ class BatchEmbedRequest(BaseModel):
         description="Structured text items with metadata",
     )
     model_name: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default="Alibaba-NLP/gte-multilingual-base",
         description="Embedding model name",
     )
     model_version: str = Field(default="1.0", description="Model version")
@@ -298,7 +298,7 @@ class SearchRequest(BaseModel):
         description="Whether to include vectors in response",
     )
     model_name: str = Field(
-        default="sentence-transformers/all-MiniLM-L6-v2",
+        default="Alibaba-NLP/gte-multilingual-base",
         description="Model name for query embedding (if query provided)",
     )
 

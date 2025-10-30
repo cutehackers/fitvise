@@ -8,6 +8,7 @@ from dataclasses import dataclass, field, fields
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from uuid import uuid4
 
+from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
 from app.domain.exceptions import ChunkingDependencyError, ChunkGenerationError
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # type: ignore
 
@@ -195,8 +196,9 @@ class LlamaIndexChunker:
                 threshold = self.config.semantic_breakpoint_threshold
                 threshold_int = int(threshold * 100) if threshold <= 1.0 else int(threshold)
 
-                # embedding model: all-MiniLM-L6-v2 
-                embed_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+                # Use configured embedding model for semantic chunking
+                embedding_config = EmbeddingModelConfig.default()
+                embed_model = HuggingFaceEmbedding(model_name=embedding_config.model_name)
 
                 semantic_parser = _SemanticSplitter.from_defaults(  # type: ignore[attr-defined]
                     breakpoint_percentile_threshold=threshold_int,

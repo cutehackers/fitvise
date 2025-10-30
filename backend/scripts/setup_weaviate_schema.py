@@ -4,10 +4,11 @@ This script creates the Chunk class schema in Weaviate with all metadata fields.
 Run this after starting Weaviate to initialize the database.
 
 Usage:
-    python scripts/init_weaviate_schema.py [--force]
+    python scripts/setup_weaviate_schema.py [--force] [--dimension DIMENSION]
 
 Options:
     --force: Delete existing schema and recreate
+    --dimension: Embedding vector dimension (default: read from config)
 """
 
 import asyncio
@@ -24,6 +25,7 @@ import weaviate
 from weaviate.exceptions import WeaviateBaseError
 
 from app.config.vector_stores.weaviate_config import WeaviateConfig
+from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
 from app.infrastructure.external_services.vector_stores.weaviate_schema import (
     WeaviateSchema,
     SCHEMA_VERSION,
@@ -36,11 +38,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def init_schema(force: bool = False) -> None:
+async def init_schema(force: bool = False, dimension: int = None) -> None:
     """Initialize Weaviate schema.
 
     Args:
         force: If True, delete existing schema and recreate
+        dimension: Embedding vector dimension (uses config default if not specified)
     """
     logger.info("Initializing Weaviate schema (Task 2.3.2)")
     logger.info(f"Schema version: {SCHEMA_VERSION}")
@@ -48,6 +51,14 @@ async def init_schema(force: bool = False) -> None:
     # Load configuration
     config = WeaviateConfig.for_local_development()
     logger.info(f"Connecting to Weaviate at {config.get_url()}")
+
+    # Get dimension from config if not provided
+    if dimension is None:
+        embedding_config = EmbeddingModelConfig.default()
+        dimension = embedding_config.model_dimension
+        logger.info(f"Using dimension from config: {dimension} ({embedding_config.model_name})")
+    else:
+        logger.info(f"Using dimension from CLI argument: {dimension}")
 
     # Create client
     try:
@@ -76,9 +87,9 @@ async def init_schema(force: bool = False) -> None:
                 return
 
         # Create Chunk class
-        logger.info("Creating Chunk class with metadata fields...")
+        logger.info(f"Creating Chunk class with {dimension}-dimensional vectors...")
         await schema_manager.create_chunk_class(
-            dimension=384,  # all-MiniLM-L6-v2 dimension
+            dimension=dimension,
             distance_metric="cosine",
             description="Document chunks with embeddings for RAG system (Task 2.3.2)",
         )
@@ -114,10 +125,16 @@ def main() -> None:
         action="store_true",
         help="Delete existing schema and recreate",
     )
+    parser.add_argument(
+        "--dimension",
+        type=int,
+        default=None,
+        help="Embedding vector dimension (default: read from config)",
+    )
     args = parser.parse_args()
 
     # Run async initialization
-    asyncio.run(init_schema(force=args.force))
+    asyncio.run(init_schema(force=args.force, dimension=args.dimension))
 
 
 if __name__ == "__main__":

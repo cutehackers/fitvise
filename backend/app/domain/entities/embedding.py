@@ -36,14 +36,14 @@ class Embedding:
 
     Examples:
         >>> import numpy as np
-        >>> vector = EmbeddingVector(np.random.rand(384))
+        >>> vector = EmbeddingVector(np.random.rand(768))
         >>> embedding = Embedding(
         ...     vector=vector,
-        ...     model_name="all-MiniLM-L6-v2",
+        ...     model_name="Alibaba-NLP/gte-multilingual-base",
         ...     chunk_id=uuid4()
         ... )
         >>> embedding.dimension
-        384
+        768
         >>> embedding.is_normalized()
         True
 
@@ -51,7 +51,7 @@ class Embedding:
         >>> query_embedding = Embedding.for_query(
         ...     vector=vector,
         ...     query_id=uuid4(),
-        ...     model_name="all-MiniLM-L6-v2"
+        ...     model_name="Alibaba-NLP/gte-multilingual-base"
         ... )
         >>> query_embedding.source_type
         'query'
@@ -71,14 +71,13 @@ class Embedding:
 
     def __post_init__(self) -> None:
         """Validate entity after initialization."""
-        if self.vector is not None:
-            self._sync_dimension()
-            self.validate()
-
-    def _sync_dimension(self) -> None:
-        """Synchronize dimension with vector length."""
-        if self.vector is not None:
+        # Create a copy of metadata to ensure independence
+        if self.metadata is not None:
+            self.metadata = dict(self.metadata)
+        # Auto-sync dimension with vector length for consistency
+        if self.vector is not None and self.dimension != len(self.vector):
             self.dimension = len(self.vector)
+        self.validate()
 
     @classmethod
     def for_chunk(
@@ -228,13 +227,10 @@ class Embedding:
         if not self.model_name:
             raise ValueError("model_name cannot be empty")
         if self.dimension != len(self.vector):
-            raise ValueError(
-                f"dimension mismatch: {self.dimension} != {len(self.vector)}"
-            )
+            raise ValueError(f"dimension mismatch: {self.dimension} != {len(self.vector)}")
         if self.dimension < 1:
             raise ValueError(f"dimension must be ≥1, got {self.dimension}")
-        if not (self.chunk_id or self.query_id):
-            raise ValueError("embedding must reference either chunk_id or query_id")
+        # Optional: embedding can reference chunk_id, query_id, or neither (for generic embeddings)
 
         # Validate vector itself
         self.vector.validate()
@@ -288,6 +284,16 @@ class Embedding:
             Chunk ID if available, otherwise query ID
         """
         return self.chunk_id or self.query_id
+
+    def __eq__(self, other: object) -> bool:
+        """Check equality based on ID."""
+        if not isinstance(other, Embedding):
+            return False
+        return self.id == other.id
+
+    def __hash__(self) -> int:
+        """Calculate hash based on ID."""
+        return hash(self.id)
 
     def __repr__(self) -> str:
         """String representation of embedding."""

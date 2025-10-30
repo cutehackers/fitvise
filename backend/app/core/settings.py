@@ -125,8 +125,8 @@ class Settings(BaseSettings):
     vector_store_path: str
     embedding_model: str
     vector_dimension: int  # MiniLM embedding dimension
-    weaviate_url: str
-    weaviate_api_key: str
+    weaviate_url: str = ""
+    weaviate_api_key: str = ""
 
     # Search Configuration
     search_max_top_k: int = 1000  # Maximum results per search
@@ -228,3 +228,8 @@ class Settings(BaseSettings):
 
 # Create a global settings instance
 settings = Settings()
+
+
+def get_settings() -> Settings:
+    """Get the global settings instance."""
+    return settings

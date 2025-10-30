@@ -12,7 +12,7 @@ REST API endpoints for embedding operations:
 from __future__ import annotations
 
 import logging
-from typing import Dict
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -526,7 +526,7 @@ async def search_embeddings(
 
 @router.get(
     "/health",
-    response_model=Dict[str, any],
+    response_model=Dict[str, Any],
     status_code=status.HTTP_200_OK,
     summary="Health check",
     description="Check embedding service and Weaviate health",
@@ -534,7 +534,7 @@ async def search_embeddings(
 async def health_check(
     embedding_service: SentenceTransformerService = Depends(get_embedding_service),
     repository: EmbeddingRepository = Depends(get_embedding_repository),
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """Health check endpoint.
 
     Args:

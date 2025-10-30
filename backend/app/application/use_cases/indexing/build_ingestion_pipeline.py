@@ -455,7 +455,7 @@ class BuildIngestionPipelineUseCase:
 
         embedding_request = EmbedChunksRequest(
             chunks=chunks,
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name="Alibaba-NLP/gte-multilingual-base",
             model_version="1.0",
             batch_size=request.batch_size,
             show_progress=request.show_progress,

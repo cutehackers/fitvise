@@ -26,13 +26,13 @@ from app.domain.value_objects.embedding_vector import EmbeddingVector
 def mock_embedding_service():
     """Mock embedding service for testing."""
     service = AsyncMock()
-    service.model_name = "sentence-transformers/all-MiniLM-L6-v2"
-    service.model_dimension = 384
+    service.model_name = "Alibaba-NLP/gte-multilingual-base"
+    service.model_dimension = 768
     service.is_loaded = True
 
     # Mock embed_query to return a vector
     async def mock_embed_query(query: str, use_cache: bool = True):
-        return EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        return EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
     service.embed_query = mock_embed_query
 
@@ -94,7 +94,7 @@ class TestEmbedQueryBasicOperation:
 
         assert response.success is True
         assert response.query_id is not None
-        assert response.vector_dimension == 384
+        assert response.vector_dimension == 768
         assert response.processing_time_ms >= 0
         assert response.error is None
 
@@ -313,7 +313,7 @@ class TestEmbedQueryStorageFailure:
         assert response.success is True
         assert response.stored is False
         assert response.embedding_id is None
-        assert response.vector_dimension == 384
+        assert response.vector_dimension == 768
 
 
 class TestEmbedQueryPerformanceMetrics:
@@ -352,7 +352,7 @@ class TestEmbedQueryRealisticScenarios:
         """Test embedding a realistic fitness query."""
         request = EmbedQueryRequest(
             query="What are the best exercises for lower back pain relief?",
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
+            model_name="Alibaba-NLP/gte-multilingual-base",
             use_cache=True,
             store_embedding=True,
             query_metadata={
@@ -365,7 +365,7 @@ class TestEmbedQueryRealisticScenarios:
         response = await use_case.execute(request)
 
         assert response.success is True
-        assert response.vector_dimension == 384
+        assert response.vector_dimension == 768
         assert response.query_id is not None
 
     @pytest.mark.asyncio
@@ -399,4 +399,4 @@ class TestEmbedQueryRealisticScenarios:
         response = await use_case.execute(request)
 
         assert response.success is True
-        assert response.vector_dimension == 384
+        assert response.vector_dimension == 768

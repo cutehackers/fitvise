@@ -53,9 +53,9 @@ class EmbeddingModelConfig:
     Examples:
         >>> config = EmbeddingModelConfig.default()
         >>> config.model_name
-        'sentence-transformers/all-MiniLM-L6-v2'
+        'Alibaba-NLP/gte-multilingual-base'
         >>> config.model_dimension
-        384
+        768
 
         >>> batch_config = EmbeddingModelConfig.for_batch_processing()
         >>> batch_config.batch_size
@@ -66,8 +66,8 @@ class EmbeddingModelConfig:
         1
     """
 
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
-    model_dimension: int = 384
+    model_name: str = "Alibaba-NLP/gte-multilingual-base"
+    model_dimension: int = 768
     device: DeviceType = DeviceType.AUTO
     batch_size: int = 32
     max_seq_length: int = 512
@@ -83,7 +83,7 @@ class EmbeddingModelConfig:
         """Create default embedding model configuration.
 
         Returns:
-            Default configuration with all-MiniLM-L6-v2 model.
+            Default configuration with Alibaba-NLP/gte-multilingual-base model.
         """
         return cls()
 

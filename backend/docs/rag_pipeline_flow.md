@@ -52,7 +52,7 @@
                     │  Embedding Generation   │
                     │                         │
                     │ • Sentence Transformers │
-                    │ • 384-dim vectors       │
+                    │ • 768-dim vectors       │
                     │ • Semantic preservation │
                     │ • Performance cache     │
                     └─────────────────────────┘
@@ -147,7 +147,7 @@
               ┌─────────────────────────────────────────────────────┐
               │          EMBEDDING GENERATION                       │
               │                                                     │
-              │  • Sentence Transformers • 384-dim vectors          │
+              │  • Sentence Transformers • 768-dim vectors          │
               │  • Performance cache • Semantic preservation        │
               └─────────────────────────┬───────────────────────────┘
                                         │
@@ -204,7 +204,7 @@ Embedding Generation → Weaviate Storage → Semantic Search API → Search Res
 │    Phase        │   Speed         │   Quality         │
 ├─────────────────┼─────────────────┼───────────────────┤
 │   Ingestion     │ 10K chunks/hr   │ 200-500 tokens    │
-│   Embedding     │ <500ms/chunk    │ 384-dim vectors   │
+│   Embedding     │ <500ms/chunk    │ 768-dim vectors   │
 │   Search        │ <200ms/query    │ Cosine similarity │
 │   Total         │ <500ms/response │ Ranked results    │
 └─────────────────┴─────────────────┴───────────────────┘
@@ -214,7 +214,7 @@ Embedding Generation → Weaviate Storage → Semantic Search API → Search Res
 ```
 User Query → Query Embedding → Vector Search → Result Ranking → Response
      ↓              ↓              ↓              ↓            ↓
-Natural Language → 384-dim vector → Similarity match → Score sort → JSON
+Natural Language → 768-dim vector → Similarity match → Score sort → JSON
 ```
 
 ## Key Integration Points

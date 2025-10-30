@@ -1,8 +1,8 @@
 """Sentence-Transformers embedding service (Task 2.2.1).
 
 This module implements the concrete embedding service using Sentence-Transformers
-with all-MiniLM-L6-v2 model, supporting batch and real-time embedding with
-CPU optimization.
+with Alibaba-NLP/gte-multilingual-base model, supporting batch and real-time embedding with
+CPU optimization and multilingual support.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ class SentenceTransformerService(BaseEmbeddingService):
     """Sentence-Transformers embedding service implementation (Task 2.2.1).
 
     Implements embedding generation using Sentence-Transformers library
-    with all-MiniLM-L6-v2 model (384 dimensions), optimized for CPU.
+    with Alibaba-NLP/gte-multilingual-base model (768 dimensions), optimized for CPU.
 
     Performance Targets:
         - Batch: ≥1000 chunks/minute
@@ -49,14 +49,14 @@ class SentenceTransformerService(BaseEmbeddingService):
         >>> # Single embedding
         >>> vector = await service.embed("Hello world")
         >>> len(vector)
-        384
+        768
 
         >>> # Batch embedding
         >>> texts = ["text1", "text2", "text3"]
         >>> vectors = await service.embed_batch(texts)
         >>> len(vectors)
         3
-        >>> all(len(v) == 384 for v in vectors)
+        >>> all(len(v) == 768 for v in vectors)
         True
     """
 

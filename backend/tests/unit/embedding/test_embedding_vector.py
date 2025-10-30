@@ -298,9 +298,9 @@ class TestEmbeddingVectorPerformance:
 
     def test_large_batch_similarity(self):
         """Test similarity calculation performance with realistic dimensions."""
-        # Simulate all-MiniLM-L6-v2 dimension (384)
-        v1 = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
-        v2 = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        # Simulate Alibaba-NLP/gte-multilingual-base dimension (768)
+        v1 = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
+        v2 = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
         # Should complete quickly
         similarity = v1.cosine_similarity(v2)
@@ -309,7 +309,7 @@ class TestEmbeddingVectorPerformance:
 
     def test_normalization_performance(self):
         """Test normalization performance with realistic dimensions."""
-        vector = EmbeddingVector.from_numpy(np.random.rand(384).astype(np.float32))
+        vector = EmbeddingVector.from_numpy(np.random.rand(768).astype(np.float32))
 
         # Should complete quickly
         normalized = vector.normalize()

@@ -446,7 +446,7 @@ class SearchResponseSchema(BaseModel):
         ...,
         ge=0,
         description="Dimension of query embedding vector",
-        example=384,
+        example=768,
     )
     avg_similarity_score: float = Field(
         ...,

@@ -32,7 +32,7 @@ class SetupRequest:
 
     embedding_config: Optional[Dict[str, Any]] = None
     weaviate_config: Optional[Dict[str, Any]] = None
-    vector_dimension: int = 384
+    vector_dimension: int = 768
     recreate_schema: bool = False
 
 

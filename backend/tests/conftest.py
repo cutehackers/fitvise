@@ -55,6 +55,8 @@ def test_settings() -> Settings:
         "LLM_MODEL": "llama2",
         "SECRET_KEY": "test-secret-key-min-32-chars-long",
         "LOG_LEVEL": "DEBUG",
+        "WEAVIATE_URL": "http://localhost:8080",
+        "WEAVIATE_API_KEY": "test-api-key",
     }
 
     # Store original values

@@ -18,7 +18,7 @@ The `Chunk` class stores document chunks with embeddings and rich metadata for f
 - Vectorizer: `none` (we provide pre-computed embeddings)
 - Index Type: HNSW (Hierarchical Navigable Small World)
 - Distance Metric: Cosine similarity
-- Dimension: 384 (all-MiniLM-L6-v2 model)
+- Dimension: 768 (Alibaba-NLP/gte-multilingual-base model)
 
 ### Property Categories
 
@@ -78,7 +78,7 @@ Key functions:
 ```python
 # Create schema definition
 schema = create_chunk_class_schema(
-    dimension=384,
+    dimension=768,
     distance_metric="cosine",
     description="Document chunks with embeddings"
 )
@@ -148,7 +148,7 @@ Optimized for performance with 1M+ vectors:
 **Performance characteristics**:
 - Sub-200ms similarity search (k=10)
 - Scales to 1M+ vectors
-- Optimized for 384-dimensional embeddings
+- Optimized for 768-dimensional embeddings
 - Trade-off: Build time vs search speed
 
 ## Usage Examples

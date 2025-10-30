@@ -64,8 +64,8 @@ services:
       WEAVIATE_SCHEME: http
 
       # Embedding Model Configuration
-      EMBEDDING_MODEL_NAME: sentence-transformers/all-MiniLM-L6-v2
-      EMBEDDING_MODEL_DIMENSION: 384
+      EMBEDDING_MODEL_NAME: Alibaba-NLP/gte-multilingual-base
+      EMBEDDING_MODEL_DIMENSION: 768
       EMBEDDING_DEVICE: cpu
       EMBEDDING_BATCH_SIZE: 32
 

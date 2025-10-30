@@ -23,7 +23,7 @@
 **Implementation**: `backend/app/infrastructure/external_services/ml_services/chunking_services/llama_index_chunker.py`
 
 **Key Components**:
-- `SemanticSplitterNodeParser` with HuggingFace embeddings (all-MiniLM-L6-v2)
+- `SemanticSplitterNodeParser` with HuggingFace embeddings (Alibaba-NLP/gte-multilingual-base)
 - Breakpoint threshold: 85% (configurable)
 - Graceful fallback: Semantic → Sentence → Basic chunker
 - Proper metadata preservation and error handling

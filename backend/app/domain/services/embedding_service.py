@@ -32,14 +32,14 @@ class EmbeddingService:
         >>> await service.store_chunk_embedding(
         ...     chunk=chunk,
         ...     vector=vector,
-        ...     model_name="all-MiniLM-L6-v2"
+        ...     model_name="Alibaba-NLP/gte-multilingual-base"
         ... )
 
         >>> # Batch storage
         >>> await service.store_chunk_embeddings_batch(
         ...     chunks=chunks,
         ...     vectors=vectors,
-        ...     model_name="all-MiniLM-L6-v2"
+        ...     model_name="Alibaba-NLP/gte-multilingual-base"
         ... )
 
         >>> # Search similar

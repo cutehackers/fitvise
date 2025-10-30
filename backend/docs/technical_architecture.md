@@ -41,7 +41,7 @@ Focus on hybrid retrieval for accuracy in domain queries (e.g., exact policy ter
     - **Table Handling**: Serialize tables as markdown or JSON; embed as a whole if small, or per-row for large ones.
     - **Upgrade**: Use recursive chunking with LangChain to handle hierarchies (e.g., policy > section > paragraph).
 2. **Embedding Model Selection**:
-    - **Domain-Specific Fine-tuning**: Start with Sentence-Transformers (e.g., all-MiniLM-L6-v2) and fine-tune on company data using Hugging Face's Trainer API. Dataset: Pairs of queries and relevant chunks from internal docs.
+    - **Domain-Specific Fine-tuning**: Start with Sentence-Transformers (e.g., Alibaba-NLP/gte-multilingual-base) and fine-tune on company data using Hugging Face's Trainer API. Dataset: Pairs of queries and relevant chunks from internal docs.
     - **Considerations**: Model size ~100MB for low latency; use ONNX for inference speedup.
     - **Multimodal Embeddings**: CLIP or BLIP for text+image embeddings if charts are key (e.g., sales graphs).
     - **Upgrade**: Ensemble embeddings (text + metadata) for better relevance.

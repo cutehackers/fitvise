@@ -147,7 +147,7 @@ class TestMetadataValidation:
             "document_id": uuid4(),
             "text": "Sample chunk text",
             "sequence": 0,
-            "model_name": "all-MiniLM-L6-v2",
+            "model_name": "Alibaba-NLP/gte-multilingual-base",
             "token_count": 10,
         }
 
@@ -253,7 +253,7 @@ class TestMetadataTemplate:
         assert metadata["document_id"] == doc_id
         assert metadata["text"] == text
         assert metadata["sequence"] == 0
-        assert metadata["model_name"] == "all-MiniLM-L6-v2"
+        assert metadata["model_name"] == "Alibaba-NLP/gte-multilingual-base"
         assert metadata["source_type"] == "chunk"
 
     def test_create_template_with_optional_fields(self):

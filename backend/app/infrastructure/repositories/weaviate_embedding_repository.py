@@ -216,7 +216,7 @@ class WeaviateEmbeddingRepository(EmbeddingRepository):
             # Query with filter
             results = await self._client.similarity_search(
                 class_name=self.CLASS_NAME,
-                vector=[0.0] * 384,  # Dummy vector for filter-only query
+                vector=[0.0] * 768,  # Dummy vector for filter-only query
                 limit=len(chunk_ids),
                 filters=filters,
                 min_certainty=0.0,
@@ -260,7 +260,7 @@ class WeaviateEmbeddingRepository(EmbeddingRepository):
             # Query with filter
             results = await self._client.similarity_search(
                 class_name=self.CLASS_NAME,
-                vector=[0.0] * 384,  # Dummy vector for filter-only query
+                vector=[0.0] * 768,  # Dummy vector for filter-only query
                 limit=10000,  # Large limit for all chunks
                 filters=filters,
                 min_certainty=0.0,
@@ -458,7 +458,7 @@ class WeaviateEmbeddingRepository(EmbeddingRepository):
 
             results = await self._client.similarity_search(
                 class_name=self.CLASS_NAME,
-                vector=[0.0] * 384,
+                vector=[0.0] * 768,
                 limit=100000,  # Large limit
                 filters=filters,
                 min_certainty=0.0,

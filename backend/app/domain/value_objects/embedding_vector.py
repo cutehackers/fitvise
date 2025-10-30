@@ -210,6 +210,14 @@ class EmbeddingVector:
         """
         return float(np.linalg.norm(self._vector))
 
+    def norm(self) -> float:
+        """Alias for magnitude() - calculate vector L2 norm.
+
+        Returns:
+            Vector L2 norm
+        """
+        return self.magnitude()
+
     def validate(self) -> None:
         """Validate vector integrity.
 
@@ -222,6 +230,15 @@ class EmbeddingVector:
             raise ValueError("vector contains NaN values")
         if np.any(np.isinf(self._vector)):
             raise ValueError("vector contains infinite values")
+
+    @property
+    def dimension(self) -> int:
+        """Get vector dimension.
+
+        Returns:
+            Vector dimension (length)
+        """
+        return len(self._vector)
 
     def __len__(self) -> int:
         """Get vector dimension.

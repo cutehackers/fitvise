@@ -37,7 +37,7 @@ class SearchRequest:
     min_similarity: float = 0.0
     filters: Optional[Dict[str, Any]] = None
     include_vectors: bool = False
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2"
+    model_name: str = "Alibaba-NLP/gte-multilingual-base"
 
 
 @dataclass

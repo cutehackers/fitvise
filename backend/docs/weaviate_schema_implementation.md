@@ -109,15 +109,15 @@ Configuration classes:
 - `ConsistencyLevel`: Write consistency (ONE, QUORUM, ALL)
 
 ### 3. Initialization Script
-**File**: `scripts/init_weaviate_schema.py`
+**File**: `scripts/setup_weaviate_schema.py`
 
 Usage:
 ```bash
 # Initialize schema (skip if exists)
-python scripts/init_weaviate_schema.py
+python scripts/setup_weaviate_schema.py
 
 # Force recreate schema
-python scripts/init_weaviate_schema.py --force
+python scripts/setup_weaviate_schema.py --force
 ```
 
 ### 4. Tests
@@ -270,7 +270,7 @@ If upgrading from basic schema (12 fields → 21 fields):
 
 2. **Delete old schema**:
    ```bash
-   python scripts/init_weaviate_schema.py --force
+   python scripts/setup_weaviate_schema.py --force
    ```
 
 3. **Re-ingest with enhanced metadata**:

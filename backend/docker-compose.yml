@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # Weaviate Vector Database for Embeddings (Task 2.2.1)
   weaviate:
@@ -56,7 +54,7 @@ services:
       # API Configuration
       API_HOST: 0.0.0.0
       API_PORT: 8000
-      ENVIRONMENT: development
+      ENVIRONMENT: local
 
       # Weaviate Configuration
       WEAVIATE_HOST: weaviate
@@ -82,7 +80,7 @@ services:
     restart: unless-stopped
     networks:
       - fitvise-network
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
   weaviate_data:

@@ -23,6 +23,7 @@ sys.path.insert(0, str(project_root))
 
 import weaviate
 from weaviate.exceptions import WeaviateBaseError
+from weaviate.classes.config import Configure, Property, DataType, VectorDistances
 
 from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
@@ -62,15 +63,80 @@ async def init_schema(force: bool = False, dimension: int = None) -> None:
 
     # Create client
     try:
-        client = weaviate.Client(url=config.get_url(), timeout_config=(5, 30))
+        # Initialize Weaviate client using local connection
+        client = weaviate.connect_to_local(
+            host="localhost",
+            port=8080,
+            grpc_port=50051
+        )
+
         logger.info("Connected to Weaviate successfully")
     except Exception as e:
         logger.error(f"Failed to connect to Weaviate: {e}")
         logger.error("Make sure Weaviate is running (docker-compose up weaviate)")
         sys.exit(1)
 
-    # Create schema manager
-    schema_manager = WeaviateSchema(client)
+    # Create schema manager with compatibility handling
+    try:
+        # Check if this is v4 client (has collections but not schema)
+        if hasattr(client, 'collections') and not hasattr(client, 'schema'):
+            # Create a simplified v4 schema manager
+            class SimpleSchemaManagerV4:
+                def __init__(self, client):
+                    self.client = client
+
+                async def class_exists(self, class_name):
+                    try:
+                        self.client.collections.get(class_name)
+                        return True
+                    except:
+                        return False
+
+                async def create_chunk_class(self, dimension, distance_metric="cosine", description=""):
+                    # Create collection using v4 API
+                    distance_enum = getattr(VectorDistances, distance_metric.upper(), VectorDistances.COSINE)
+                    collection = self.client.collections.create(
+                        name="chunk",
+                        vectorizer_config=Configure.Vectorizer.none(),
+                        vector_index_config=Configure.VectorIndex.hnsw(
+                            distance_metric=distance_enum
+                        ),
+                        properties=[
+                            Property(
+                                name="content",
+                                data_type=DataType.TEXT
+                            ),
+                            Property(
+                                name="metadata",
+                                data_type=DataType.TEXT
+                            )
+                        ]
+                    )
+                    return collection
+
+                async def get_class(self, class_name):
+                    try:
+                        collection = self.client.collections.get(class_name.lower())
+                        return {"class": collection.name, "properties": []}
+                    except:
+                        return None
+
+                async def delete_class(self, class_name):
+                    try:
+                        self.client.collections.delete(class_name.lower())
+                        return True
+                    except:
+                        return False
+
+            schema_manager = SimpleSchemaManagerV4(client)
+        else:
+            # Use original schema manager for v3
+            schema_manager = WeaviateSchema(client)
+    except Exception as e:
+        logger.error(f"Failed to initialize schema manager: {e}")
+        if 'client' in locals():
+            client.close()
+        sys.exit(1)
 
     try:
         # Check if Chunk class exists
@@ -109,10 +175,18 @@ async def init_schema(force: bool = False, dimension: int = None) -> None:
 
     except WeaviateBaseError as e:
         logger.error(f"Weaviate error during schema initialization: {e}")
+        if 'client' in locals():
+            client.close()
         sys.exit(1)
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        if 'client' in locals():
+            client.close()
         sys.exit(1)
+    finally:
+        # Ensure client is properly closed
+        if 'client' in locals():
+            client.close()
 
 
 def main() -> None:

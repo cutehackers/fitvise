@@ -1053,7 +1053,7 @@ async def _maybe_chunk_documents(
     return summary
 
 
-async def run_pipeline(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
+async def ingestion(spec: PipelineSpec, dry_run: bool = False) -> RunSummary:
     """Coordinate the RAG ingestion workflow across the aligned phases.
 
     Phase timeline:

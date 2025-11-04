@@ -1,4 +1,4 @@
-"""SQLAlchemy models for persistent storage."""
+"""SQLAlchemy model for Document entity."""
 import uuid as uuid_pkg
 from datetime import datetime
 from typing import Any, Dict, List, Optional

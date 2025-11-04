@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.pipeline.config import PipelineSpec
 from app.pipeline.workflow import RAGWorkflow
+from app.infrastructure.database.database import async_session_maker
 
 # Setup logging
 logging.basicConfig(
@@ -73,157 +74,159 @@ async def main() -> int:
         # Load pipeline specification
         spec = PipelineSpec.from_file(args.config)
 
-        # Initialize workflow orchestrator
-        workflow = RAGWorkflow(verbose=args.verbose)
+        # Create database session for the pipeline
+        async with async_session_maker() as session:
+            # Initialize workflow orchestrator with database session
+            workflow = RAGWorkflow(verbose=args.verbose, session=session)
 
-        # Determine which phases to run
-        phases_to_run = set(args.phases) if args.phases else {"infrastructure", "ingestion", "embedding"}
+            # Determine which phases to run
+            phases = set(args.phases) if args.phases else {"infrastructure", "ingestion", "embedding"}
 
-        logger.info(f"🚀 Starting RAG pipeline with phases: {', '.join(sorted(phases_to_run))}")
+            logger.info(f"🚀 Starting RAG pipeline with phases: {', '.join(sorted(phases))}")
 
-        # Run complete pipeline if all phases selected
-        if phases_to_run == {"infrastructure", "ingestion", "embedding"}:
-            summary = await workflow.run_complete_pipeline(
-                spec=spec,
-                dry_run=args.dry_run,
-                batch_size=args.batch_size,
-                document_limit=args.document_limit,
-                output_dir=args.output_dir,
-            )
-            summary.print_summary()
-            return 0 if summary.success else 1
+            # Run complete pipeline if all phases selected
+            if phases == {"infrastructure", "ingestion", "embedding"}:
+                summary = await workflow.run_complete_pipeline(
+                    spec=spec,
+                    dry_run=args.dry_run,
+                    batch_size=args.batch_size,
+                    document_limit=args.document_limit,
+                    output_dir=args.output_dir,
+                )
+                summary.print_summary()
+                return 0 if summary.success else 1
 
-        # Run individual phases
-        success = True
+            # Run individual phases
+            success = True
 
-        # Phase 1: Infrastructure validation
-        if "infrastructure" in phases_to_run:
-            logger.info("=" * 60)
-            logger.info("PHASE 1: INFRASTRUCTURE VALIDATION")
-            logger.info("=" * 60)
+            # Phase 1: Infrastructure validation
+            if "infrastructure" in phases:
+                logger.info("=" * 60)
+                logger.info("PHASE 1: INFRASTRUCTURE VALIDATION")
+                logger.info("=" * 60)
 
-            infra_result = await workflow.run_infrastructure_check(spec)
+                infra_result = await workflow.run_infrastructure_check(spec)
 
-            print("\n" + "=" * 60)
-            print("INFRASTRUCTURE VALIDATION RESULT")
-            print("=" * 60)
-            print(f"Success: {'✅ YES' if infra_result.success else '❌ NO'}")
+                print("\n" + "=" * 60)
+                print("INFRASTRUCTURE VALIDATION RESULT")
+                print("=" * 60)
+                print(f"Success: {'✅ YES' if infra_result.success else '❌ NO'}")
 
-            if infra_result.errors:
-                print(f"\n❌ {len(infra_result.errors)} validation errors:")
-                for error in infra_result.errors:
-                    print(f"   - {error}")
-                success = False
+                if infra_result.errors:
+                    print(f"\n❌ {len(infra_result.errors)} validation errors:")
+                    for error in infra_result.errors:
+                        print(f"   - {error}")
+                    success = False
+                else:
+                    print("\n✅ All infrastructure components validated successfully!")
+
+                if infra_result.warnings:
+                    print(f"\n⚠️  {len(infra_result.warnings)} warnings:")
+                    for warning in infra_result.warnings:
+                        print(f"   - {warning}")
+
+            # Phase 2: Document ingestion
+            if "ingestion" in phases:
+                logger.info("\n" + "=" * 60)
+                logger.info("PHASE 2: DOCUMENT INGESTION")
+                logger.info("=" * 60)
+
+                ingestion_summary = await workflow.run_ingestion(spec, dry_run=args.dry_run)
+
+                print("\n" + "=" * 60)
+                print("DOCUMENT INGESTION SUMMARY")
+                print("=" * 60)
+                print(f"Documents Discovered: {ingestion_summary.counters.get('discovered', 0)}")
+                print(f"Documents Processed: {ingestion_summary.processed}")
+                print(f"Documents Skipped: {ingestion_summary.skipped}")
+                print(f"Documents Failed: {ingestion_summary.failed}")
+                print(f"Chunks Generated: {ingestion_summary.counters.get('chunking', {}).get('total_chunks', 0)}")
+
+                if ingestion_summary.errors:
+                    print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_summary.errors)} issues):")
+                    for i, error in enumerate(ingestion_summary.errors[:5], 1):
+                        error_msg = error.get('message', str(error))
+                        error_type = error.get('type', 'Unknown')
+                        print(f"   {i}. [{error_type}] {error_msg}")
+
+                        # Provide actionable suggestions for common errors
+                        if "path does not exist" in str(error_msg).lower():
+                            print(f"      💡 SOLUTION: Check the 'documents.path' in your config file")
+                        elif "permission" in str(error_msg).lower():
+                            print(f"      💡 SOLUTION: Check file permissions for the document path")
+                        elif "corrupted" in str(error_msg).lower() or "invalid" in str(error_msg).lower():
+                            print(f"      💡 SOLUTION: Verify the document file is not corrupted")
+
+                    if len(ingestion_summary.errors) > 5:
+                        print(f"   ... and {len(ingestion_summary.errors) - 5} more errors")
+
+                    print(f"\n📊 SUMMARY: {ingestion_summary.processed} processed, {ingestion_summary.failed} failed, {ingestion_summary.skipped} skipped")
+                    success = False
+
+            # Phase 3: Embedding generation
+            if "embedding" in phases:
+                logger.info("\n" + "=" * 60)
+                logger.info("PHASE 3: EMBEDDING GENERATION")
+                logger.info("=" * 60)
+
+                embedding_result = await workflow.run_embedding(
+                    spec,
+                    batch_size=args.batch_size,
+                    document_limit=args.document_limit,
+                )
+
+                print("\n" + "=" * 60)
+                print("EMBEDDING GENERATION SUMMARY")
+                print("=" * 60)
+                print(f"Success: {'✅ YES' if embedding_result.success else '❌ NO'}")
+                print(f"Documents Processed: {embedding_result.documents_processed}")
+                print(f"Total Chunks: {embedding_result.total_chunks}")
+                print(f"Unique Chunks: {embedding_result.unique_chunks}")
+                print(f"Duplicates Removed: {embedding_result.duplicates_removed}")
+                print(f"Embeddings Generated: {embedding_result.embeddings_generated}")
+                print(f"Embeddings Stored: {embedding_result.embeddings_stored}")
+                print(f"Processing Time: {embedding_result.processing_time_seconds:.2f}s")
+
+                if embedding_result.warnings:
+                    print(f"\n⚠️  {len(embedding_result.warnings)} warnings:")
+                    for warning in embedding_result.warnings:
+                        print(f"   - {warning}")
+
+                if embedding_result.errors:
+                    print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_result.errors)} issues):")
+                    for i, error in enumerate(embedding_result.errors[:5], 1):
+                        print(f"   {i}. {error}")
+
+                        # Provide actionable suggestions for common embedding errors
+                        error_str = str(error).lower()
+                        if "trust_remote_code" in error_str:
+                            print(f"      💡 SOLUTION: This should be fixed now with trust_remote_code=True")
+                        elif "memory" in error_str or "cuda" in error_str:
+                            print(f"      💡 SOLUTION: Reduce batch_size or free up system memory")
+                        elif "connection" in error_str or "timeout" in error_str:
+                            print(f"      💡 SOLUTION: Check Weaviate connection and network connectivity")
+                        elif "model" in error_str:
+                            print(f"      💡 SOLUTION: Ensure embedding model is downloaded and accessible")
+
+                    if len(embedding_result.errors) > 5:
+                        print(f"   ... and {len(embedding_result.errors) - 5} more errors")
+
+                    success = False
+
+            # Final status
+            logger.info("\n" + "=" * 60)
+            if success:
+                logger.info("✅ All requested phases completed successfully!")
             else:
-                print("\n✅ All infrastructure components validated successfully!")
-
-            if infra_result.warnings:
-                print(f"\n⚠️  {len(infra_result.warnings)} warnings:")
-                for warning in infra_result.warnings:
-                    print(f"   - {warning}")
-
-        # Phase 2: Document ingestion
-        if "ingestion" in phases_to_run:
-            logger.info("\n" + "=" * 60)
-            logger.info("PHASE 2: DOCUMENT INGESTION")
+                logger.error("❌ Pipeline completed with ERRORS - See details above for solutions")
+                logger.error("💡 Most common fixes:")
+                logger.error("   • Check 'documents.path' in your config file exists")
+                logger.error("   • Ensure Weaviate is running: docker-compose up -d weaviate")
+                logger.error("   • Verify document files are readable and not corrupted")
+                logger.error("   • Try smaller batch sizes if memory errors occur")
             logger.info("=" * 60)
 
-            ingestion_summary = await workflow.run_ingestion(spec, dry_run=args.dry_run)
-
-            print("\n" + "=" * 60)
-            print("DOCUMENT INGESTION SUMMARY")
-            print("=" * 60)
-            print(f"Documents Discovered: {ingestion_summary.counters.get('discovered', 0)}")
-            print(f"Documents Processed: {ingestion_summary.processed}")
-            print(f"Documents Skipped: {ingestion_summary.skipped}")
-            print(f"Documents Failed: {ingestion_summary.failed}")
-            print(f"Chunks Generated: {ingestion_summary.counters.get('chunking', {}).get('total_chunks', 0)}")
-
-            if ingestion_summary.errors:
-                print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_summary.errors)} issues):")
-                for i, error in enumerate(ingestion_summary.errors[:5], 1):
-                    error_msg = error.get('message', str(error))
-                    error_type = error.get('type', 'Unknown')
-                    print(f"   {i}. [{error_type}] {error_msg}")
-
-                    # Provide actionable suggestions for common errors
-                    if "path does not exist" in str(error_msg).lower():
-                        print(f"      💡 SOLUTION: Check the 'documents.path' in your config file")
-                    elif "permission" in str(error_msg).lower():
-                        print(f"      💡 SOLUTION: Check file permissions for the document path")
-                    elif "corrupted" in str(error_msg).lower() or "invalid" in str(error_msg).lower():
-                        print(f"      💡 SOLUTION: Verify the document file is not corrupted")
-
-                if len(ingestion_summary.errors) > 5:
-                    print(f"   ... and {len(ingestion_summary.errors) - 5} more errors")
-
-                print(f"\n📊 SUMMARY: {ingestion_summary.processed} processed, {ingestion_summary.failed} failed, {ingestion_summary.skipped} skipped")
-                success = False
-
-        # Phase 3: Embedding generation
-        if "embedding" in phases_to_run:
-            logger.info("\n" + "=" * 60)
-            logger.info("PHASE 3: EMBEDDING GENERATION")
-            logger.info("=" * 60)
-
-            embedding_result = await workflow.run_embedding(
-                spec,
-                batch_size=args.batch_size,
-                document_limit=args.document_limit,
-            )
-
-            print("\n" + "=" * 60)
-            print("EMBEDDING GENERATION SUMMARY")
-            print("=" * 60)
-            print(f"Success: {'✅ YES' if embedding_result.success else '❌ NO'}")
-            print(f"Documents Processed: {embedding_result.documents_processed}")
-            print(f"Total Chunks: {embedding_result.total_chunks}")
-            print(f"Unique Chunks: {embedding_result.unique_chunks}")
-            print(f"Duplicates Removed: {embedding_result.duplicates_removed}")
-            print(f"Embeddings Generated: {embedding_result.embeddings_generated}")
-            print(f"Embeddings Stored: {embedding_result.embeddings_stored}")
-            print(f"Processing Time: {embedding_result.processing_time_seconds:.2f}s")
-
-            if embedding_result.warnings:
-                print(f"\n⚠️  {len(embedding_result.warnings)} warnings:")
-                for warning in embedding_result.warnings:
-                    print(f"   - {warning}")
-
-            if embedding_result.errors:
-                print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_result.errors)} issues):")
-                for i, error in enumerate(embedding_result.errors[:5], 1):
-                    print(f"   {i}. {error}")
-
-                    # Provide actionable suggestions for common embedding errors
-                    error_str = str(error).lower()
-                    if "trust_remote_code" in error_str:
-                        print(f"      💡 SOLUTION: This should be fixed now with trust_remote_code=True")
-                    elif "memory" in error_str or "cuda" in error_str:
-                        print(f"      💡 SOLUTION: Reduce batch_size or free up system memory")
-                    elif "connection" in error_str or "timeout" in error_str:
-                        print(f"      💡 SOLUTION: Check Weaviate connection and network connectivity")
-                    elif "model" in error_str:
-                        print(f"      💡 SOLUTION: Ensure embedding model is downloaded and accessible")
-
-                if len(embedding_result.errors) > 5:
-                    print(f"   ... and {len(embedding_result.errors) - 5} more errors")
-
-                success = False
-
-        # Final status
-        logger.info("\n" + "=" * 60)
-        if success:
-            logger.info("✅ All requested phases completed successfully!")
-        else:
-            logger.error("❌ Pipeline completed with ERRORS - See details above for solutions")
-            logger.error("💡 Most common fixes:")
-            logger.error("   • Check 'documents.path' in your config file exists")
-            logger.error("   • Ensure Weaviate is running: docker-compose up -d weaviate")
-            logger.error("   • Verify document files are readable and not corrupted")
-            logger.error("   • Try smaller batch sizes if memory errors occur")
-        logger.info("=" * 60)
-
-        return 0 if success else 1
+            return 0 if success else 1
 
     except KeyboardInterrupt:
         logger.info("🛑 Pipeline interrupted by user")

@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.pipeline.config import PipelineSpec
 from app.pipeline.phases import InfrastructurePhase, IngestionPhase, EmbeddingPhase
 from app.pipeline.phases.infrastructure_phase import InfrastructureValidationResult
@@ -19,12 +21,8 @@ from app.pipeline.phases.embedding_phase import EmbeddingResult
 from app.pipeline.contracts import RunSummary
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.infrastructure.repositories.in_memory_document_repository import (
-    InMemoryDocumentRepository,
-)
-from app.infrastructure.repositories.in_memory_data_source_repository import (
-    InMemoryDataSourceRepository,
-)
+from app.infrastructure.repositories.factory import RepositoryFactory
+from app.core.settings import Settings
 from scripts.rag_summary import (
     RagIngestionSummary,
     create_infrastructure_phase_result,
@@ -64,25 +62,28 @@ class RAGWorkflow:
     def __init__(
         self,
         repositories: Optional[RepositoryBundle] = None,
+        session: Optional[AsyncSession] = None,
         verbose: bool = False,
     ):
         """Initialize the RAG workflow orchestrator.
 
         Args:
             repositories: Optional pre-configured repository bundle.
-                         If not provided, creates in-memory repositories.
+                         If not provided, creates repositories based on session parameter.
+            session: Optional database session for SQLAlchemy repositories.
+                    If provided without repositories, creates SQLAlchemy-based bundle.
+                    If neither provided, creates in-memory repositories.
             verbose: Enable verbose logging
         """
         self.verbose = verbose
+        self.session = session
+
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize or use provided repositories
         if repositories is None:
-            self.repositories = RepositoryBundle(
-                document_repository=InMemoryDocumentRepository(),
-                data_source_repository=InMemoryDataSourceRepository(),
-            )
+            self.repositories = self._create_repository_bundle(session)
         else:
             self.repositories = repositories
 
@@ -101,6 +102,40 @@ class RAGWorkflow:
         # Summary tracking
         self.summary = RagIngestionSummary()
         self.start_time: Optional[datetime] = None
+
+    @staticmethod
+    def _create_repository_bundle(
+        session: Optional[AsyncSession] = None,
+    ) -> RepositoryBundle:
+        """Create a repository bundle based on session availability.
+
+        Args:
+            session: Optional database session
+
+        Returns:
+            RepositoryBundle with appropriate repository implementations
+        """
+        if session is not None:
+            # Create database-backed repositories
+            document_repo = RepositoryFactory.create_document_repository(
+                repository_type="database",
+                session=session,
+            )
+        else:
+            # Create in-memory repositories
+            document_repo = RepositoryFactory.create_document_repository(
+                repository_type="memory"
+            )
+
+        # Data source repository (always in-memory for now)
+        data_source_repo = RepositoryFactory.create_data_source_repository(
+            repository_type="memory"
+        )
+
+        return RepositoryBundle(
+            document_repository=document_repo,
+            data_source_repository=data_source_repo,
+        )
 
     async def run_infrastructure_check(
         self, spec: PipelineSpec

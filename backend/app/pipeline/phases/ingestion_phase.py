@@ -86,7 +86,6 @@ from app.application.use_cases.storage_management import (
 )
 from app.infrastructure.external_services.data_sources.database_connectors import DatabaseConnectionConfig
 from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
-from app.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
 from app.config.ml_models import get_chunking_config
@@ -100,7 +99,7 @@ logger = logging.getLogger(__name__)
 class UseCaseBundle:
     """Bundle of use cases required for ingestion pipeline execution."""
     repository: InMemoryDataSourceRepository
-    document_repository: InMemoryDocumentRepository
+    document_repository: DocumentRepository
     storage: SetupObjectStorageUseCase
     process_pdfs: ProcessPdfsUseCase
     normalize_text: NormalizeTextUseCase
@@ -134,7 +133,9 @@ class IngestionPhase:
         """Initialize the ingestion phase.
 
         Args:
-            document_repository: Shared document repository instance
+            document_repository: Shared document repository instance (required).
+                                Should be provided by the workflow orchestrator
+                                to ensure data continuity across pipeline phases.
             data_source_repository: Optional shared data source repository
             verbose: Enable verbose logging
         """

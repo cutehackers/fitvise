@@ -30,5 +30,9 @@ huggingface-hub>=0.16.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
 
+# Performance Optimization Dependencies
+xxhash>=3.0.0
+psutil>=5.9.0
+
 # Vector Database (Epic 2.3)
 weaviate-client>=3.24.0

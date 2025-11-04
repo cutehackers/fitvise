@@ -64,6 +64,10 @@ async def main() -> int:
     # Setup logging level
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+        logger.info("🔧 Verbose logging enabled - DEBUG level activated")
+        print(f"📝 Running with verbose logging: args.verbose={args.verbose}")
+    else:
+        logger.info("ℹ️ Running with normal logging (use --verbose for detailed logs)")
 
     try:
         # Load pipeline specification
@@ -136,11 +140,24 @@ async def main() -> int:
             print(f"Chunks Generated: {ingestion_summary.counters.get('chunking', {}).get('total_chunks', 0)}")
 
             if ingestion_summary.errors:
-                print(f"\n⚠️  {len(ingestion_summary.errors)} errors occurred:")
-                for error in ingestion_summary.errors[:5]:
-                    print(f"   - {error.get('message', str(error))}")
+                print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_summary.errors)} issues):")
+                for i, error in enumerate(ingestion_summary.errors[:5], 1):
+                    error_msg = error.get('message', str(error))
+                    error_type = error.get('type', 'Unknown')
+                    print(f"   {i}. [{error_type}] {error_msg}")
+
+                    # Provide actionable suggestions for common errors
+                    if "path does not exist" in str(error_msg).lower():
+                        print(f"      💡 SOLUTION: Check the 'documents.path' in your config file")
+                    elif "permission" in str(error_msg).lower():
+                        print(f"      💡 SOLUTION: Check file permissions for the document path")
+                    elif "corrupted" in str(error_msg).lower() or "invalid" in str(error_msg).lower():
+                        print(f"      💡 SOLUTION: Verify the document file is not corrupted")
+
                 if len(ingestion_summary.errors) > 5:
                     print(f"   ... and {len(ingestion_summary.errors) - 5} more errors")
+
+                print(f"\n📊 SUMMARY: {ingestion_summary.processed} processed, {ingestion_summary.failed} failed, {ingestion_summary.skipped} skipped")
                 success = False
 
         # Phase 3: Embedding generation
@@ -173,9 +190,24 @@ async def main() -> int:
                     print(f"   - {warning}")
 
             if embedding_result.errors:
-                print(f"\n❌ {len(embedding_result.errors)} errors occurred:")
-                for error in embedding_result.errors:
-                    print(f"   - {error}")
+                print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_result.errors)} issues):")
+                for i, error in enumerate(embedding_result.errors[:5], 1):
+                    print(f"   {i}. {error}")
+
+                    # Provide actionable suggestions for common embedding errors
+                    error_str = str(error).lower()
+                    if "trust_remote_code" in error_str:
+                        print(f"      💡 SOLUTION: This should be fixed now with trust_remote_code=True")
+                    elif "memory" in error_str or "cuda" in error_str:
+                        print(f"      💡 SOLUTION: Reduce batch_size or free up system memory")
+                    elif "connection" in error_str or "timeout" in error_str:
+                        print(f"      💡 SOLUTION: Check Weaviate connection and network connectivity")
+                    elif "model" in error_str:
+                        print(f"      💡 SOLUTION: Ensure embedding model is downloaded and accessible")
+
+                if len(embedding_result.errors) > 5:
+                    print(f"   ... and {len(embedding_result.errors) - 5} more errors")
+
                 success = False
 
         # Final status
@@ -183,7 +215,12 @@ async def main() -> int:
         if success:
             logger.info("✅ All requested phases completed successfully!")
         else:
-            logger.error("❌ Some phases completed with errors")
+            logger.error("❌ Pipeline completed with ERRORS - See details above for solutions")
+            logger.error("💡 Most common fixes:")
+            logger.error("   • Check 'documents.path' in your config file exists")
+            logger.error("   • Ensure Weaviate is running: docker-compose up -d weaviate")
+            logger.error("   • Verify document files are readable and not corrupted")
+            logger.error("   • Try smaller batch sizes if memory errors occur")
         logger.info("=" * 60)
 
         return 0 if success else 1

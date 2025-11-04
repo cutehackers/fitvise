@@ -1,10 +1,10 @@
 documents:
-  path: ../DATA
+  path: ../../DATA
   recurse: true
   include: ["*.pdf"]
 storage:
   provider: local
-  base_dir: ../STORAGE
+  base_dir: ../../STORAGE
   access_key: null
   secret_key: null
   secure: false
@@ -26,7 +26,7 @@ dedupe:
 sources:
   audit:
     enabled: true
-    scan_paths: ["../rag"]
+    scan_paths: ["../../rag"]
   document_apis:
     enabled: false
   databases: []

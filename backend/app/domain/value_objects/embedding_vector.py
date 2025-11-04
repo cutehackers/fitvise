@@ -6,7 +6,7 @@ an immutable vector with similarity computation methods.
 
 from __future__ import annotations
 
-from typing import List, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import numpy.typing as npt
@@ -41,13 +41,15 @@ class EmbeddingVector:
         3
     """
 
-    __slots__ = ("_vector",)
+    __slots__ = ("_vector", "_memory_block", "_block_index")
 
-    def __init__(self, vector: npt.NDArray[np.float32]) -> None:
+    def __init__(self, vector: npt.NDArray[np.float32], memory_block: Optional[Any] = None, block_index: Optional[int] = None) -> None:
         """Initialize embedding vector.
 
         Args:
             vector: Numpy array of embedding values
+            memory_block: Optional memory block for pooled storage
+            block_index: Optional index in memory block
 
         Raises:
             ValueError: If vector is invalid
@@ -59,9 +61,23 @@ class EmbeddingVector:
         if len(vector) == 0:
             raise ValueError("vector cannot be empty")
 
-        # Store as immutable by copying
-        self._vector = vector.astype(np.float32).copy()
-        self._vector.setflags(write=False)
+        # Zero-copy when possible, otherwise convert with minimal copying
+        if vector.dtype == np.float32:
+            if vector.flags.writeable:
+                # Make view read-only without copying
+                self._vector = vector.view()
+                self._vector.setflags(write=False)
+            else:
+                # Already read-only, use directly
+                self._vector = vector
+        else:
+            # Convert to float32 with single copy
+            self._vector = np.asarray(vector, dtype=np.float32)
+            self._vector.setflags(write=False)
+
+        # Store memory block references for pooled storage
+        self._memory_block = memory_block
+        self._block_index = block_index
 
     @classmethod
     def from_list(cls, values: List[float]) -> EmbeddingVector:
@@ -93,6 +109,60 @@ class EmbeddingVector:
             EmbeddingVector instance
         """
         return cls(array)
+
+    @classmethod
+    def from_model_output(cls, model_arrays: npt.NDArray[np.float32]) -> List[EmbeddingVector]:
+        """Create embedding vectors from model output with zero-copy optimization.
+
+        Args:
+            model_arrays: Model output arrays of shape (batch_size, dimension)
+
+        Returns:
+            List of embedding vectors
+        """
+        vectors = []
+        for i in range(model_arrays.shape[0]):
+            vectors.append(cls(model_arrays[i]))
+        return vectors
+
+    @classmethod
+    def from_model_output_pooled(
+        cls,
+        model_arrays: npt.NDArray[np.float32],
+        memory_pool
+    ) -> List[EmbeddingVector]:
+        """Create embedding vectors from model output using memory pool.
+
+        Args:
+            model_arrays: Model output arrays of shape (batch_size, dimension)
+            memory_pool: Memory pool for allocation
+
+        Returns:
+            List of embedding vectors with pooled storage
+        """
+        if model_arrays.ndim != 2:
+            raise ValueError(f"Expected 2D array, got {model_arrays.ndim}D")
+
+        batch_size, dimension = model_arrays.shape
+        vectors = []
+
+        # Try to allocate from memory pool
+        if memory_pool is not None:
+            for i in range(batch_size):
+                allocation = memory_pool.allocate_vector(dimension)
+                if allocation:
+                    vector_array, block, index = allocation
+                    # Zero-copy from model output to pooled memory
+                    np.copyto(vector_array, model_arrays[i])
+                    vectors.append(cls(vector_array, block, index))
+                else:
+                    # Fallback to regular allocation
+                    vectors.append(cls(model_arrays[i]))
+        else:
+            # No pooling available
+            vectors = cls.from_model_output(model_arrays)
+
+        return vectors
 
     def to_list(self) -> List[float]:
         """Convert vector to list of floats.
@@ -280,6 +350,29 @@ class EmbeddingVector:
         """
         return float(self._vector[index])
 
+    def cleanup(self) -> None:
+        """Cleanup pooled memory resources.
+
+        Deallocates vector from memory pool if it was allocated from one.
+        """
+        if self._memory_block is not None and self._block_index is not None:
+            try:
+                self._memory_block.deallocate(self._block_index)
+                self._memory_block = None
+                self._block_index = None
+            except Exception as e:
+                # Log error but don't raise - cleanup should be safe
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to cleanup vector memory: {e}")
+
+    def __del__(self) -> None:
+        """Cleanup when vector is garbage collected."""
+        try:
+            self.cleanup()
+        except Exception:
+            pass  # Ignore errors during garbage collection
+
     def __repr__(self) -> str:
         """String representation of vector."""
         preview = self._vector[:3].tolist()
@@ -287,4 +380,5 @@ class EmbeddingVector:
             preview_str = f"{preview[0]:.3f}, {preview[1]:.3f}, {preview[2]:.3f}..."
         else:
             preview_str = ", ".join(f"{v:.3f}" for v in preview)
-        return f"EmbeddingVector(dim={len(self)}, values=[{preview_str}])"
+        pool_info = " (pooled)" if self._memory_block else ""
+        return f"EmbeddingVector(dim={len(self)}, values=[{preview_str}]{pool_info})"

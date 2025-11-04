@@ -198,7 +198,10 @@ class LlamaIndexChunker:
 
                 # Use configured embedding model for semantic chunking
                 embedding_config = EmbeddingModelConfig.default()
-                embed_model = HuggingFaceEmbedding(model_name=embedding_config.model_name)
+                embed_model = HuggingFaceEmbedding(
+                    model_name=embedding_config.model_name,
+                    trust_remote_code=True  # Required for Alibaba-NLP models
+                )
 
                 semantic_parser = _SemanticSplitter.from_defaults(  # type: ignore[attr-defined]
                     breakpoint_percentile_threshold=threshold_int,

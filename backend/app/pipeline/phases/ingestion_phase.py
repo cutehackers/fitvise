@@ -297,32 +297,69 @@ class IngestionPhase:
     def _discover_file_documents(self, spec: PipelineSpec) -> List[DocumentSource]:
         """Scan the configured filesystem path(s) and wrap matching files as sources."""
         root = spec.documents.path
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Starting file discovery at path: {root}")
+            logger.debug(f"🔧 INGESTION VERBOSE: File exists check: {root.exists()}")
+
+        if not root.exists():
+            root.mkdir(parents=True, exist_ok=True)
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Created directory: {root}")
+
         if not root.exists():
             raise DocumentPathNotFoundError(
                 f"Input path does not exist: {root}",
                 document=str(root),
             )
+
         patterns = spec.documents.include or ["*.pdf"]
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: File patterns to match: {patterns}")
+            logger.debug(f"🔧 INGESTION VERBOSE: Recursive search: {spec.documents.recurse}")
+
         paths: List[Path] = []
         for pattern in patterns:
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Searching for pattern: {pattern}")
+
             if spec.documents.recurse:
-                paths.extend(root.rglob(pattern))
+                matched_paths = list(root.rglob(pattern))
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Recursive search found {len(matched_paths)} matches for pattern '{pattern}'")
+                paths.extend(matched_paths)
             else:
-                paths.extend(root.glob(pattern))
+                matched_paths = list(root.glob(pattern))
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Non-recursive search found {len(matched_paths)} matches for pattern '{pattern}'")
+                paths.extend(matched_paths)
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Total files found before filtering: {len(paths)}")
 
         documents: List[DocumentSource] = []
-        for path in paths:
+        for i, path in enumerate(paths):
             if path.is_file():
+                content_type = self._guess_content_type(path)
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: File {i+1}: {path} (type: {content_type}, size: {path.stat().st_size} bytes)")
+
                 documents.append(
                     DocumentSource(
                         source_id=None,
                         uri=str(path),
                         path=str(path),
                         content_bytes=None,
-                        content_type=self._guess_content_type(path),
+                        content_type=content_type,
                         origin="file",
                     )
                 )
+            elif self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Skipped non-file: {path}")
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: File discovery completed: {len(documents)} documents found")
+
         return documents
 
     async def _discover_database_documents(
@@ -333,7 +370,16 @@ class IngestionPhase:
     ) -> List[DocumentSource]:
         """Run each configured database connector and capture sample exports as sources."""
         documents: List[DocumentSource] = []
-        for option in spec.sources.databases:
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Starting database discovery with {len(spec.sources.databases)} database configurations")
+
+        for i, option in enumerate(spec.sources.databases):
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Processing database {i+1}/{len(spec.sources.databases)}: {option.name}")
+                logger.debug(f"🔧 INGESTION VERBOSE: Database config - driver: {option.driver}, host: {option.host}, port: {option.port}")
+                logger.debug(f"🔧 INGESTION VERBOSE: Database config - connector_type: {option.connector_type}, fetch_samples: {option.fetch_samples}")
+
             config = DatabaseConnectionConfig(
                 name=option.name,
                 driver=option.driver,
@@ -352,11 +398,22 @@ class IngestionPhase:
                 sample_collection=option.sample_collection,
                 sample_limit=option.sample_limit,
             )
+
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Attempting database connection to {option.name}")
+
             try:
                 response = await use_cases.connect_databases.execute(
                     ConnectDatabasesRequest(connectors=[spec_obj], fetch_samples=option.fetch_samples)
                 )
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Database {option.name} connected successfully")
+                    logger.debug(f"🔧 INGESTION VERBOSE: Database {option.name} returned {len(response.results)} results")
+
             except Exception as exc:
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Database {option.name} connection failed: {exc}")
                 logger.warning("Database connector '%s' failed: %s", option.name, exc)
                 if errors is not None:
                     err = SourceNotReachableError(
@@ -841,17 +898,50 @@ class IngestionPhase:
         skipped = 0
         processed_document_ids: List[UUID] = []
 
-        for doc in documents:
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Starting processing of {len(documents)} documents")
+
+        for i, doc in enumerate(documents):
             try:
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Processing document {i+1}/{len(documents)}: {doc.uri or doc.path or 'inline'}")
+                    logger.debug(f"🔧 INGESTION VERBOSE: Document origin: {doc.origin}, content_type: {doc.content_type}")
+
                 content = await self._extract_content(doc, spec, use_cases)
                 base_text = content.markdown or content.text or ""
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Extracted content length: {len(base_text)} characters")
+
                 if not base_text:
+                    if self.verbose:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Skipping document {i+1} - no content extracted")
                     skipped += 1
                     continue
 
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Starting normalization for document {i+1}")
+
                 normalized = await self._normalize_content(base_text, use_cases)
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Normalization complete - tokens: {len(normalized.tokens) if normalized.tokens else 0}")
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Starting metadata enrichment for document {i+1}")
+
                 enriched = await self._enrich_content(normalized.normalized, use_cases)
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Metadata enrichment complete - keywords: {len(enriched.keywords) if enriched.keywords else 0}, entities: {len(enriched.entities) if enriched.entities else 0}")
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Starting quality validation for document {i+1}")
+
                 quality = await self._validate_content(normalized.normalized, use_cases)
+
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Quality validation complete - score: {quality.overall_score:.4f}, level: {quality.quality_level}")
 
                 now = datetime.now(timezone.utc)
                 dated = now.strftime("%Y/%m/%d")
@@ -953,13 +1043,24 @@ class IngestionPhase:
             "preset": getattr(chunk_options, "preset", None) or "balanced",
         }
 
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Chunking configuration - enabled: {chunk_enabled}, documents_to_chunk: {len(processed_document_ids)}")
+            logger.debug(f"🔧 INGESTION VERBOSE: Chunking preset: {summary['preset']}, dry_run: {dry_run}")
+
         if not (chunk_enabled and processed_document_ids):
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Skipping chunking - enabled={chunk_enabled}, documents_count={len(processed_document_ids)}")
             return summary
 
         try:
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Loading chunking configuration for preset: {getattr(chunk_options, 'preset', None)}")
+
             chunk_config = get_chunking_config(getattr(chunk_options, "preset", None))
             overrides = getattr(chunk_options, "overrides", {}) if chunk_options else {}
             if overrides:
+                if self.verbose:
+                    logger.debug(f"🔧 INGESTION VERBOSE: Applying chunking config overrides: {list(overrides.keys())}")
                 chunk_config.update(overrides)
 
             metadata_overrides = {"run_id": run_id}
@@ -967,6 +1068,10 @@ class IngestionPhase:
             metadata_overrides.update(extra_metadata)
 
             replace_existing = getattr(chunk_options, "replace_existing_chunks", True) if chunk_options else True
+
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Chunking config - replace_existing: {replace_existing}")
+                logger.debug(f"🔧 INGESTION VERBOSE: Starting semantic chunking for {len(processed_document_ids)} documents")
 
             chunk_response = await use_cases.chunk_documents.execute(
                 SemanticChunkingRequest(
@@ -977,6 +1082,14 @@ class IngestionPhase:
                     metadata_overrides=metadata_overrides,
                 )
             )
+
+            if self.verbose:
+                logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - results: {len(chunk_response.results)}, total_chunks: {chunk_response.total_chunks}")
+                if hasattr(chunk_response, 'results') and chunk_response.results:
+                    for result in chunk_response.results[:3]:  # Log first 3 results to avoid spam
+                        if hasattr(result, 'document_id') and hasattr(result, 'chunks'):
+                            logger.debug(f"🔧 INGESTION VERBOSE: Document {result.document_id}: {len(result.chunks)} chunks")
+
             summary.update(
                 {
                     "documents": len(chunk_response.results),
@@ -1021,20 +1134,45 @@ class IngestionPhase:
         """
         logger.info("Running ingestion with shared document repository...")
 
+        if self.verbose:
+            logger.debug("🔧 INGESTION VERBOSE: Starting ingestion phase with verbose logging")
+            logger.debug(f"🔧 INGESTION VERBOSE: dry_run={dry_run}")
+            logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.path={spec.documents.path}")
+            logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.include={spec.documents.include}")
+            logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.recurse={spec.documents.recurse}")
+            logger.debug(f"🔧 INGESTION VERBOSE: spec.storage.provider={spec.storage.provider}")
+            logger.debug(f"🔧 INGESTION VERBOSE: spec.storage.bucket={spec.storage.bucket}")
+
         # Build use case bundle with injected repositories
         use_cases = self._build_use_cases()
         run_id = datetime.now(timezone.utc).isoformat()
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Generated run_id={run_id}")
+            all_data_sources = await use_cases.repository.find_all()
+            logger.debug(f"🔧 INGESTION VERBOSE: Use case bundle built with {len(all_data_sources)} existing data sources")
 
         # Phase 1: Infrastructure setup
         logger.info("pipeline initialization started | phase=setup")
         await self._init_pipeline(spec, use_cases)
 
         # Phase 2: Discovery
+        if self.verbose:
+            logger.debug("🔧 INGESTION VERBOSE: Starting document discovery phase")
+
         documents, errors = await self._discover_documents(spec, use_cases)
         discovery_error_count = len(errors)
 
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Discovery completed - found {len(documents)} documents, {discovery_error_count} errors")
+
         # Phase 3: Processing
         client = self._storage_client(spec)
+
+        if self.verbose:
+            logger.debug("🔧 INGESTION VERBOSE: Starting document processing phase")
+            logger.debug(f"🔧 INGESTION VERBOSE: Storage client created for provider: {spec.storage.provider}")
+
         stored_objects, origin_counts, skipped, processed_document_ids = (
             await self._process_documents(
                 documents=documents,
@@ -1046,7 +1184,13 @@ class IngestionPhase:
             )
         )
 
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Processing completed - stored: {len(stored_objects)}, skipped: {skipped}, processed_ids: {len(processed_document_ids)}")
+
         # Phase 4: Post-processing (chunking)
+        if self.verbose:
+            logger.debug("🔧 INGESTION VERBOSE: Starting chunking phase")
+
         chunk_summary = await self._maybe_chunk_documents(
             processed_document_ids=processed_document_ids,
             use_cases=use_cases,
@@ -1055,6 +1199,9 @@ class IngestionPhase:
             dry_run=dry_run,
             errors=errors,
         )
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - documents: {chunk_summary.get('documents', 0)}, chunks: {chunk_summary.get('total_chunks', 0)}, enabled: {chunk_summary.get('enabled', False)}")
 
         # Build summary
         processing_failures = max(len(errors) - discovery_error_count, 0)

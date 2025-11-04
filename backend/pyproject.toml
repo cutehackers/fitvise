@@ -49,6 +49,10 @@ dependencies = [
     "torch>=2.9.0",
     "torchvision>=0.24.0",
     "torchaudio>=2.9.0",
+    "sqlalchemy[asyncio]>=2.0.43",
+    "asyncpg>=0.30.0",
+    "alembic>=1.17.1",
+    "aiosqlite>=0.21.0",
 ]
 
 [tool.isort]

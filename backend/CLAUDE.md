@@ -283,6 +283,8 @@ class {Action}{Resource}Response(BaseModel):
 - **Type Safety**: Use strict typing to prevent injection attacks
 
 ### Testing Requirements
+- Every test should have a clear description of what it is testing
+- Every test file should be placed under `tests` directory
 
 #### **Schema Validation Tests**
 ```python

@@ -19,7 +19,8 @@ from app.domain.value_objects.document_metadata import (
 )
 from app.domain.value_objects.quality_metrics import DataQualityMetrics, ContentQualityMetrics
 from app.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
-from app.infrastructure.repositories.factory import RepositoryFactory
+from app.infrastructure.repositories.container import RepositoryContainer
+from app.core.settings import Settings
 
 
 @pytest.fixture
@@ -571,11 +572,17 @@ class TestInMemoryDocumentRepository:
         os.environ['DATABASE_URL'] = 'memory'
 
         try:
-            # Reset factory cache
-            RepositoryFactory._repositories.clear()
+            # Create settings with memory URL
+            settings = Settings()
+
+            # Create container (no session needed for in-memory)
+            container = RepositoryContainer(settings)
+
+            # Verify container uses in-memory mode
+            assert container._use_database is False
 
             # Get repository
-            repo = RepositoryFactory.get_repository()
+            repo = container.document_repository
             assert isinstance(repo, InMemoryDocumentRepository)
         finally:
             # Restore original URL

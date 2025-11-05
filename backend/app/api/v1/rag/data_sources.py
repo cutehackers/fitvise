@@ -20,18 +20,13 @@ from app.application.use_cases.knowledge_sources.categorize_sources import (
     CategorizeSourcesRequest,
     CategorizeSourcesResponse
 )
-from app.infrastructure.repositories.in_memory_data_source_repository import (
-    InMemoryDataSourceRepository
-)
+from app.domain.repositories.data_source_repository import DataSourceRepository
+from app.infrastructure.repositories.dependencies import get_data_source_repository
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import (
     SklearnDocumentCategorizer
 )
 
 router = APIRouter(prefix="/rag/data-sources", tags=["RAG Data Sources"])
-
-# Dependency injection - in production, use proper DI container
-def get_data_source_repository():
-    return InMemoryDataSourceRepository()
 
 def get_categorizer():
     return SklearnDocumentCategorizer()
@@ -102,7 +97,7 @@ class CategorizationResponse(BaseModel):
 @router.get("/", response_model=List[DataSourceResponse])
 async def list_data_sources(
     active_only: bool = Query(False, description="Return only active sources"),
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """List all data sources in the inventory."""
     try:
@@ -130,7 +125,7 @@ async def list_data_sources(
 @router.get("/{source_id}", response_model=DataSourceResponse)
 async def get_data_source(
     source_id: UUID,
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Get a specific data source by ID."""
     try:
@@ -157,7 +152,7 @@ async def get_data_source(
 async def scan_and_catalog_sources(
     request: DataSourceScanRequest,
     background_tasks: BackgroundTasks,
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Scan and catalog data sources (Task 1.1.1)."""
     try:
@@ -191,7 +186,7 @@ async def scan_and_catalog_sources(
 @router.post("/document-apis", response_model=ApiDocumentationResponse)
 async def document_external_apis(
     request: ApiDocumentationRequest,
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Document external API sources (Task 1.1.2)."""
     try:
@@ -224,7 +219,7 @@ async def document_external_apis(
 @router.post("/categorize", response_model=CategorizationResponse)
 async def categorize_sources(
     request: CategorizationRequest,
-    repository = Depends(get_data_source_repository),
+    repository: DataSourceRepository = Depends(get_data_source_repository),
     categorizer = Depends(get_categorizer)
 ):
     """Categorize sources using ML (Task 1.1.3)."""
@@ -258,7 +253,7 @@ async def categorize_sources(
 
 @router.get("/statistics/inventory")
 async def get_inventory_statistics(
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Get inventory statistics and summary."""
     try:
@@ -271,7 +266,7 @@ async def get_inventory_statistics(
 
 @router.get("/statistics/apis")
 async def get_api_registry_statistics(
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Get API registry statistics."""
     try:
@@ -284,7 +279,7 @@ async def get_api_registry_statistics(
 
 @router.get("/statistics/categorization")
 async def get_categorization_statistics(
-    repository = Depends(get_data_source_repository),
+    repository: DataSourceRepository = Depends(get_data_source_repository),
     categorizer = Depends(get_categorizer)
 ):
     """Get categorization system statistics."""
@@ -298,7 +293,7 @@ async def get_categorization_statistics(
 
 @router.get("/health")
 async def health_check(
-    repository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(get_data_source_repository)
 ):
     """Health check for RAG data sources system."""
     try:

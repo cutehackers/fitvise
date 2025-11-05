@@ -23,7 +23,7 @@ from app.domain.value_objects.quality_metrics import DataQualityMetrics, Content
 from app.infrastructure.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.repositories.factory import RepositoryFactory
+from app.infrastructure.repositories.container import RepositoryContainer
 from app.infrastructure.database import async_session_maker
 
 
@@ -758,16 +758,15 @@ class TestSQLAlchemyDocumentRepository:
             # Create new settings with updated DATABASE_URL
             settings = Settings()
 
-            # Test repository type selection
-            repository_type = RepositoryFactory.get_repository_type_from_settings(settings)
-            assert repository_type == "database"
-
-            # Test repository creation with session
+            # Test repository container with database settings
             async with async_session_maker() as session:
-                repo = RepositoryFactory.create_document_repository(
-                    repository_type="database",
-                    session=session
-                )
+                container = RepositoryContainer(settings, session)
+
+                # Verify container detects database mode
+                assert container._use_database is True
+
+                # Test repository creation
+                repo = container.document_repository
                 assert isinstance(repo, SQLAlchemyDocumentRepository)
         finally:
             # Restore original URL

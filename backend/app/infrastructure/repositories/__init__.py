@@ -6,11 +6,13 @@ from app.infrastructure.repositories.in_memory_document_repository import (
 from app.infrastructure.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.repositories.factory import RepositoryFactory, RepositoryType
+from app.infrastructure.repositories.container import RepositoryContainer
 from app.infrastructure.repositories.dependencies import (
+    get_repository_container,
     get_document_repository,
     get_data_source_repository,
-    create_repository_bundle_for_pipeline,
+    create_repository_container_for_pipeline,
+    create_repository_bundle_for_pipeline,  # Deprecated but kept for backward compatibility
 )
 
 # Backward-compatible aliases
@@ -23,10 +25,12 @@ __all__ = [
     "SQLAlchemyDocumentRepository",
     "PostgresDocumentRepository",  # Alias for backward compatibility
     "SQLiteDocumentRepository",  # Alias for clarity
-    # Factory and dependencies
-    "RepositoryFactory",
-    "RepositoryType",
+    # Container and dependencies (NEW - Recommended)
+    "RepositoryContainer",
+    "get_repository_container",
     "get_document_repository",
     "get_data_source_repository",
+    "create_repository_container_for_pipeline",
+    # Deprecated but kept for backward compatibility
     "create_repository_bundle_for_pipeline",
 ]

@@ -5,26 +5,64 @@ and application services.
 """
 from typing import AsyncGenerator
 
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.settings import Settings
-from app.domain.repositories.document_repository import DocumentRepository
+from app.core.settings import Settings, get_settings
 from app.domain.repositories.data_source_repository import DataSourceRepository
+from app.domain.repositories.document_repository import DocumentRepository
 from app.infrastructure.database.database import get_async_session
-from app.infrastructure.repositories.factory import RepositoryFactory
-
-# Global settings instance
-_settings = Settings()
+from app.infrastructure.repositories.container import RepositoryContainer
 
 
-async def get_document_repository() -> AsyncGenerator[DocumentRepository, None]:
+async def get_repository_container(
+    settings: Settings = Depends(get_settings),
+) -> AsyncGenerator[RepositoryContainer, None]:
+    """Get repository container for request lifecycle.
+
+    Container is created per-request with session attached.
+    All repositories share the same session within the request.
+
+    Args:
+        settings: Application settings (auto-injected)
+        session: Database session (auto-injected if database mode)
+
+    Yields:
+        RepositoryContainer instance
+
+    Example:
+        ```python
+        @app.get("/documents")
+        async def list_documents(
+            container: RepositoryContainer = Depends(get_repository_container)
+        ):
+            documents = await container.document_repository.find_all()
+            return documents
+        ```
+    """
+    # Get session for database repositories
+    async for db_session in get_async_session():
+        container = RepositoryContainer(settings, db_session)
+        try:
+            yield container
+        finally:
+            # Cleanup if needed
+            pass
+
+
+async def get_document_repository(
+    container: RepositoryContainer = Depends(get_repository_container),
+) -> DocumentRepository:
     """FastAPI dependency for document repository.
 
     Automatically selects repository type based on DATABASE_URL configuration.
     Uses database repository if async driver is configured, otherwise in-memory.
 
-    Yields:
-        DocumentRepository instance (async context manager)
+    Args:
+        container: Repository container (auto-injected)
+
+    Returns:
+        DocumentRepository instance
 
     Example:
         ```python
@@ -32,26 +70,20 @@ async def get_document_repository() -> AsyncGenerator[DocumentRepository, None]:
         async def list_documents(
             repo: DocumentRepository = Depends(get_document_repository)
         ):
-            documents = await repo.list()
+            documents = await repo.find_all()
             return documents
         ```
     """
-    repository_type = RepositoryFactory.get_repository_type_from_settings(_settings)
-
-    if repository_type == "database":
-        # Create database repository with async session
-        async for session in get_async_session():
-            yield RepositoryFactory.create_document_repository(
-                repository_type="database",
-                session=session,
-            )
-    else:
-        # Create in-memory repository (no session needed)
-        yield RepositoryFactory.create_document_repository(repository_type="memory")
+    return container.document_repository
 
 
-def get_data_source_repository() -> DataSourceRepository:
+def get_data_source_repository(
+    container: RepositoryContainer = Depends(get_repository_container),
+) -> DataSourceRepository:
     """FastAPI dependency for data source repository.
+
+    Args:
+        container: Repository container (auto-injected)
 
     Returns:
         DataSourceRepository instance (currently always in-memory)
@@ -59,69 +91,85 @@ def get_data_source_repository() -> DataSourceRepository:
     Example:
         ```python
         @app.get("/sources")
-        def list_sources(
+        async def list_sources(
             repo: DataSourceRepository = Depends(get_data_source_repository)
         ):
-            sources = repo.find_all()
+            sources = await repo.find_all()
             return sources
         ```
     """
-    return RepositoryFactory.create_data_source_repository(repository_type="memory")
+    return container.data_source_repository
 
 
-async def create_repository_bundle_for_pipeline(
+async def create_repository_container_for_pipeline(
     settings: Settings | None = None,
-) -> tuple[DocumentRepository, DataSourceRepository]:
-    """Create repository bundle for RAG pipeline execution.
+) -> RepositoryContainer:
+    """Create repository container for RAG pipeline execution.
 
-    This function creates properly configured repository instances for use
+    This function creates a properly configured repository container for use
     in the RAG pipeline workflow, handling session management automatically.
 
     Args:
-        settings: Optional settings instance (uses global if not provided)
+        settings: Optional settings instance (uses default if not provided)
 
     Returns:
-        Tuple of (document_repository, data_source_repository)
+        RepositoryContainer with all repositories ready to use
 
     Example:
         ```python
-        doc_repo, src_repo = await create_repository_bundle_for_pipeline()
-        workflow = RAGWorkflow(
-            repositories=RepositoryBundle(
-                document_repository=doc_repo,
-                data_source_repository=src_repo,
-            )
-        )
+        container = await create_repository_container_for_pipeline()
+
+        # Access repositories
+        documents = await container.document_repository.find_all()
+        sources = await container.data_source_repository.find_all()
+
+        # Use in pipeline phases
+        phase = IngestionPhase(container)
+        await phase.execute(documents)
         ```
 
     Note:
         For database repositories, the session is managed internally.
-        The repository will work correctly within async contexts.
+        The container will work correctly within async contexts.
     """
     if settings is None:
-        settings = _settings
+        settings = get_settings()
 
-    repository_type = RepositoryFactory.get_repository_type_from_settings(settings)
+    # Create session for database mode
+    async for session in get_async_session():
+        return RepositoryContainer(settings, session)
 
-    # Data source repository (always in-memory for now)
-    data_source_repo = RepositoryFactory.create_data_source_repository(
-        repository_type="memory"
+    # Fallback for in-memory mode (no session needed)
+    return RepositoryContainer(settings)
+
+
+# Backward compatibility function - deprecated
+async def create_repository_bundle_for_pipeline(
+    settings: Settings | None = None,
+) -> tuple[DocumentRepository, DataSourceRepository]:
+    """DEPRECATED: Use create_repository_container_for_pipeline() instead.
+
+    Create repository bundle for RAG pipeline execution.
+
+    Args:
+        settings: Optional settings instance
+
+    Returns:
+        Tuple of (document_repository, data_source_repository)
+
+    Note:
+        This function is deprecated and will be removed in a future version.
+        Use create_repository_container_for_pipeline() instead, which returns
+        a RepositoryContainer that provides cleaner access to repositories.
+    """
+    import warnings
+
+    warnings.warn(
+        "create_repository_bundle_for_pipeline() is deprecated. "
+        "Use create_repository_container_for_pipeline() instead.",
+        DeprecationWarning,
+        stacklevel=2,
     )
 
-    # Document repository based on configuration
-    if repository_type == "database":
-        # For pipeline usage, we need a repository with a long-lived session
-        # The pipeline will manage the session lifecycle
-        from app.infrastructure.database.database import async_session_maker
-
-        session = async_session_maker()
-        document_repo = RepositoryFactory.create_document_repository(
-            repository_type="database",
-            session=session,
-        )
-    else:
-        document_repo = RepositoryFactory.create_document_repository(
-            repository_type="memory"
-        )
-
-    return document_repo, data_source_repo
+    container = await create_repository_container_for_pipeline(settings)
+    return container.document_repository, container.data_source_repository

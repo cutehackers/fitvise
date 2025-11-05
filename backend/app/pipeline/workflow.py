@@ -21,8 +21,8 @@ from app.pipeline.phases.embedding_phase import EmbeddingResult
 from app.pipeline.contracts import RunSummary
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.infrastructure.repositories.factory import RepositoryFactory
-from app.core.settings import Settings
+from app.infrastructure.repositories.container import RepositoryContainer
+from app.core.settings import Settings, get_settings
 from scripts.rag_summary import (
     RagIngestionSummary,
     create_infrastructure_phase_result,
@@ -115,26 +115,15 @@ class RAGWorkflow:
         Returns:
             RepositoryBundle with appropriate repository implementations
         """
-        if session is not None:
-            # Create database-backed repositories
-            document_repo = RepositoryFactory.create_document_repository(
-                repository_type="database",
-                session=session,
-            )
-        else:
-            # Create in-memory repositories
-            document_repo = RepositoryFactory.create_document_repository(
-                repository_type="memory"
-            )
+        # Get settings
+        settings = get_settings()
 
-        # Data source repository (always in-memory for now)
-        data_source_repo = RepositoryFactory.create_data_source_repository(
-            repository_type="memory"
-        )
+        # Create container with session (works for both database and in-memory)
+        container = RepositoryContainer(settings, session)
 
         return RepositoryBundle(
-            document_repository=document_repo,
-            data_source_repository=data_source_repo,
+            document_repository=container.document_repository,
+            data_source_repository=container.data_source_repository,
         )
 
     async def run_infrastructure_check(

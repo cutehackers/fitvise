@@ -142,10 +142,160 @@ Pydantic models provide comprehensive validation and auto-documentation:
 
 ### Key Design Patterns
 - **Dependency Injection**: Services injected through FastAPI's dependency system
+- **Repository Pattern**: Data access abstraction through RepositoryContainer
 - **Async Operations**: Non-blocking I/O throughout the stack
 - **Configuration as Code**: All settings externalized to environment variables
 - **Comprehensive Error Handling**: Graceful degradation with meaningful error messages
 - **Health Monitoring**: Service and dependency health checking
+
+### Repository Container Pattern
+
+The application uses **RepositoryContainer** for dependency injection of data repositories. This pattern provides:
+
+**Benefits**:
+- ✅ Works in both FastAPI endpoints and standalone scripts
+- ✅ Configuration-driven repository selection (in-memory vs database)
+- ✅ Lazy initialization for optimal performance
+- ✅ Easy testing with dependency overrides
+- ✅ Clean property-based API
+
+**Location**: `app/infrastructure/repositories/container.py`
+
+**Usage in FastAPI Endpoints**:
+```python
+from fastapi import Depends
+from app.infrastructure.repositories.dependencies import (
+    get_repository_container,
+    get_document_repository,
+)
+from app.domain.repositories import DocumentRepository
+
+@router.post("/documents")
+async def create_document(
+    # Option 1: Inject specific repository
+    repo: DocumentRepository = Depends(get_document_repository),
+):
+    document = await repo.save(new_document)
+    return document
+
+@router.get("/documents")
+async def list_documents(
+    # Option 2: Inject entire container for multiple repositories
+    container: RepositoryContainer = Depends(get_repository_container),
+):
+    documents = await container.document_repository.find_all()
+    sources = await container.data_source_repository.find_all()
+    return {"documents": documents, "sources": sources}
+```
+
+**Usage in Scripts**:
+```python
+import asyncio
+from app.core.settings import Settings
+from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.database.database import AsyncSessionLocal
+
+async def maintenance_script():
+    """Example maintenance script using RepositoryContainer."""
+    settings = Settings()
+
+    # For database operations
+    async with AsyncSessionLocal() as session:
+        container = RepositoryContainer(settings, session)
+
+        # Access repositories
+        documents = await container.document_repository.find_all()
+        for doc in documents:
+            # Process documents
+            pass
+
+        await session.commit()
+
+async def quick_test():
+    """Quick test using in-memory repositories."""
+    settings = Settings()
+    settings.database_url = "sqlite:///:memory:"
+
+    # No session needed for in-memory mode
+    container = RepositoryContainer(settings)
+
+    # Use repositories directly
+    await container.document_repository.save(document)
+
+if __name__ == "__main__":
+    asyncio.run(maintenance_script())
+```
+
+**Usage in Pipeline Phases**:
+```python
+from app.pipeline.phases.ingestion_phase import IngestionPhase
+
+async def run_pipeline():
+    """Run pipeline with repository container."""
+    settings = Settings()
+
+    async with AsyncSessionLocal() as session:
+        # Create container once for entire pipeline
+        container = RepositoryContainer(settings, session)
+
+        # Pass to pipeline phases
+        phase = IngestionPhase(
+            document_repository=container.document_repository,
+            data_source_repository=container.data_source_repository,
+        )
+
+        await phase.execute(spec)
+        await session.commit()
+```
+
+**Testing with Container**:
+```python
+from fastapi.testclient import TestClient
+from app.main import app
+from app.infrastructure.dependencies import get_repository_container
+
+def test_endpoint_with_mock_container():
+    """Test endpoint by mocking the entire container."""
+    # Create mock container
+    mock_container = Mock(spec=RepositoryContainer)
+    mock_repo = AsyncMock()
+    mock_container.document_repository = mock_repo
+
+    # Override dependency
+    async def override_container():
+        yield mock_container
+
+    app.dependency_overrides[get_repository_container] = override_container
+
+    # Test endpoint
+    client = TestClient(app)
+    response = client.post("/api/v1/documents/", json={...})
+
+    # Verify mock was called
+    assert mock_repo.save.called
+
+    # Cleanup
+    app.dependency_overrides.clear()
+```
+
+**Configuration-Based Selection**:
+
+The container automatically selects repository implementation based on `DATABASE_URL`:
+
+- **In-Memory Mode**: `sqlite:///:memory:` (no async driver)
+  - Fast, no persistence
+  - Ideal for testing and prototyping
+
+- **Database Mode**: Async drivers detected automatically
+  - `sqlite+aiosqlite:///` - SQLite with async support
+  - `postgresql+asyncpg://` - PostgreSQL with async support
+  - `mysql+aiomysql://` or `mysql+asyncmy://` - MySQL with async support
+
+**See Also**:
+- Container implementation: `app/infrastructure/repositories/container.py`
+- FastAPI dependencies: `app/infrastructure/repositories/dependencies.py`
+- Usage examples: `scripts/examples/use_container.py`
+- Tests: `tests/unit/infrastructure/test_repository_container.py`
 
 ### Development Considerations
 - The service expects an external LLM API (typically Ollama) for core functionality

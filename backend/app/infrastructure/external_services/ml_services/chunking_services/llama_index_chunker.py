@@ -7,10 +7,9 @@ import time
 from dataclasses import dataclass, field, fields
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 from uuid import uuid4
+from llama_index.core.embeddings import BaseEmbedding
 
-from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
 from app.domain.exceptions import ChunkingDependencyError, ChunkGenerationError
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -109,10 +108,23 @@ class LlamaIndexChunker:
         self,
         config: Optional[LlamaIndexChunkerConfig] = None,
         *,
+        embed_model: BaseEmbedding,
         require_llama_index: bool = False,
     ) -> None:
+        """Initialize semantic chunker with pre-initialized embedding model.
+
+        Args:
+            config: Chunking configuration. Defaults to LlamaIndexChunkerConfig().
+            embed_model: Pre-initialized HuggingFaceEmbedding model instance.
+                        MANDATORY - ensures single model initialization per pipeline.
+            require_llama_index: Raise error if llama_index unavailable
+
+        Raises:
+            ChunkingDependencyError: If llama_index unavailable and required
+        """
         self.config = config or LlamaIndexChunkerConfig()
         self.config.validate()
+        self._embed_model = embed_model
         self._llama_available = _LlamaDocument is not None and _SentenceSplitter is not None
         if require_llama_index and not self._llama_available:
             raise ChunkingDependencyError("llama_index is not installed")
@@ -196,16 +208,11 @@ class LlamaIndexChunker:
                 threshold = self.config.semantic_breakpoint_threshold
                 threshold_int = int(threshold * 100) if threshold <= 1.0 else int(threshold)
 
-                # Use configured embedding model for semantic chunking
-                embedding_config = EmbeddingModelConfig.default()
-                embed_model = HuggingFaceEmbedding(
-                    model_name=embedding_config.model_name,
-                    trust_remote_code=True  # Required for Alibaba-NLP models
-                )
-
+                # Use pre-initialized embedding model (injected via constructor)
+                # This ensures model is created ONCE and reused across all documents
                 semantic_parser = _SemanticSplitter.from_defaults(  # type: ignore[attr-defined]
                     breakpoint_percentile_threshold=threshold_int,
-                    embed_model=embed_model,
+                    embed_model=self._embed_model,
                 )
                 nodes = semantic_parser.get_nodes_from_documents([document])
             except Exception as exc:  # pragma: no cover - semantic splitter optional

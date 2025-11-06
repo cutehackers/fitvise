@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -88,9 +89,11 @@ from app.infrastructure.external_services.data_sources.database_connectors impor
 from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
+from app.infrastructure.ml_services import MLServicesContainer
 from app.config.ml_models import get_chunking_config
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
+from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +130,7 @@ class IngestionPhase:
     def __init__(
         self,
         document_repository: DocumentRepository,
+        ml_services: MLServicesContainer,
         data_source_repository: Optional[DataSourceRepository] = None,
         verbose: bool = False,
     ):
@@ -136,10 +140,13 @@ class IngestionPhase:
             document_repository: Shared document repository instance (required).
                                 Should be provided by the workflow orchestrator
                                 to ensure data continuity across pipeline phases.
+            ml_services: ML services container with embedding model.
+                        Ensures single embedding model initialization.
             data_source_repository: Optional shared data source repository
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
+        self.ml_services = ml_services
         self.data_source_repository = data_source_repository
         self.verbose = verbose
 
@@ -169,7 +176,10 @@ class IngestionPhase:
             audit_sources=AuditDataSourcesUseCase(repository),
             categorize_sources=CategorizeSourcesUseCase(repository, SklearnDocumentCategorizer()),
             document_apis=DocumentExternalApisUseCase(repository),
-            chunk_documents=SemanticChunkingUseCase(document_repository=self.document_repository),
+            chunk_documents=SemanticChunkingUseCase(
+                document_repository=self.document_repository,
+                embedding_model=self.ml_services.embedding_model,  # Use injected embedding model
+            ),
         )
 
     def _guess_content_type(self, path: Path) -> Optional[str]:
@@ -1074,6 +1084,8 @@ class IngestionPhase:
                 logger.debug(f"🔧 INGESTION VERBOSE: Chunking config - replace_existing: {replace_existing}")
                 logger.debug(f"🔧 INGESTION VERBOSE: Starting semantic chunking for {len(processed_document_ids)} documents")
 
+            # Priority 3: Add timing instrumentation
+            chunk_start = time.perf_counter()
             chunk_response = await use_cases.chunk_documents.execute(
                 SemanticChunkingRequest(
                     document_ids=processed_document_ids,
@@ -1083,13 +1095,18 @@ class IngestionPhase:
                     metadata_overrides=metadata_overrides,
                 )
             )
+            chunk_duration = time.perf_counter() - chunk_start
 
             if self.verbose:
-                logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - results: {len(chunk_response.results)}, total_chunks: {chunk_response.total_chunks}")
+                logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed in {chunk_duration:.2f}s - results: {len(chunk_response.results)}, total_chunks: {chunk_response.total_chunks}")
+                if chunk_response.total_chunks > 0:
+                    avg_time_per_chunk = chunk_duration / chunk_response.total_chunks
+                    logger.debug(f"🔧 INGESTION VERBOSE: Performance - {chunk_response.total_chunks / chunk_duration:.1f} chunks/sec, {avg_time_per_chunk * 1000:.2f}ms per chunk")
                 if hasattr(chunk_response, 'results') and chunk_response.results:
                     for result in chunk_response.results[:3]:  # Log first 3 results to avoid spam
-                        if hasattr(result, 'document_id') and hasattr(result, 'chunks'):
-                            logger.debug(f"🔧 INGESTION VERBOSE: Document {result.document_id}: {len(result.chunks)} chunks")
+                        logger.debug(f"🔧 INGESTION VERBOSE: Document {result.document_id}: {result.chunk_count} chunks")
+            else:
+                logger.info(f"Semantic chunking completed: {chunk_response.total_chunks} chunks in {chunk_duration:.2f}s ({chunk_response.total_chunks / chunk_duration:.1f} chunks/sec)")
 
             summary.update(
                 {

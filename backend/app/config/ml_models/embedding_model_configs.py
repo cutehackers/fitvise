@@ -90,13 +90,18 @@ class EmbeddingModelConfig:
     @classmethod
     def for_batch_processing(
         cls,
-        batch_size: int = 32,
+        batch_size: int = 64,
         show_progress: bool = True,
     ) -> EmbeddingModelConfig:
-        """Create configuration optimized for batch processing.
+        """Create configuration optimized for batch processing (Priority 4).
+
+        Optimized for ingestion pipeline chunking operations with:
+        - Larger batch size (64 vs 32) for better throughput
+        - Increased worker threads for I/O parallelism
+        - Hybrid caching for memory efficiency
 
         Args:
-            batch_size: Number of texts to process in parallel
+            batch_size: Number of texts to process in parallel (default: 64)
             show_progress: Whether to show progress bars
 
         Returns:
@@ -106,7 +111,7 @@ class EmbeddingModelConfig:
             batch_size=batch_size,
             show_progress=show_progress,
             cache_strategy=CacheStrategy.HYBRID,
-            num_workers=4,
+            num_workers=6,  # Increased from 4 for better parallelism
         )
 
     @classmethod

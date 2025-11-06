@@ -22,6 +22,7 @@ from app.pipeline.contracts import RunSummary
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.ml_services import MLServicesContainer
 from app.core.settings import Settings, get_settings
 from scripts.rag_summary import (
     RagIngestionSummary,
@@ -62,6 +63,7 @@ class RAGWorkflow:
     def __init__(
         self,
         repositories: Optional[RepositoryBundle] = None,
+        ml_services: Optional[MLServicesContainer] = None,
         session: Optional[AsyncSession] = None,
         verbose: bool = False,
     ):
@@ -70,6 +72,8 @@ class RAGWorkflow:
         Args:
             repositories: Optional pre-configured repository bundle.
                          If not provided, creates repositories based on session parameter.
+            ml_services: Optional pre-configured ML services container.
+                        If not provided, creates new container with settings.
             session: Optional database session for SQLAlchemy repositories.
                     If provided without repositories, creates SQLAlchemy-based bundle.
                     If neither provided, creates in-memory repositories.
@@ -87,10 +91,18 @@ class RAGWorkflow:
         else:
             self.repositories = repositories
 
-        # Initialize phases with shared repositories
+        # Initialize or use provided ML services
+        if ml_services is None:
+            settings = get_settings()
+            self.ml_services = MLServicesContainer(settings)
+        else:
+            self.ml_services = ml_services
+
+        # Initialize phases with shared repositories and ML services
         self.infrastructure_phase = InfrastructurePhase(verbose=verbose)
         self.ingestion_phase = IngestionPhase(
             document_repository=self.repositories.document_repository,
+            ml_services=self.ml_services,
             data_source_repository=self.repositories.data_source_repository,
             verbose=verbose,
         )

@@ -1,6 +1,6 @@
 """RAG Workflow Orchestrator.
 
-This module provides a unified workflow class that orchestrates all phases
+This module provides a unified workflow class that orchestrates all tasks
 of the RAG pipeline with proper dependency injection and shared repository state.
 """
 
@@ -15,9 +15,16 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.pipeline.config import PipelineSpec
-from app.pipeline.phases import InfrastructurePhase, IngestionPhase, EmbeddingPhase
-from app.pipeline.phases.infrastructure_phase import InfrastructureValidationResult
-from app.pipeline.phases.embedding_phase import EmbeddingResult
+from app.pipeline.phases import RagInfrastructureTask, RagIngestionTask, RagEmbeddingTask
+from app.pipeline.phases.infrastructure_task import (
+    InfrastructureResult,
+    RagInfrastructureTaskReport,
+)
+from app.pipeline.phases.embedding_task import (
+    EmbeddingResult,
+    RagEmbeddingTaskReport,
+)
+from app.pipeline.phases.ingestion_task import RagIngestionTaskReport
 from app.pipeline.contracts import RunSummary
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
@@ -25,13 +32,10 @@ from app.infrastructure.repositories.container import RepositoryContainer
 from app.infrastructure.ml_services import MLServicesContainer
 from app.core.settings import Settings, get_settings
 from scripts.rag_summary import (
-    RagIngestionSummary,
+    RagBuildSummary,
     create_infrastructure_phase_result,
     create_ingestion_phase_result,
     create_embedding_phase_result,
-    InfrastructureResults,
-    IngestionResults,
-    EmbeddingResults,
 )
 
 logger = logging.getLogger(__name__)
@@ -52,12 +56,12 @@ class RepositoryBundle:
 class RAGWorkflow:
     """Orchestrates the complete RAG build pipeline with dependency injection.
 
-    This class coordinates all three phases of the RAG pipeline:
+    This class coordinates all three tasks of the RAG pipeline:
     1. Infrastructure validation
     2. Document ingestion and processing
     3. Embedding generation and storage
 
-    All phases share the same repository instances to ensure data continuity.
+    All tasks share the same repository instances to ensure data continuity.
     """
 
     def __init__(
@@ -98,21 +102,21 @@ class RAGWorkflow:
         else:
             self.ml_services = ml_services
 
-        # Initialize phases with shared repositories and ML services
-        self.infrastructure_phase = InfrastructurePhase(verbose=verbose)
-        self.ingestion_phase = IngestionPhase(
+        # Initialize tasks with shared repositories and ML services
+        self.infrastructure_phase = RagInfrastructureTask(verbose=verbose)
+        self.ingestion_phase = RagIngestionTask(
             document_repository=self.repositories.document_repository,
             ml_services=self.ml_services,
             data_source_repository=self.repositories.data_source_repository,
             verbose=verbose,
         )
-        self.embedding_phase = EmbeddingPhase(
+        self.embedding_phase = RagEmbeddingTask(
             document_repository=self.repositories.document_repository,
             verbose=verbose,
         )
 
         # Summary tracking
-        self.summary = RagIngestionSummary()
+        self.summary = RagBuildSummary()
         self.start_time: Optional[datetime] = None
 
     @staticmethod
@@ -140,53 +144,43 @@ class RAGWorkflow:
 
     async def run_infrastructure_check(
         self, spec: PipelineSpec
-    ) -> InfrastructureValidationResult:
-        """Run Phase 1: Infrastructure validation independently.
+    ) -> RagInfrastructureTaskReport:
+        """Run Task 1: Infrastructure validation independently.
 
         Args:
             spec: Pipeline specification
 
         Returns:
-            InfrastructureValidationResult
-
-        Raises:
-            InfrastructureValidationError: If critical validation fails
+            RagInfrastructureTaskReport with task execution results and timing
         """
-        logger.info("🔧 Phase 1: Infrastructure Setup and Validation")
-        phase_start = datetime.now(timezone.utc)
+        logger.info("🔧 Task 1: Infrastructure Setup and Validation")
 
         try:
-            result = await self.infrastructure_phase.execute(spec)
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
+            # Phase now returns TaskReport directly
+            task_report = await self.infrastructure_phase.execute(spec)
 
             logger.info(
-                f"✅ Phase 1 completed in {execution_time:.2f}s"
+                f"✅ Task 1 completed in {task_report.execution_time_seconds:.2f}s"
             )
-            return result
+            return task_report
 
         except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-            logger.error(
-                f"❌ Phase 1 failed after {execution_time:.2f}s: {str(e)}"
-            )
+            logger.error(f"❌ Task 1 failed: {str(e)}")
             raise
 
     async def run_ingestion(
         self, spec: PipelineSpec, dry_run: bool = False
-    ) -> RunSummary:
-        """Run Phase 2: Document ingestion independently.
+    ) -> RagIngestionTaskReport:
+        """Run Task 2: Document ingestion independently.
 
         Args:
             spec: Pipeline specification
             dry_run: Run in dry-run mode (skip actual storage)
 
         Returns:
-            RunSummary with processing results
+            RagIngestionTaskReport with task execution results and timing
         """
-        logger.info("📄 Phase 2: Document Ingestion and Processing")
-        phase_start = datetime.now(timezone.utc)
+        logger.info("📄 Task 2: Document Ingestion and Processing")
 
         try:
             # Override storage for dry run
@@ -197,21 +191,21 @@ class RAGWorkflow:
                 data["storage"]["provider"] = "local"
                 spec = PipelineSpec.model_validate(data)
 
-            result = await self.ingestion_phase.execute(spec, dry_run=dry_run)
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
+            # Phase now returns TaskReport directly
+            task_report = await self.ingestion_phase.execute(spec, dry_run=dry_run)
 
-            logger.info(
-                f"✅ Phase 2 completed in {execution_time:.2f}s: {result.processed} documents processed"
+            documents_processed = (
+                task_report.phase_result.processed
+                if task_report.phase_result
+                else 0
             )
-            return result
+            logger.info(
+                f"✅ Task 2 completed in {task_report.execution_time_seconds:.2f}s: {documents_processed} documents processed"
+            )
+            return task_report
 
         except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-            logger.error(
-                f"❌ Phase 2 failed after {execution_time:.2f}s: {str(e)}"
-            )
+            logger.error(f"❌ Task 2 failed: {str(e)}")
             raise
 
     async def run_embedding(
@@ -219,8 +213,8 @@ class RAGWorkflow:
         spec: PipelineSpec,
         batch_size: int = 32,
         document_limit: Optional[int] = None,
-    ) -> EmbeddingResult:
-        """Run Phase 3: Embedding generation independently.
+    ) -> RagEmbeddingTaskReport:
+        """Run Task 3: Embedding generation independently.
 
         Args:
             spec: Pipeline specification
@@ -228,13 +222,13 @@ class RAGWorkflow:
             document_limit: Optional limit on documents to process
 
         Returns:
-            EmbeddingResult with comprehensive statistics
+            RagEmbeddingTaskReport with task execution results and timing
         """
-        logger.info("🔢 Phase 3: Embedding Generation and Storage")
-        phase_start = datetime.now(timezone.utc)
+        logger.info("🔢 Task 3: Embedding Generation and Storage")
 
         try:
-            result = await self.embedding_phase.execute(
+            # Phase now returns TaskReport directly
+            task_report = await self.embedding_phase.execute(
                 spec=spec,
                 batch_size=batch_size,
                 deduplication_enabled=True,
@@ -242,20 +236,19 @@ class RAGWorkflow:
                 show_progress=not self.verbose,
                 document_limit=document_limit,
             )
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
 
-            logger.info(
-                f"✅ Phase 3 completed in {execution_time:.2f}s: {result.embeddings_stored} embeddings stored"
+            embeddings_stored = (
+                task_report.phase_result.embeddings_stored
+                if task_report.phase_result
+                else 0
             )
-            return result
+            logger.info(
+                f"✅ Task 3 completed in {task_report.execution_time_seconds:.2f}s: {embeddings_stored} embeddings stored"
+            )
+            return task_report
 
         except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-            logger.error(
-                f"❌ Phase 3 failed after {execution_time:.2f}s: {str(e)}"
-            )
+            logger.error(f"❌ Task 3 failed: {str(e)}")
             raise
 
     async def run_complete_pipeline(
@@ -265,8 +258,8 @@ class RAGWorkflow:
         batch_size: int = 32,
         document_limit: Optional[int] = None,
         output_dir: Optional[str] = None,
-    ) -> RagIngestionSummary:
-        """Run the complete RAG pipeline (all 3 phases sequentially).
+    ) -> RagBuildSummary:
+        """Run the complete RAG pipeline (all 3 tasks sequentially).
 
         Args:
             spec: Pipeline specification
@@ -276,7 +269,7 @@ class RAGWorkflow:
             output_dir: Directory to save reports and outputs
 
         Returns:
-            RagIngestionSummary with comprehensive results from all phases
+            RagBuildSummary with comprehensive results from all tasks
         """
         self.start_time = datetime.now(timezone.utc)
         self.summary.mark_started()
@@ -292,13 +285,13 @@ class RAGWorkflow:
             output_path.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Phase 1: Infrastructure Validation
+            # Task 1: Infrastructure Validation
             await self._run_infrastructure_with_tracking(spec, output_dir)
 
-            # Phase 2: Document Ingestion
+            # Task 2: Document Ingestion
             await self._run_ingestion_with_tracking(spec, dry_run, output_dir)
 
-            # Phase 3: Embedding Generation
+            # Task 3: Embedding Generation
             await self._run_embedding_with_tracking(
                 spec, batch_size, document_limit, output_dir
             )
@@ -328,112 +321,79 @@ class RAGWorkflow:
     async def _run_infrastructure_with_tracking(
         self, spec: PipelineSpec, output_dir: Optional[str]
     ) -> None:
-        """Run infrastructure phase with result tracking."""
-        phase_start = datetime.now(timezone.utc)
-
+        """Run infrastructure task with result tracking."""
         try:
-            validation_result = await self.infrastructure_phase.execute(spec)
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
+            # Phase now returns TaskReport directly with all timing
+            task_report = await self.infrastructure_phase.execute(spec)
 
-            # Create phase result
+            # Extract validation result from task report
+            validation_result = task_report.phase_result
+            if not validation_result:
+                raise ValueError("Infrastructure phase returned no result")
+
+            # Create phase result (for backward compatibility with RagBuildSummary)
             phase_result = create_infrastructure_phase_result(
-                success=validation_result.success,
-                execution_time=execution_time,
+                success=task_report.success,
+                execution_time=task_report.execution_time_seconds,
                 validation_results=validation_result.validation_results,
                 errors=validation_result.errors,
                 warnings=validation_result.warnings,
-                start_time=phase_start,
-                end_time=phase_end,
+                start_time=task_report.start_time,
+                end_time=task_report.end_time,
             )
 
-            # Create infrastructure-specific results
-            infra_results = InfrastructureResults(
-                embedding_service_status=validation_result.validation_results.get(
-                    "embedding_service", {}
-                ),
-                weaviate_status=validation_result.validation_results.get(
-                    "weaviate_schema", {}
-                ),
-                object_storage_status=validation_result.validation_results.get(
-                    "object_storage", {}
-                ),
-                configuration_status=validation_result.validation_results.get(
-                    "configuration", {}
-                ),
-            )
-
+            # Add to summary tracking
             self.summary.add_phase_result(phase_result)
-            self.summary.set_infrastructure_results(infra_results)
+            self.summary.infrastructure_task_report = task_report
 
             # Save phase-specific report
             if output_dir:
                 self._save_phase_report(
-                    output_dir, "phase_1_infrastructure.json", phase_result.as_dict()
+                    output_dir, "task_1_infrastructure.json", task_report.as_dict()
                 )
 
-            logger.info("✅ Phase 1 completed successfully")
-
-        except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-
-            phase_result = create_infrastructure_phase_result(
-                success=False,
-                execution_time=execution_time,
-                validation_results={},
-                errors=[str(e)],
-                warnings=[],
-                start_time=phase_start,
-                end_time=phase_end,
+            logger.info(
+                f"✅ Task 1 completed in {task_report.execution_time_seconds:.2f}s"
             )
 
-            self.summary.add_phase_result(phase_result)
+        except Exception as e:
+            logger.error(f"❌ Task 1 failed: {str(e)}")
             raise
 
     async def _run_ingestion_with_tracking(
         self, spec: PipelineSpec, dry_run: bool, output_dir: Optional[str]
     ) -> None:
-        """Run ingestion phase with result tracking."""
-        phase_start = datetime.now(timezone.utc)
-
+        """Run ingestion task with result tracking."""
         try:
-            ingestion_summary = await self.ingestion_phase.execute(spec, dry_run)
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
+            # Phase now returns TaskReport directly with all timing
+            task_report = await self.ingestion_phase.execute(spec, dry_run=dry_run)
 
-            # Create phase result
+            # Extract ingestion summary from task report
+            ingestion_summary = task_report.phase_result
+            if not ingestion_summary:
+                raise ValueError("Ingestion phase returned no result")
+
+            # Create phase result (for backward compatibility with RagBuildSummary)
             phase_result = create_ingestion_phase_result(
-                success=ingestion_summary.processed > 0,
-                execution_time=execution_time,
+                success=task_report.success,
+                execution_time=task_report.execution_time_seconds,
                 pipeline_summary=ingestion_summary.as_dict(),
                 errors=[
                     str(error.get("message", error))
                     for error in ingestion_summary.errors
                 ],
-                start_time=phase_start,
-                end_time=phase_end,
+                start_time=task_report.start_time,
+                end_time=task_report.end_time,
             )
 
-            # Create ingestion-specific results
-            counters = ingestion_summary.counters
-            ingestion_results = IngestionResults(
-                documents_discovered=counters.get("discovered", 0),
-                documents_processed=ingestion_summary.processed,
-                documents_skipped=ingestion_summary.skipped,
-                documents_failed=ingestion_summary.failed,
-                chunks_generated=counters.get("chunking", {}).get("total_chunks", 0),
-                storage_objects_created=len(ingestion_summary.stored),
-                processing_errors=[str(error) for error in ingestion_summary.errors],
-            )
-
+            # Add to summary tracking
             self.summary.add_phase_result(phase_result)
-            self.summary.set_ingestion_results(ingestion_results)
+            self.summary.ingestion_task_report = task_report
 
             # Save phase-specific reports
             if output_dir:
                 self._save_phase_report(
-                    output_dir, "phase_2_ingestion.json", phase_result.as_dict()
+                    output_dir, "task_2_ingestion.json", task_report.as_dict()
                 )
                 self._save_phase_report(
                     output_dir,
@@ -443,25 +403,13 @@ class RAGWorkflow:
 
             if ingestion_summary.processed > 0:
                 logger.info(
-                    f"✅ Phase 2 completed: {ingestion_summary.processed} documents processed"
+                    f"✅ Task 2 completed in {task_report.execution_time_seconds:.2f}s: {ingestion_summary.processed} documents processed"
                 )
             else:
-                logger.warning("⚠️ Phase 2 completed but no documents were processed")
+                logger.warning("⚠️ Task 2 completed but no documents were processed")
 
         except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-
-            phase_result = create_ingestion_phase_result(
-                success=False,
-                execution_time=execution_time,
-                pipeline_summary={},
-                errors=[str(e)],
-                start_time=phase_start,
-                end_time=phase_end,
-            )
-
-            self.summary.add_phase_result(phase_result)
+            logger.error(f"❌ Task 2 failed: {str(e)}")
             raise
 
     async def _run_embedding_with_tracking(
@@ -471,11 +419,10 @@ class RAGWorkflow:
         document_limit: Optional[int],
         output_dir: Optional[str],
     ) -> None:
-        """Run embedding phase with result tracking."""
-        phase_start = datetime.now(timezone.utc)
-
+        """Run embedding task with result tracking."""
         try:
-            embedding_result = await self.embedding_phase.execute(
+            # Phase now returns TaskReport directly with all timing
+            task_report = await self.embedding_phase.execute(
                 spec=spec,
                 batch_size=batch_size,
                 deduplication_enabled=True,
@@ -483,37 +430,30 @@ class RAGWorkflow:
                 show_progress=not self.verbose,
                 document_limit=document_limit,
             )
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
 
-            # Create phase result
+            # Extract embedding result from task report
+            embedding_result = task_report.phase_result
+            if not embedding_result:
+                raise ValueError("Embedding phase returned no result")
+
+            # Create phase result (for backward compatibility with RagBuildSummary)
             phase_result = create_embedding_phase_result(
-                success=embedding_result.success,
-                execution_time=execution_time,
+                success=task_report.success,
+                execution_time=task_report.execution_time_seconds,
                 embedding_result=embedding_result.as_dict(),
                 errors=embedding_result.errors,
-                start_time=phase_start,
-                end_time=phase_end,
+                start_time=task_report.start_time,
+                end_time=task_report.end_time,
             )
 
-            # Create embedding-specific results
-            embedding_results = EmbeddingResults(
-                documents_processed=embedding_result.documents_processed,
-                total_chunks=embedding_result.total_chunks,
-                unique_chunks=embedding_result.unique_chunks,
-                duplicates_removed=embedding_result.duplicates_removed,
-                embeddings_generated=embedding_result.embeddings_generated,
-                embeddings_stored=embedding_result.embeddings_stored,
-                deduplication_stats=embedding_result.deduplication_stats,
-            )
-
+            # Add to summary tracking
             self.summary.add_phase_result(phase_result)
-            self.summary.set_embedding_results(embedding_results)
+            self.summary.embedding_task_report = task_report
 
             # Save phase-specific reports
             if output_dir:
                 self._save_phase_report(
-                    output_dir, "phase_3_embedding.json", phase_result.as_dict()
+                    output_dir, "task_3_embedding.json", task_report.as_dict()
                 )
                 self._save_phase_report(
                     output_dir, "embedding_detailed.json", embedding_result.as_dict()
@@ -521,28 +461,16 @@ class RAGWorkflow:
 
             if embedding_result.success:
                 logger.info(
-                    f"✅ Phase 3 completed: {embedding_result.embeddings_stored} embeddings stored"
+                    f"✅ Task 3 completed in {task_report.execution_time_seconds:.2f}s: {embedding_result.embeddings_stored} embeddings stored"
                 )
             else:
-                logger.error("❌ Phase 3 failed")
+                logger.error("❌ Task 3 failed")
                 raise Exception(
                     f"Embedding pipeline failed with {len(embedding_result.errors)} errors"
                 )
 
         except Exception as e:
-            phase_end = datetime.now(timezone.utc)
-            execution_time = (phase_end - phase_start).total_seconds()
-
-            phase_result = create_embedding_phase_result(
-                success=False,
-                execution_time=execution_time,
-                embedding_result={},
-                errors=[str(e)],
-                start_time=phase_start,
-                end_time=phase_end,
-            )
-
-            self.summary.add_phase_result(phase_result)
+            logger.error(f"❌ Task 3 failed: {str(e)}")
             raise
 
     def _save_phase_report(
@@ -560,13 +488,13 @@ class RAGWorkflow:
         output_path = Path(output_dir)
 
         # Save main summary
-        main_report_path = output_path / "rag_ingestion_summary.json"
+        main_report_path = output_path / "rag_build_summary.json"
         self.summary.save_to_file(str(main_report_path))
 
         # Save human-readable report
-        readable_report_path = output_path / "rag_ingestion_report.txt"
+        readable_report_path = output_path / "rag_build_report.txt"
         with open(readable_report_path, "w") as f:
-            f.write(f"RAG Ingestion Pipeline Report\n")
+            f.write(f"RAG Build Pipeline Report\n")
             f.write(f"Generated: {datetime.now(timezone.utc).isoformat()}\n")
             f.write("=" * 80 + "\n\n")
             f.write(self.summary.as_json(indent=2))

@@ -4,11 +4,11 @@ Complete modular RAG ingestion pipeline with 3 phases: infrastructure validation
 
 ## Overview
 
-The RAG Build Pipeline is designed to process documents through a complete ingestion workflow with a clean 4-layer architecture that supports dependency injection and independent phase execution:
+The RAG Build Pipeline is designed to process documents through a complete ingestion workflow with a clean 4-layer architecture that supports dependency injection and independent task execution:
 
-1. **Phase 1: Infrastructure Setup and Validation** (`InfrastructurePhase`)
-2. **Phase 2: Document Ingestion and Processing** (`IngestionPhase`)
-3. **Phase 3: Embedding Generation and Storage** (`EmbeddingPhase`)
+1. **Task 1: Infrastructure Setup and Validation** (`RagInfrastructureTask`)
+2. **Task 2: Document Ingestion and Processing** (`RagIngestionTask`)
+3. **Task 3: Embedding Generation and Storage** (`RagEmbeddingTask`)
 
 All phases are coordinated by the `RAGWorkflow` orchestrator, which ensures proper dependency injection and data continuity across phases.
 
@@ -23,10 +23,10 @@ Layer 1: Repository Interfaces (Domain)
 ├── DocumentRepository (abstract)
 └── DataSourceRepository (abstract)
 
-Layer 2: Phase Classes (Pipeline Logic)
-├── InfrastructurePhase (app/pipeline/phases/infrastructure_phase.py)
-├── IngestionPhase (app/pipeline/phases/ingestion_phase.py)
-└── EmbeddingPhase (app/pipeline/phases/embedding_phase.py)
+Layer 2: Task Classes (Pipeline Logic)
+├── RagInfrastructureTask (app/pipeline/phases/infrastructure_task.py)
+├── RagIngestionTask (app/pipeline/phases/ingestion_task.py)
+└── RagEmbeddingTask (app/pipeline/phases/embedding_task.py)
 
 Layer 3: Workflow Orchestrator (Coordination)
 └── RAGWorkflow (app/pipeline/workflow.py)
@@ -260,13 +260,13 @@ When using `--output-dir`, the pipeline creates:
 
 ```
 ./reports/
-├── rag_ingestion_summary.json     # Main summary report
-├── rag_ingestion_report.txt       # Human-readable report
-├── phase_1_infrastructure.json    # Phase 1 detailed results
-├── phase_2_ingestion.json         # Phase 2 detailed results
-├── phase_3_embedding.json         # Phase 3 detailed results
-├── ingestion_detailed.json         # Complete ingestion summary
-└── embedding_detailed.json         # Complete embedding summary
+├── rag_build_summary.json         # Main summary report
+├── rag_build_report.txt           # Human-readable report
+├── task_1_infrastructure.json     # Task 1 detailed results
+├── task_2_ingestion.json          # Task 2 detailed results
+├── task_3_embedding.json          # Task 3 detailed results
+├── ingestion_detailed.json        # Complete ingestion summary
+└── embedding_detailed.json        # Complete embedding summary
 ```
 
 ## Example Workflow
@@ -312,7 +312,7 @@ python scripts/build_rag_pipeline.py \
 The pipeline will print a summary like:
 
 ```
-🚀 RAG Ingestion Pipeline - EXECUTION SUMMARY
+🚀 RAG Build Pipeline - EXECUTION SUMMARY
 ===============================================================================
 Status: ✅ SUCCESS
 Execution Time: 2m 15.30s
@@ -327,10 +327,10 @@ Embeddings Stored: 125
 Average Chunks per Document: 8.47
 Embedding Success Rate: 98.43%
 
-📋 PHASE RESULTS:
-  ✅ Phase Infrastructure Setup: 3.21s
-  ✅ Phase Document Ingestion: 45.67s
-  ✅ Phase Embedding Generation: 86.42s
+📋 TASK RESULTS:
+  ✅ Infrastructure Setup: 3.21s
+  ✅ Document Ingestion: 45.67s
+  ✅ Embedding Generation: 86.42s
 ```
 
 ## Troubleshooting
@@ -408,7 +408,7 @@ python scripts/build_rag_pipeline.py --config my_rag_pipeline.yaml --phases embe
 
 ## Phase Implementation Details
 
-### Phase 1: InfrastructurePhase (`app/pipeline/phases/infrastructure_phase.py`)
+### Task 1: RagInfrastructureTask (`app/pipeline/phases/infrastructure_task.py`)
 
 **Responsibilities**:
 - Validates embedding model (`Alibaba-NLP/gte-multilingual-base`)
@@ -425,7 +425,7 @@ async def execute(self, spec: PipelineSpec) -> InfrastructureValidationResult:
 
 **Dependencies**: None (stateless validation)
 
-### Phase 2: IngestionPhase (`app/pipeline/phases/ingestion_phase.py`)
+### Task 2: RagIngestionTask (`app/pipeline/phases/ingestion_task.py`)
 
 **Responsibilities**:
 - Discovers documents based on configured patterns
@@ -445,7 +445,7 @@ async def execute(self, spec: PipelineSpec, dry_run: bool = False) -> RunSummary
 - `document_repository: DocumentRepository` - **Shared instance for data continuity**
 - `data_source_repository: Optional[DataSourceRepository]`
 
-### Phase 3: EmbeddingPhase (`app/pipeline/phases/embedding_phase.py`)
+### Task 3: RagEmbeddingTask (`app/pipeline/phases/embedding_task.py`)
 
 **Responsibilities**:
 - Retrieves processed documents from **shared repository** (continuity from Phase 2)
@@ -490,12 +490,12 @@ repositories = RepositoryBundle(
     data_source_repository=InMemoryDataSourceRepository(),
 )
 
-# Workflow injects into phase classes
-self.ingestion_phase = IngestionPhase(
+# Workflow injects into task classes
+self.ingestion_phase = RagIngestionTask(
     document_repository=self.repositories.document_repository,  # Shared
     data_source_repository=self.repositories.data_source_repository,
 )
-self.embedding_phase = EmbeddingPhase(
+self.embedding_phase = RagEmbeddingTask(
     document_repository=self.repositories.document_repository,  # Same instance!
 )
 
@@ -524,15 +524,15 @@ app/pipeline/
 ├── contracts.py (data contracts)
 ├── workflow.py (orchestration)
 └── phases/
-    ├── infrastructure_phase.py (self-contained)
-    ├── ingestion_phase.py (1086 lines - fully self-contained!)
-    └── embedding_phase.py (self-contained)
+    ├── infrastructure_task.py (self-contained)
+    ├── ingestion_task.py (1086 lines - fully self-contained!)
+    └── embedding_task.py (self-contained)
 ```
 
 **Benefits**:
-- ✅ **Self-contained phases**: All logic in phase classes, no external dependencies
+- ✅ **Self-contained tasks**: All logic in task classes, no external dependencies
 - ✅ **Single CLI entry point**: One script with flexible `--phases` flag
-- ✅ **No extra layers**: Direct phase → workflow relationship
+- ✅ **No extra layers**: Direct task → workflow relationship
 - ✅ **Clean architecture**: Clear responsibility boundaries
 - ✅ **Production ready**: Clean architecture suitable for launch
 
@@ -540,21 +540,21 @@ app/pipeline/
 ## Quality Improvements
 
 ### Architecture Quality
-- ✅ **No External Orchestrator**: Phase classes are truly self-contained
+- ✅ **No External Orchestrator**: Task classes are truly self-contained
 - ✅ **Single Entry Point**: One CLI script instead of four
-- ✅ **Flexible Execution**: Run any combination of phases via `--phases` flag
-- ✅ **Clear Boundaries**: No confusing phase → orchestrator → implementation flow
+- ✅ **Flexible Execution**: Run any combination of tasks via `--phases` flag
+- ✅ **Clear Boundaries**: No confusing task → orchestrator → implementation flow
 - ✅ **Production Ready**: Clean architecture suitable for launch
 
 ### Code Organization
-- ✅ **Logical Grouping**: All ingestion logic in `IngestionPhase` class
+- ✅ **Logical Grouping**: All ingestion logic in `RagIngestionTask` class
 - ✅ **Instance Methods**: Helper functions converted to instance methods for clarity
 - ✅ **No Globals**: All state managed through dependency injection
-- ✅ **Consistent Pattern**: All three phases follow same self-contained pattern
+- ✅ **Consistent Pattern**: All three tasks follow same self-contained pattern
 
 ### Developer Experience
 - ✅ **Simpler Codebase**: One place to look for ingestion logic
-- ✅ **Easier Testing**: Can test `IngestionPhase` directly without orchestrator
+- ✅ **Easier Testing**: Can test `RagIngestionTask` directly without orchestrator
 - ✅ **Better Documentation**: README reflects actual architecture
 - ✅ **Clear Migration Path**: Straightforward command updates
 
@@ -581,8 +581,8 @@ The pipeline leverages your existing components:
 - `WeaviateClient`: Vector storage
 
 **Workflow Integration**:
-- `InfrastructurePhase` → delegates to `SetupEmbeddingInfrastructureUseCase`
-- `IngestionPhase` → delegates to `run_pipeline()` with injected repositories
-- `EmbeddingPhase` → delegates to `BuildIngestionPipelineUseCase` with injected repositories
+- `RagInfrastructureTask` → delegates to `SetupEmbeddingInfrastructureUseCase`
+- `RagIngestionTask` → delegates to `run_pipeline()` with injected repositories
+- `RagEmbeddingTask` → delegates to `BuildIngestionPipelineUseCase` with injected repositories
 
-This modular design allows you to run the complete pipeline or individual phases as needed, with comprehensive reporting and error handling throughout.
+This modular design allows you to run the complete pipeline or individual tasks as needed, with comprehensive reporting and error handling throughout.

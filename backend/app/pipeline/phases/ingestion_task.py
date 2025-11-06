@@ -117,8 +117,47 @@ class UseCaseBundle:
     chunk_documents: SemanticChunkingUseCase
 
 
-class IngestionPhase:
-    """Phase 2: Document Ingestion and Processing.
+@dataclass
+class RagIngestionTaskReport:
+    """Report for document ingestion and processing task execution.
+
+    Wraps RunSummary with timing metadata.
+    """
+
+    success: bool = False
+    execution_time_seconds: float = 0.0
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    phase_result: Optional[RunSummary] = None
+    total_errors: int = 0
+    total_warnings: int = 0
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        result_dict = {}
+        if self.phase_result and hasattr(self.phase_result, 'as_dict'):
+            result_dict = self.phase_result.as_dict()
+        elif self.phase_result:
+            result_dict = self.phase_result.__dict__
+
+        return {
+            "task_name": "Document Ingestion",
+            "success": self.success,
+            "execution_time_seconds": round(self.execution_time_seconds, 2),
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "phase_result": result_dict,
+            "total_errors": self.total_errors,
+            "total_warnings": self.total_warnings
+        }
+
+    def as_json(self, indent: int = 2) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.as_dict(), indent=indent, default=str)
+
+
+class RagIngestionTask:
+    """Task 2: Document Ingestion and Processing.
 
     Handles document discovery, processing, normalization, chunking,
     and storage to prepare documents for embedding.
@@ -1134,7 +1173,7 @@ class IngestionPhase:
 
     async def execute(
         self, spec: PipelineSpec, dry_run: bool = False
-    ) -> RunSummary:
+    ) -> RagIngestionTaskReport:
         """Execute document ingestion phase.
 
         Coordinates the complete ingestion workflow:
@@ -1148,8 +1187,9 @@ class IngestionPhase:
             dry_run: Run in dry-run mode (skip actual storage)
 
         Returns:
-            RunSummary with processing results and stored documents
+            RagIngestionTaskReport with processing results, stored documents, and timing
         """
+        phase_start_time = datetime.now(timezone.utc)
         logger.info("Running ingestion with shared document repository...")
 
         if self.verbose:
@@ -1247,4 +1287,16 @@ class IngestionPhase:
         logger.info(
             f"Ingestion completed: {summary.processed} documents stored in shared repository"
         )
-        return summary
+
+        phase_end_time = datetime.now(timezone.utc)
+        execution_time = (phase_end_time - phase_start_time).total_seconds()
+
+        return RagIngestionTaskReport(
+            success=summary.processed > 0,
+            execution_time_seconds=execution_time,
+            start_time=phase_start_time,
+            end_time=phase_end_time,
+            phase_result=summary,
+            total_errors=len(summary.errors),
+            total_warnings=0,
+        )

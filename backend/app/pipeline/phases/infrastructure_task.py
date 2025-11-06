@@ -6,8 +6,10 @@ with document ingestion and embedding generation.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.pipeline.config import PipelineSpec
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class InfrastructureValidationResult:
+class InfrastructureResult:
     """Result of infrastructure validation."""
 
     success: bool
@@ -45,7 +47,7 @@ class InfrastructureValidationResult:
         }
 
 
-class InfrastructureValidationError(Exception):
+class InfrastructureError(Exception):
     """Critical infrastructure validation failed."""
 
     def __init__(
@@ -56,8 +58,47 @@ class InfrastructureValidationError(Exception):
         self.validation_results = validation_results
 
 
-class InfrastructurePhase:
-    """Phase 1: Infrastructure Setup and Validation.
+@dataclass
+class RagInfrastructureTaskReport:
+    """Report for infrastructure setup and validation task execution.
+
+    Wraps InfrastructureValidationResult with timing metadata.
+    """
+
+    success: bool = False
+    execution_time_seconds: float = 0.0
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    phase_result: Optional[InfrastructureResult] = None
+    total_errors: int = 0
+    total_warnings: int = 0
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        result_dict = {}
+        if self.phase_result and hasattr(self.phase_result, 'as_dict'):
+            result_dict = self.phase_result.as_dict()
+        elif self.phase_result:
+            result_dict = self.phase_result.__dict__
+
+        return {
+            "task_name": "Infrastructure Setup",
+            "success": self.success,
+            "execution_time_seconds": round(self.execution_time_seconds, 2),
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "phase_result": result_dict,
+            "total_errors": self.total_errors,
+            "total_warnings": self.total_warnings
+        }
+
+    def as_json(self, indent: int = 2) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.as_dict(), indent=indent, default=str)
+
+
+class RagInfrastructureTask:
+    """Task 1: Infrastructure Setup and Validation.
 
     Validates all required services and configurations before proceeding
     with document ingestion and embedding generation.
@@ -370,57 +411,112 @@ class InfrastructurePhase:
 
     async def execute(
         self, spec: PipelineSpec
-    ) -> InfrastructureValidationResult:
+    ) -> RagInfrastructureTaskReport:
         """Execute infrastructure validation phase.
 
         Args:
             spec: Pipeline specification
 
         Returns:
-            InfrastructureValidationResult with comprehensive status
+            RagInfrastructureTaskReport with comprehensive status and timing
 
         Raises:
-            InfrastructureValidationError: If critical validation fails
+            InfrastructureError: If critical validation fails
         """
+        from datetime import timezone
+        start_time = datetime.now(timezone.utc)
         validation_results = {}
         errors = []
 
         logger.info("Starting RAG infrastructure validation...")
 
-        # Run all validations
-        await self._validate_embedding_service(validation_results, errors)
-        await self._validate_weaviate_schema(validation_results, errors)
-        await self._validate_object_storage(spec, validation_results, errors)
-        await self._validate_configuration(spec, validation_results, errors)
+        try:
+            # Run all validations
+            await self._validate_embedding_service(validation_results, errors)
+            await self._validate_weaviate_schema(validation_results, errors)
+            await self._validate_object_storage(spec, validation_results, errors)
+            await self._validate_configuration(spec, validation_results, errors)
 
-        # Categorize errors
-        critical_errors = [e for e in errors if "Critical:" in e]
-        warnings = [e for e in errors if "Critical:" not in e]
+            # Categorize errors
+            critical_errors = [e for e in errors if "Critical:" in e]
+            warnings = [e for e in errors if "Critical:" not in e]
 
-        # Fail fast on critical errors
-        if critical_errors:
-            logger.error(
-                f"❌ Infrastructure validation failed with {len(critical_errors)} critical errors"
-            )
-            for error in critical_errors:
-                logger.error(f"   - {error}")
+            # Fail fast on critical errors
+            if critical_errors:
+                logger.error(
+                    f"❌ Infrastructure validation failed with {len(critical_errors)} critical errors"
+                )
+                for error in critical_errors:
+                    logger.error(f"   - {error}")
 
-            raise InfrastructureValidationError(
-                message="Critical infrastructure validation failed",
-                errors=critical_errors,
+                from datetime import timezone
+                end_time = datetime.now(timezone.utc)
+                execution_time = (end_time - start_time).total_seconds()
+
+                failed_result = InfrastructureResult(
+                    success=False,
+                    validation_results=validation_results,
+                    errors=critical_errors,
+                    warnings=warnings,
+                )
+
+                return RagInfrastructureTaskReport(
+                    success=False,
+                    execution_time_seconds=execution_time,
+                    start_time=start_time,
+                    end_time=end_time,
+                    phase_result=failed_result,
+                    total_errors=len(critical_errors),
+                    total_warnings=len(warnings),
+                )
+
+            # Success case
+            logger.info("🎉 RAG infrastructure validation completed successfully!")
+            if warnings:
+                logger.warning(f"⚠️  {len(warnings)} warnings found:")
+                for warning in warnings:
+                    logger.warning(f"   - {warning}")
+
+            from datetime import timezone
+            end_time = datetime.now(timezone.utc)
+            execution_time = (end_time - start_time).total_seconds()
+
+            validation_result = InfrastructureResult(
+                success=len(critical_errors) == 0,
                 validation_results=validation_results,
+                errors=errors,
+                warnings=warnings,
             )
 
-        # Success case
-        logger.info("🎉 RAG infrastructure validation completed successfully!")
-        if warnings:
-            logger.warning(f"⚠️  {len(warnings)} warnings found:")
-            for warning in warnings:
-                logger.warning(f"   - {warning}")
+            return RagInfrastructureTaskReport(
+                success=validation_result.success,
+                execution_time_seconds=execution_time,
+                start_time=start_time,
+                end_time=end_time,
+                phase_result=validation_result,
+                total_errors=len(validation_result.errors),
+                total_warnings=len(validation_result.warnings),
+            )
 
-        return InfrastructureValidationResult(
-            success=len(critical_errors) == 0,
-            validation_results=validation_results,
-            errors=errors,
-            warnings=warnings,
-        )
+        except Exception as e:
+            from datetime import timezone
+            end_time = datetime.now(timezone.utc)
+            execution_time = (end_time - start_time).total_seconds()
+            logger.error(f"❌ Infrastructure validation failed: {str(e)}")
+
+            error_result = InfrastructureResult(
+                success=False,
+                validation_results=validation_results,
+                errors=[f"Validation failed: {str(e)}"],
+                warnings=[],
+            )
+
+            return RagInfrastructureTaskReport(
+                success=False,
+                execution_time_seconds=execution_time,
+                start_time=start_time,
+                end_time=end_time,
+                phase_result=error_result,
+                total_errors=1,
+                total_warnings=0,
+            )

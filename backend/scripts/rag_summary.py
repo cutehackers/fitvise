@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """
-RAG Ingestion Summary Report Structure
+RAG Build Summary Report Structure
 
 Provides data structures and utilities for generating comprehensive reports
 from the RAG build pipeline execution.
 
-This module defines the RagIngestionSummary class and related components
-that aggregate results from all three phases of the RAG build pipeline.
+This module defines the RagBuildSummary class that aggregates results from
+all three tasks of the RAG build pipeline.
+
+Note: Task-specific TaskReport classes are now defined in their respective task files:
+- RagInfrastructureTaskReport in infrastructure_task.py
+- RagIngestionTaskReport in ingestion_task.py
+- RagEmbeddingTaskReport in embedding_task.py
 """
 
 import json
@@ -45,102 +50,29 @@ class PhaseResult:
 
 
 @dataclass
-class InfrastructureResults:
-    """Specific results from infrastructure validation phase."""
+class RagBuildSummary:
+    """Comprehensive summary of RAG build pipeline execution.
 
-    embedding_service_status: Dict[str, Any]
-    weaviate_status: Dict[str, Any]
-    object_storage_status: Dict[str, Any]
-    configuration_status: Dict[str, Any]
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "embedding_service": self.embedding_service_status,
-            "weaviate": self.weaviate_status,
-            "object_storage": self.object_storage_status,
-            "configuration": self.configuration_status
-        }
-
-
-@dataclass
-class IngestionResults:
-    """Specific results from document ingestion phase."""
-
-    documents_discovered: int
-    documents_processed: int
-    documents_skipped: int
-    documents_failed: int
-    chunks_generated: int
-    storage_objects_created: int
-    processing_errors: List[str]
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "documents_discovered": self.documents_discovered,
-            "documents_processed": self.documents_processed,
-            "documents_skipped": self.documents_skipped,
-            "documents_failed": self.documents_failed,
-            "chunks_generated": self.chunks_generated,
-            "storage_objects_created": self.storage_objects_created,
-            "processing_errors": self.processing_errors,
-            "processing_success_rate": round((self.documents_processed / self.documents_discovered * 100), 2) if self.documents_discovered > 0 else 0,
-            "average_chunks_per_document": round((self.chunks_generated / self.documents_processed), 2) if self.documents_processed > 0 else 0
-        }
-
-
-@dataclass
-class EmbeddingResults:
-    """Specific results from embedding generation phase."""
-
-    documents_processed: int
-    total_chunks: int
-    unique_chunks: int
-    duplicates_removed: int
-    embeddings_generated: int
-    embeddings_stored: int
-    deduplication_stats: Optional[Dict[str, Any]] = None
-
-    def as_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
-        return {
-            "documents_processed": self.documents_processed,
-            "total_chunks": self.total_chunks,
-            "unique_chunks": self.unique_chunks,
-            "duplicates_removed": self.duplicates_removed,
-            "duplicates_percentage": round((self.duplicates_removed / self.total_chunks * 100), 2) if self.total_chunks > 0 else 0,
-            "embeddings_generated": self.embeddings_generated,
-            "embeddings_stored": self.embeddings_stored,
-            "embedding_success_rate": round((self.embeddings_stored / self.unique_chunks * 100), 2) if self.unique_chunks > 0 else 0,
-            "deduplication_stats": self.deduplication_stats,
-            "average_chunks_per_document": round((self.total_chunks / self.documents_processed), 2) if self.documents_processed > 0 else 0
-        }
-
-
-@dataclass
-class RagIngestionSummary:
-    """Comprehensive summary of RAG ingestion pipeline execution.
-
-    Aggregates results from all three phases:
-    - Phase 1: Infrastructure Setup and Validation
-    - Phase 2: Document Ingestion and Processing
-    - Phase 3: Embedding Generation and Storage
+    Aggregates results from all three tasks:
+    - Task 1: Infrastructure Setup and Validation
+    - Task 2: Document Ingestion and Processing
+    - Task 3: Embedding Generation and Storage
     """
 
-    pipeline_name: str = "RAG Ingestion Pipeline"
+    pipeline_name: str = "RAG Build Pipeline"
     version: str = "1.0"
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     total_execution_time_seconds: float = 0.0
 
-    # Phase Results
+    # Phase Results (kept for backward compatibility with internal tracking)
     phase_results: List[PhaseResult] = field(default_factory=list)
 
-    # Specific Results by Phase
-    infrastructure_results: Optional[InfrastructureResults] = None
-    ingestion_results: Optional[IngestionResults] = None
-    embedding_results: Optional[EmbeddingResults] = None
+    # Task Reports - These wrap the actual phase result models
+    # (Actual TaskReport classes are defined in their respective phase files)
+    infrastructure_task_report: Optional[Any] = None  # RagInfrastructureTaskReport from infrastructure_phase.py
+    ingestion_task_report: Optional[Any] = None  # RagIngestionTaskReport from ingestion_phase.py
+    embedding_task_report: Optional[Any] = None  # RagEmbeddingTaskReport from embedding_phase.py
 
     # Aggregated Metrics
     total_documents_processed: int = 0
@@ -171,20 +103,6 @@ class RagIngestionSummary:
             self.success = False
             self.failure_phase = phase_result.phase_name
 
-    def set_infrastructure_results(self, results: InfrastructureResults) -> None:
-        """Set infrastructure-specific results."""
-        self.infrastructure_results = results
-
-    def set_ingestion_results(self, results: IngestionResults) -> None:
-        """Set ingestion-specific results."""
-        self.ingestion_results = results
-        self.total_documents_processed = results.documents_processed
-        self.total_chunks_generated = results.chunks_generated
-
-    def set_embedding_results(self, results: EmbeddingResults) -> None:
-        """Set embedding-specific results."""
-        self.embedding_results = results
-        self.total_embeddings_stored = results.embeddings_stored
 
     def mark_started(self) -> None:
         """Mark the pipeline as started."""
@@ -222,10 +140,12 @@ class RagIngestionSummary:
                 "total_errors": self.total_errors,
                 "total_warnings": self.total_warnings
             },
+            "task_reports": {
+                "infrastructure": self.infrastructure_task_report.as_dict() if self.infrastructure_task_report else None,
+                "ingestion": self.ingestion_task_report.as_dict() if self.ingestion_task_report else None,
+                "embedding": self.embedding_task_report.as_dict() if self.embedding_task_report else None,
+            },
             "phase_results": [phase.as_dict() for phase in self.phase_results],
-            "infrastructure_results": self.infrastructure_results.as_dict() if self.infrastructure_results else None,
-            "ingestion_results": self.ingestion_results.as_dict() if self.ingestion_results else None,
-            "embedding_results": self.embedding_results.as_dict() if self.embedding_results else None,
             "aggregated_metrics": {
                 "total_documents_processed": self.total_documents_processed,
                 "total_chunks_generated": self.total_chunks_generated,

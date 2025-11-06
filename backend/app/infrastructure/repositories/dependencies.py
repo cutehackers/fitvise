@@ -123,9 +123,12 @@ async def create_repository_container_for_pipeline(
         documents = await container.document_repository.find_all()
         sources = await container.data_source_repository.find_all()
 
-        # Use in pipeline phases
-        phase = IngestionPhase(container)
-        await phase.execute(documents)
+        # Use in pipeline tasks
+        task = RagIngestionTask(
+            document_repository=container.document_repository,
+            data_source_repository=container.data_source_repository,
+        )
+        await task.execute(spec)
         ```
 
     Note:

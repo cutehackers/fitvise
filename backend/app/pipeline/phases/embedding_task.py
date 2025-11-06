@@ -6,9 +6,11 @@ them in the vector database.
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -84,8 +86,47 @@ class EmbeddingPipelineError(Exception):
     pass
 
 
-class EmbeddingPhase:
-    """Phase 3: Embedding Generation and Storage.
+@dataclass
+class RagEmbeddingTaskReport:
+    """Report for embedding generation and storage task execution.
+
+    Wraps EmbeddingResult with timing metadata.
+    """
+
+    success: bool = False
+    execution_time_seconds: float = 0.0
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    phase_result: Optional[EmbeddingResult] = None
+    total_errors: int = 0
+    total_warnings: int = 0
+
+    def as_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        result_dict = {}
+        if self.phase_result and hasattr(self.phase_result, 'as_dict'):
+            result_dict = self.phase_result.as_dict()
+        elif self.phase_result:
+            result_dict = self.phase_result.__dict__
+
+        return {
+            "task_name": "Embedding Generation",
+            "success": self.success,
+            "execution_time_seconds": round(self.execution_time_seconds, 2),
+            "start_time": self.start_time.isoformat() if self.start_time else None,
+            "end_time": self.end_time.isoformat() if self.end_time else None,
+            "phase_result": result_dict,
+            "total_errors": self.total_errors,
+            "total_warnings": self.total_warnings
+        }
+
+    def as_json(self, indent: int = 2) -> str:
+        """Convert to JSON string."""
+        return json.dumps(self.as_dict(), indent=indent, default=str)
+
+
+class RagEmbeddingTask:
+    """Task 3: Embedding Generation and Storage.
 
     Generates embeddings for processed document chunks and stores them
     in the vector database with deduplication.
@@ -153,7 +194,7 @@ class EmbeddingPhase:
         max_retries: int = 3,
         show_progress: bool = True,
         document_limit: Optional[int] = None,
-    ) -> EmbeddingResult:
+    ) -> RagEmbeddingTaskReport:
         """Execute embedding generation phase.
 
         Args:
@@ -165,11 +206,13 @@ class EmbeddingPhase:
             document_limit: Optional limit on documents to process
 
         Returns:
-            EmbeddingResult with comprehensive statistics
+            RagEmbeddingTaskReport with comprehensive statistics and timing
 
         Raises:
             EmbeddingPipelineError: If pipeline execution fails
         """
+        from datetime import timezone
+        phase_start_time = datetime.now(timezone.utc)
         start_time = time.time()
 
         logger.info("Starting RAG embedding pipeline...")
@@ -204,7 +247,11 @@ class EmbeddingPhase:
 
             if not document_ids:
                 logger.warning("No documents to process")
-                return EmbeddingResult(
+                from datetime import timezone
+                phase_end_time = datetime.now(timezone.utc)
+                execution_time = (phase_end_time - phase_start_time).total_seconds()
+
+                empty_result = EmbeddingResult(
                     success=True,
                     documents_processed=0,
                     total_chunks=0,
@@ -214,6 +261,16 @@ class EmbeddingPhase:
                     embeddings_stored=0,
                     processing_time_seconds=time.time() - start_time,
                     warnings=["No documents found for embedding generation"],
+                )
+
+                return RagEmbeddingTaskReport(
+                    success=True,
+                    execution_time_seconds=execution_time,
+                    start_time=phase_start_time,
+                    end_time=phase_end_time,
+                    phase_result=empty_result,
+                    total_errors=0,
+                    total_warnings=1,
                 )
 
             # Create pipeline request
@@ -285,14 +342,29 @@ class EmbeddingPhase:
                 for error in pipeline_response.errors:
                     logger.error(f"   - {error}")
 
-            return result
+            from datetime import timezone
+            phase_end_time = datetime.now(timezone.utc)
+            execution_time = (phase_end_time - phase_start_time).total_seconds()
+
+            return RagEmbeddingTaskReport(
+                success=result.success,
+                execution_time_seconds=execution_time,
+                start_time=phase_start_time,
+                end_time=phase_end_time,
+                phase_result=result,
+                total_errors=len(result.errors),
+                total_warnings=len(result.warnings),
+            )
 
         except Exception as e:
+            from datetime import timezone
             processing_time = time.time() - start_time
+            phase_end_time = datetime.now(timezone.utc)
+            execution_time = (phase_end_time - phase_start_time).total_seconds()
             error_msg = f"Embedding pipeline failed: {str(e)}"
             logger.error(error_msg)
 
-            return EmbeddingResult(
+            error_result = EmbeddingResult(
                 success=False,
                 documents_processed=0,
                 total_chunks=0,
@@ -302,4 +374,14 @@ class EmbeddingPhase:
                 embeddings_stored=0,
                 processing_time_seconds=processing_time,
                 errors=[error_msg],
+            )
+
+            return RagEmbeddingTaskReport(
+                success=False,
+                execution_time_seconds=execution_time,
+                start_time=phase_start_time,
+                end_time=phase_end_time,
+                phase_result=error_result,
+                total_errors=1,
+                total_warnings=0,
             )

@@ -19,8 +19,9 @@ class ChunkingPreset:
         default_factory=lambda: ("document_id", "source_id", "file_name", "doc_type")
     )
     chunk_sizes: Iterable[int] | None = None  # For hierarchical chunking (Task 2.1.3)
+    enable_semantic: bool = True  # Use semantic chunking with embeddings
 
-    def as_dict(self) -> Dict[str, int | List[str] | List[int] | str]:
+    def as_dict(self) -> Dict[str, int | List[str] | List[int] | str | bool]:
         result = {
             "preset": self.name,
             "description": self.description,
@@ -29,6 +30,7 @@ class ChunkingPreset:
             "min_chunk_chars": self.min_chunk_chars,
             "max_chunk_chars": self.max_chunk_chars,
             "metadata_passthrough_fields": list(self.metadata_passthrough),
+            "enable_semantic": self.enable_semantic,
         }
         if self.chunk_sizes is not None:
             result["chunk_sizes"] = list(self.chunk_sizes)
@@ -43,6 +45,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         chunk_overlap=128,
         min_chunk_chars=120,
         max_chunk_chars=2048,
+        enable_semantic=True,  # Semantic for mixed content types
     ),
     "short_form": ChunkingPreset(
         name="short_form",
@@ -51,6 +54,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         chunk_overlap=64,
         min_chunk_chars=60,
         max_chunk_chars=1200,
+        enable_semantic=False,  # Fast sentence-based for short content
     ),
     "long_form": ChunkingPreset(
         name="long_form",
@@ -59,6 +63,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         chunk_overlap=256,
         min_chunk_chars=160,
         max_chunk_chars=3072,
+        enable_semantic=True,  # Semantic for better coherence in long content
     ),
     "hierarchical": ChunkingPreset(
         name="hierarchical",
@@ -68,6 +73,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         min_chunk_chars=100,
         max_chunk_chars=2048,
         chunk_sizes=[2048, 512, 128],  # Multi-level: document → section → paragraph
+        enable_semantic=True,  # Semantic for document structure understanding
     ),
 }
 

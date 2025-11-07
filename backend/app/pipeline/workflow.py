@@ -62,6 +62,110 @@ class RAGWorkflow:
     3. Embedding generation and storage
 
     All tasks share the same repository instances to ensure data continuity.
+
+    ## Pipeline Configuration Options
+
+    The RAGWorkflow provides two key configuration options that significantly impact
+    the pipeline flow and performance:
+
+    ### enable_semantic_chunking (Task 2 - Document Ingestion)
+
+    **Purpose**: Controls the chunking strategy used during document ingestion.
+
+    **Impact on Pipeline Flow**:
+
+    When **enable_semantic_chunking=False** (Default - Performance Mode):
+    - Uses sentence-based splitting with fixed size boundaries
+    - No embedding generation required during chunking
+    - Faster processing, lower computational cost
+    - Chunks are created based on sentence boundaries and size limits
+    - Optimal for: Large document sets, processing speed prioritized, initial indexing
+
+    When **enable_semantic_chunking=True** (Quality Mode):
+    - Uses semantic chunking with embedding analysis
+    - Generates temporary embeddings to determine semantic boundaries
+    - Chunks are created where topic shifts occur (based on embedding similarity)
+    - Higher computational cost but better semantic coherence
+    - Optimal for: High-quality retrieval, document sets where context matters,
+                  academic/technical content requiring coherent chunks
+
+    **Performance Considerations**:
+    - False: 2-3x faster processing, minimal resource usage
+    - True: Slower processing due to embedding generation, higher memory/CPU usage
+
+    ### skip_chunking (Task 3 - Embedding Generation)
+
+    **Purpose**: Controls whether to reuse chunks from Task 2 or regenerate them.
+
+    **Impact on Pipeline Flow**:
+
+    When **skip_chunking=True** (Default - Optimization Mode):
+    - Task 3 loads chunks directly from the repository (created in Task 2)
+    - No re-chunking occurs, preserving the original chunk structure
+    - Significant performance optimization (avoids redundant processing)
+    - Maintains consistency between ingestion and embedding phases
+    - Optimal for: Standard pipeline execution, incremental updates
+
+    When **skip_chunking=False** (Re-chunking Mode):
+    - Task 3 re-chunks all documents using current configuration
+    - Useful when chunking parameters need to be changed after ingestion
+    - Allows testing different chunking strategies without re-ingesting documents
+    - Higher processing cost but provides flexibility
+    - Optimal for: Parameter tuning, strategy experimentation,
+                  fixing chunking issues from Task 2
+
+    **Performance Considerations**:
+    - True: 10-20x faster for Task 3 (avoids re-chunking entire document set)
+    - False: Full re-chunking cost, but enables configuration changes
+
+    ### Recommended Configurations
+
+    **Production Pipeline (Default)**:
+    ```python
+    await workflow.run_complete_pipeline(
+        spec=spec,
+        enable_semantic_chunking=False,  # Fast sentence-based chunking
+        skip_chunking=True,              # Reuse chunks from Task 2
+    )
+    ```
+
+    **High-Quality Pipeline**:
+    ```python
+    await workflow.run_complete_pipeline(
+        spec=spec,
+        enable_semantic_chunking=True,   # Semantic boundaries
+        skip_chunking=True,              # Reuse semantic chunks
+    )
+    ```
+
+    **Parameter Experimentation**:
+    ```python
+    # Run ingestion once with semantic chunking
+    await workflow.run_ingestion(
+        spec=spec,
+        enable_semantic_chunking=True
+    )
+
+    # Test different embedding parameters without re-chunking
+    await workflow.run_embedding(
+        spec=spec,
+        skip_chunking=True,              # Reuse existing chunks
+        batch_size=64                    # Test different batch size
+    )
+    ```
+
+    **Pipeline Debugging**:
+    ```python
+    # Re-chunk with different parameters if issues detected
+    await workflow.run_embedding(
+        spec=spec,
+        skip_chunking=False,             # Force re-chunking
+        document_limit=10               # Test on subset first
+    )
+    ```
+
+    These options provide fine-grained control over the quality-performance tradeoff
+    and enable flexible pipeline execution patterns for different use cases.
     """
 
     def __init__(
@@ -103,14 +207,14 @@ class RAGWorkflow:
             self.ml_services = ml_services
 
         # Initialize tasks with shared repositories and ML services
-        self.infrastructure_phase = RagInfrastructureTask(verbose=verbose)
-        self.ingestion_phase = RagIngestionTask(
+        self.infrastructure_task = RagInfrastructureTask(verbose=verbose)
+        self.ingestion_task = RagIngestionTask(
             document_repository=self.repositories.document_repository,
             ml_services=self.ml_services,
             data_source_repository=self.repositories.data_source_repository,
             verbose=verbose,
         )
-        self.embedding_phase = RagEmbeddingTask(
+        self.embedding_task = RagEmbeddingTask(
             document_repository=self.repositories.document_repository,
             verbose=verbose,
         )
@@ -157,7 +261,7 @@ class RAGWorkflow:
 
         try:
             # Phase now returns TaskReport directly
-            task_report = await self.infrastructure_phase.execute(spec)
+            task_report = await self.infrastructure_task.execute(spec)
 
             logger.info(
                 f"✅ Task 1 completed in {task_report.execution_time_seconds:.2f}s"
@@ -169,13 +273,16 @@ class RAGWorkflow:
             raise
 
     async def run_ingestion(
-        self, spec: PipelineSpec, dry_run: bool = False
+        self, spec: PipelineSpec, dry_run: bool = False, enable_semantic_chunking: bool = False
     ) -> RagIngestionTaskReport:
         """Run Task 2: Document ingestion independently.
 
         Args:
             spec: Pipeline specification
             dry_run: Run in dry-run mode (skip actual storage)
+            enable_semantic_chunking: If True, use semantic splitter with embeddings for chunk boundaries.
+                                     If False, use sentence splitter (faster, no embeddings).
+                                     Defaults to False for performance.
 
         Returns:
             RagIngestionTaskReport with task execution results and timing
@@ -191,8 +298,10 @@ class RAGWorkflow:
                 data["storage"]["provider"] = "local"
                 spec = PipelineSpec.model_validate(data)
 
-            # Phase now returns TaskReport directly
-            task_report = await self.ingestion_phase.execute(spec, dry_run=dry_run)
+            # Task now returns TaskReport directly
+            task_report = await self.ingestion_task.execute(
+                spec, dry_run=dry_run, enable_semantic_chunking=enable_semantic_chunking
+            )
 
             documents_processed = (
                 task_report.phase_result.processed
@@ -213,6 +322,7 @@ class RAGWorkflow:
         spec: PipelineSpec,
         batch_size: int = 32,
         document_limit: Optional[int] = None,
+        skip_chunking: bool = True,
     ) -> RagEmbeddingTaskReport:
         """Run Task 3: Embedding generation independently.
 
@@ -220,6 +330,9 @@ class RAGWorkflow:
             spec: Pipeline specification
             batch_size: Batch size for embedding generation
             document_limit: Optional limit on documents to process
+            skip_chunking: If True, load existing chunks from repository (optimization).
+                          If False, re-chunk documents with current configuration.
+                          Defaults to True for performance.
 
         Returns:
             RagEmbeddingTaskReport with task execution results and timing
@@ -227,14 +340,15 @@ class RAGWorkflow:
         logger.info("🔢 Task 3: Embedding Generation and Storage")
 
         try:
-            # Phase now returns TaskReport directly
-            task_report = await self.embedding_phase.execute(
+            # Task now returns TaskReport directly
+            task_report = await self.embedding_task.execute(
                 spec=spec,
                 batch_size=batch_size,
                 deduplication_enabled=True,
                 max_retries=3,
                 show_progress=not self.verbose,
                 document_limit=document_limit,
+                skip_chunking=skip_chunking,
             )
 
             embeddings_stored = (
@@ -258,6 +372,8 @@ class RAGWorkflow:
         batch_size: int = 32,
         document_limit: Optional[int] = None,
         output_dir: Optional[str] = None,
+        skip_chunking: bool = True,
+        enable_semantic_chunking: bool = False,
     ) -> RagBuildSummary:
         """Run the complete RAG pipeline (all 3 tasks sequentially).
 
@@ -267,6 +383,11 @@ class RAGWorkflow:
             batch_size: Batch size for embedding generation
             document_limit: Optional limit on documents to process
             output_dir: Directory to save reports and outputs
+            skip_chunking: If True, Task 3 loads existing chunks from Task 2 (optimization).
+                          If False, Task 3 re-chunks documents. Defaults to True.
+            enable_semantic_chunking: If True, Task 2 uses semantic splitter with embeddings.
+                                     If False, uses sentence splitter (faster, no embeddings).
+                                     Defaults to False for performance.
 
         Returns:
             RagBuildSummary with comprehensive results from all tasks
@@ -278,6 +399,8 @@ class RAGWorkflow:
         logger.info(f"Configuration: {spec}")
         logger.info(f"Output Directory: {output_dir or 'default'}")
         logger.info(f"Dry Run: {dry_run}")
+        logger.info(f"Semantic Chunking (Task 2): {enable_semantic_chunking}")
+        logger.info(f"Skip Chunking (Task 3): {skip_chunking}")
 
         # Create output directory if specified
         if output_dir:
@@ -289,11 +412,11 @@ class RAGWorkflow:
             await self._run_infrastructure_with_tracking(spec, output_dir)
 
             # Task 2: Document Ingestion
-            await self._run_ingestion_with_tracking(spec, dry_run, output_dir)
+            await self._run_ingestion_with_tracking(spec, dry_run, output_dir, enable_semantic_chunking)
 
             # Task 3: Embedding Generation
             await self._run_embedding_with_tracking(
-                spec, batch_size, document_limit, output_dir
+                spec, batch_size, document_limit, output_dir, skip_chunking
             )
 
             # Complete pipeline
@@ -324,7 +447,7 @@ class RAGWorkflow:
         """Run infrastructure task with result tracking."""
         try:
             # Phase now returns TaskReport directly with all timing
-            task_report = await self.infrastructure_phase.execute(spec)
+            task_report = await self.infrastructure_task.execute(spec)
 
             # Extract validation result from task report
             validation_result = task_report.phase_result
@@ -361,12 +484,19 @@ class RAGWorkflow:
             raise
 
     async def _run_ingestion_with_tracking(
-        self, spec: PipelineSpec, dry_run: bool, output_dir: Optional[str]
+        self, spec: PipelineSpec, dry_run: bool, output_dir: Optional[str], enable_semantic_chunking: bool
     ) -> None:
-        """Run ingestion task with result tracking."""
+        """Run ingestion task with result tracking.
+
+        Args:
+            enable_semantic_chunking: If True, use semantic splitter with embeddings.
+                                     If False, use sentence splitter (faster, no embeddings).
+        """
         try:
-            # Phase now returns TaskReport directly with all timing
-            task_report = await self.ingestion_phase.execute(spec, dry_run=dry_run)
+            # Task now returns TaskReport directly with all timing
+            task_report = await self.ingestion_task.execute(
+                spec, dry_run=dry_run, enable_semantic_chunking=enable_semantic_chunking
+            )
 
             # Extract ingestion summary from task report
             ingestion_summary = task_report.phase_result
@@ -418,17 +548,24 @@ class RAGWorkflow:
         batch_size: int,
         document_limit: Optional[int],
         output_dir: Optional[str],
+        skip_chunking: bool,
     ) -> None:
-        """Run embedding task with result tracking."""
+        """Run embedding task with result tracking.
+
+        Args:
+            skip_chunking: If True, load existing chunks from repository (optimization).
+                          If False, re-chunk documents with current configuration.
+        """
         try:
-            # Phase now returns TaskReport directly with all timing
-            task_report = await self.embedding_phase.execute(
+            # Task now returns TaskReport directly with all timing
+            task_report = await self.embedding_task.execute(
                 spec=spec,
                 batch_size=batch_size,
                 deduplication_enabled=True,
                 max_retries=3,
                 show_progress=not self.verbose,
                 document_limit=document_limit,
+                skip_chunking=skip_chunking,
             )
 
             # Extract embedding result from task report

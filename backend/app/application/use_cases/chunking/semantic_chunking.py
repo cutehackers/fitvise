@@ -299,12 +299,13 @@ class SemanticChunkingUseCase:
         # Run chunking in dedicated thread pool to avoid blocking event loop
         # (HuggingFace embedding inference is CPU-bound)
         # The embedding model access inside _chunk_document is protected by threading.Lock
-        chunks = await asyncio.to_thread(
+        loop = asyncio.get_running_loop()
+        chunks = await loop.run_in_executor(
+            self._executor,
             self._chunk_document,
             chunker,
             document,
             request,
-            executor=self._executor,
         )
 
         chunk_count = len(chunks)

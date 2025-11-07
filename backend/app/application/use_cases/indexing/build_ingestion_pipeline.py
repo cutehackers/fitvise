@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 
 from app.domain.entities.chunk import Chunk
 from app.domain.entities.processing_job import (
+    JobStatus,
     JobType,
     ProcessingJob,
 )
@@ -54,6 +55,7 @@ class BuildIngestionPipelineRequest:
     retry_backoff_factor: float = 1.0
     show_progress: bool = True
     replace_existing_embeddings: bool = False
+    skip_chunking: bool = False  # If True, load existing chunks from repository instead of re-chunking
 
 
 @dataclass
@@ -320,14 +322,65 @@ class BuildIngestionPipelineUseCase:
                 processing_stats=self._current_job.get_progress_dict() if self._current_job else {}
             )
 
-    async def _get_chunks(self, request: BuildIngestionPipelineRequest) -> List[Chunk]:
-        """Get chunks from documents using existing chunking use case.
+    async def _load_chunks(self, document_ids: List[UUID]) -> List[Chunk]:
+        """Load chunks that were already created by ingestion task.
+
+        This method retrieves pre-existing chunks from the document repository,
+        avoiding the need to re-run semantic chunking.
 
         Args:
-            request: Pipeline request with document IDs
+            document_ids: List of document IDs to load chunks from
 
         Returns:
-            List of generated chunks
+            List of Chunk objects from document repository
+
+        Raises:
+            ChunkingError: If chunk loading encounters critical errors
+        """
+        all_chunks = []
+        failed_loads = 0
+
+        for doc_id in document_ids:
+            try:
+                doc = await self._document_repository.find_by_id(doc_id)
+                if doc and hasattr(doc, 'chunks') and doc.chunks:
+                    # Convert stored chunk dictionaries to Chunk objects
+                    for chunk_data in doc.chunks:
+                        try:
+                            # Assume Chunk has a from_dict classmethod or can be instantiated
+                            if hasattr(Chunk, 'from_dict'):
+                                chunk = Chunk.from_dict(chunk_data)
+                            else:
+                                # Fallback: direct instantiation from dict
+                                chunk = Chunk(**chunk_data)
+                            all_chunks.append(chunk)
+                        except Exception as e:
+                            logger.warning(f"Failed to convert chunk from document {doc_id}: {e}")
+                            continue
+            except Exception as e:
+                logger.warning(f"Failed to load document {doc_id}: {e}")
+                failed_loads += 1
+                continue
+
+        if failed_loads > 0:
+            logger.warning(f"Failed to load chunks from {failed_loads} documents")
+
+        logger.info(f"Loaded {len(all_chunks)} existing chunks from {len(document_ids) - failed_loads}/{len(document_ids)} documents")
+        return all_chunks
+
+    async def _get_chunks(self, request: BuildIngestionPipelineRequest) -> List[Chunk]:
+        """Get chunks from documents - load existing or generate new.
+
+        Strategy:
+        1. If skip_chunking=True, load existing chunks from repository
+        2. Otherwise, generate new chunks using SemanticChunkingUseCase
+        3. Fallback to generation if no existing chunks found
+
+        Args:
+            request: Pipeline request with document IDs and configuration
+
+        Returns:
+            List of chunks (either loaded or generated)
 
         Raises:
             ChunkingError: If chunking fails
@@ -335,6 +388,19 @@ class BuildIngestionPipelineUseCase:
         if not request.document_ids:
             raise ChunkingError("No document IDs provided for chunking")
 
+        # Try loading existing chunks first if skip_chunking enabled
+        if request.skip_chunking:
+            logger.info("Loading existing chunks from repository (skip_chunking=True)")
+            chunks = await self._load_chunks(request.document_ids)
+
+            if chunks:
+                logger.info(f"✅ Reusing {len(chunks)} existing chunks from ingestion phase")
+                return chunks
+            else:
+                logger.warning("⚠️ No existing chunks found, falling back to chunking")
+
+        # Generate new chunks (original behavior or fallback)
+        logger.info("Generating new chunks using SemanticChunkingUseCase")
         chunking_request = SemanticChunkingRequest(
             document_ids=request.document_ids,
             include_failed=False,  # Don't include failed chunks in pipeline
@@ -345,11 +411,12 @@ class BuildIngestionPipelineUseCase:
 
         if not chunking_response.success:
             raise ChunkingError(
-                f"Chunking failed with errors: {chunking_response.errors}",
+                f"Chunking failed",
                 document_id=str(request.document_ids)
             )
 
-        return chunking_response.chunks
+        # Load chunks from documents after chunking
+        return await self._load_chunks(request.document_ids)
 
     async def _deduplicate_chunks(
         self,

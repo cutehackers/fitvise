@@ -108,24 +108,24 @@ async def main() -> int:
                 logger.info("PHASE 1: INFRASTRUCTURE VALIDATION")
                 logger.info("=" * 60)
 
-                infra_result = await workflow.run_infrastructure_check(spec)
+                infra_report = await workflow.run_infrastructure_check(spec)
 
                 print("\n" + "=" * 60)
                 print("INFRASTRUCTURE VALIDATION RESULT")
                 print("=" * 60)
-                print(f"Success: {'✅ YES' if infra_result.success else '❌ NO'}")
+                print(f"Success: {'✅ YES' if infra_report.success else '❌ NO'}")
 
-                if infra_result.errors:
-                    print(f"\n❌ {len(infra_result.errors)} validation errors:")
-                    for error in infra_result.errors:
+                if infra_report.errors:
+                    print(f"\n❌ {len(infra_report.errors)} validation errors:")
+                    for error in infra_report.errors:
                         print(f"   - {error}")
                     success = False
                 else:
                     print("\n✅ All infrastructure components validated successfully!")
 
-                if infra_result.warnings:
-                    print(f"\n⚠️  {len(infra_result.warnings)} warnings:")
-                    for warning in infra_result.warnings:
+                if infra_report.warnings:
+                    print(f"\n⚠️  {len(infra_report.warnings)} warnings:")
+                    for warning in infra_report.warnings:
                         print(f"   - {warning}")
 
             # Phase 2: Document ingestion
@@ -134,20 +134,20 @@ async def main() -> int:
                 logger.info("PHASE 2: DOCUMENT INGESTION")
                 logger.info("=" * 60)
 
-                ingestion_summary = await workflow.run_ingestion(spec, dry_run=args.dry_run)
+                ingestion_report = await workflow.run_ingestion(spec, dry_run=args.dry_run)
 
                 print("\n" + "=" * 60)
                 print("DOCUMENT INGESTION SUMMARY")
                 print("=" * 60)
-                print(f"Documents discovered: {ingestion_summary.discovered}")
-                print(f"Documents processed: {ingestion_summary.processed}")
-                print(f"Documents skipped: {ingestion_summary.skipped}")
-                print(f"Documents failed: {ingestion_summary.failed}")
-                print(f"Chunks generated: {ingestion_summary.chunking_summary.get('total_chunks', 0)}")
+                print(f"Documents discovered: {ingestion_report.discovered}")
+                print(f"Documents processed: {ingestion_report.processed}")
+                print(f"Documents skipped: {ingestion_report.skipped}")
+                print(f"Documents failed: {ingestion_report.failed}")
+                print(f"Chunks generated: {ingestion_report.chunking_summary.get('total_chunks', 0)}")
 
-                if ingestion_summary.errors:
-                    print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_summary.errors)} issues):")
-                    for i, error in enumerate(ingestion_summary.errors[:5], 1):
+                if ingestion_report.errors:
+                    print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_report.errors)} issues):")
+                    for i, error in enumerate(ingestion_report.errors[:5], 1):
                         error_msg = error.get('message', str(error))
                         error_type = error.get('type', 'Unknown')
                         print(f"   {i}. [{error_type}] {error_msg}")
@@ -160,10 +160,10 @@ async def main() -> int:
                         elif "corrupted" in str(error_msg).lower() or "invalid" in str(error_msg).lower():
                             print(f"      💡 SOLUTION: Verify the document file is not corrupted")
 
-                    if len(ingestion_summary.errors) > 5:
-                        print(f"   ... and {len(ingestion_summary.errors) - 5} more errors")
+                    if len(ingestion_report.errors) > 5:
+                        print(f"   ... and {len(ingestion_report.errors) - 5} more errors")
 
-                    print(f"\n📊 SUMMARY: {ingestion_summary.processed} processed, {ingestion_summary.failed} failed, {ingestion_summary.skipped} skipped")
+                    print(f"\n📊 SUMMARY: {ingestionreporty.processed} processed, {ingestionreporty.failed} failed, {ingestionreporty.skipped} skipped")
                     success = False
 
             # Phase 3: Embedding generation
@@ -172,7 +172,7 @@ async def main() -> int:
                 logger.info("PHASE 3: EMBEDDING GENERATION")
                 logger.info("=" * 60)
 
-                embedding_result = await workflow.run_embedding(
+                embedding_report = await workflow.run_embedding(
                     spec,
                     batch_size=args.batch_size,
                     document_limit=args.document_limit,
@@ -181,23 +181,23 @@ async def main() -> int:
                 print("\n" + "=" * 60)
                 print("EMBEDDING GENERATION SUMMARY")
                 print("=" * 60)
-                print(f"Success: {'✅ YES' if embedding_result.success else '❌ NO'}")
-                print(f"Documents Processed: {embedding_result.documents_processed}")
-                print(f"Total Chunks: {embedding_result.total_chunks}")
-                print(f"Unique Chunks: {embedding_result.unique_chunks}")
-                print(f"Duplicates Removed: {embedding_result.duplicates_removed}")
-                print(f"Embeddings Generated: {embedding_result.embeddings_generated}")
-                print(f"Embeddings Stored: {embedding_result.embeddings_stored}")
-                print(f"Processing Time: {embedding_result.processing_time_seconds:.2f}s")
+                print(f"Success: {'✅ YES' if embedding_report.success else '❌ NO'}")
+                print(f"Documents Processed: {embedding_report.documents_processed}")
+                print(f"Total Chunks: {embedding_report.total_chunks}")
+                print(f"Unique Chunks: {embedding_report.unique_chunks}")
+                print(f"Duplicates Removed: {embedding_report.duplicates_removed}")
+                print(f"Embeddings Generated: {embedding_report.embeddings_generated}")
+                print(f"Embeddings Stored: {embedding_report.embeddings_stored}")
+                print(f"Processing Time: {embedding_report.processing_time_seconds:.2f}s")
 
-                if embedding_result.warnings:
-                    print(f"\n⚠️  {len(embedding_result.warnings)} warnings:")
-                    for warning in embedding_result.warnings:
+                if embedding_report.warnings:
+                    print(f"\n⚠️  {len(embedding_report.warnings)} warnings:")
+                    for warning in embedding_report.warnings:
                         print(f"   - {warning}")
 
-                if embedding_result.errors:
-                    print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_result.errors)} issues):")
-                    for i, error in enumerate(embedding_result.errors[:5], 1):
+                if embedding_report.errors:
+                    print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_report.errors)} issues):")
+                    for i, error in enumerate(embedding_report.errors[:5], 1):
                         print(f"   {i}. {error}")
 
                         # Provide actionable suggestions for common embedding errors
@@ -211,8 +211,8 @@ async def main() -> int:
                         elif "model" in error_str:
                             print(f"      💡 SOLUTION: Ensure embedding model is downloaded and accessible")
 
-                    if len(embedding_result.errors) > 5:
-                        print(f"   ... and {len(embedding_result.errors) - 5} more errors")
+                    if len(embedding_report.errors) > 5:
+                        print(f"   ... and {len(embedding_report.errors) - 5} more errors")
 
                     success = False
 

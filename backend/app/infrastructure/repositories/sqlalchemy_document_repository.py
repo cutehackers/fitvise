@@ -81,6 +81,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             self._session.add(model)
 
         await self._session.flush()
+        await self._session.commit()
         return document
 
     async def find_by_id(self, document_id: UUID) -> Optional[Document]:
@@ -273,6 +274,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
         if model:
             await self._session.delete(model)
             await self._session.flush()
+            await self._session.commit()
             return True
         return False
 
@@ -295,6 +297,7 @@ class SQLAlchemyDocumentRepository(DocumentRepository):
             await self._session.delete(model)
 
         await self._session.flush()
+        await self._session.commit()
         return count
 
     async def count_all(self) -> int:

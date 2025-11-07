@@ -11,7 +11,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -94,6 +93,7 @@ from app.config.ml_models import get_chunking_config
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.core.settings import get_settings
+from app.pipeline.performance_tracker import PerformanceTracker
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +121,8 @@ class UseCaseBundle:
 class RagIngestionTaskReport:
     """Report for document ingestion and processing task execution.
 
-    Wraps RunSummary with timing metadata.
+    Wraps RunSummary with detailed timing metadata for all pipeline steps.
+    Tracks execution time for: setup, discovery, processing stages, and chunking.
     """
 
     success: bool = False
@@ -132,13 +133,26 @@ class RagIngestionTaskReport:
     total_errors: int = 0
     total_warnings: int = 0
 
+    # Pipeline step timing breakdown (all times in seconds)
+    timing_breakdown: Dict[str, float] = None
+
+    def __post_init__(self):
+        """Initialize timing breakdown if not provided."""
+        if self.timing_breakdown is None:
+            self.timing_breakdown = {}
+
     def as_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
+        """Convert to dictionary with detailed pipeline timing breakdown."""
         result_dict = {}
         if self.phase_result and hasattr(self.phase_result, 'as_dict'):
             result_dict = self.phase_result.as_dict()
         elif self.phase_result:
             result_dict = self.phase_result.__dict__
+
+        # Format timing breakdown with rounded values
+        formatted_timing = {
+            step: round(duration, 3) for step, duration in (self.timing_breakdown or {}).items()
+        }
 
         return {
             "task_name": "Document Ingestion",
@@ -146,14 +160,82 @@ class RagIngestionTaskReport:
             "execution_time_seconds": round(self.execution_time_seconds, 2),
             "start_time": self.start_time.isoformat() if self.start_time else None,
             "end_time": self.end_time.isoformat() if self.end_time else None,
+            "pipeline_timing": {
+                "total_seconds": round(self.execution_time_seconds, 2),
+                "breakdown": formatted_timing,
+                "summary": self._compute_timing_summary(formatted_timing),
+            },
             "phase_result": result_dict,
             "total_errors": self.total_errors,
             "total_warnings": self.total_warnings
         }
 
+    def _compute_timing_summary(self, timing_breakdown: Dict[str, float]) -> Dict[str, Any]:
+        """Compute summary statistics for pipeline timing."""
+        if not timing_breakdown:
+            return {"steps": 0, "fastest": None, "slowest": None, "average": None}
+
+        values = list(timing_breakdown.values())
+        return {
+            "steps": len(timing_breakdown),
+            "fastest": min(values),
+            "slowest": max(values),
+            "average": sum(values) / len(values),
+        }
+
     def as_json(self, indent: int = 2) -> str:
         """Convert to JSON string."""
         return json.dumps(self.as_dict(), indent=indent, default=str)
+
+    # Convenience properties for easy access to key metrics
+    @property
+    def discovered(self) -> int:
+        """Number of documents discovered."""
+        if self.phase_result and self.phase_result.counters:
+            return self.phase_result.counters.get('discovered', 0)
+        return 0
+
+    @property
+    def processed(self) -> int:
+        """Number of documents processed."""
+        if self.phase_result:
+            return self.phase_result.processed
+        return 0
+
+    @property
+    def skipped(self) -> int:
+        """Number of documents skipped."""
+        if self.phase_result:
+            return self.phase_result.skipped
+        return 0
+
+    @property
+    def failed(self) -> int:
+        """Number of documents that failed processing."""
+        if self.phase_result:
+            return self.phase_result.failed
+        return 0
+
+    @property
+    def chunking_summary(self) -> Dict[str, Any]:
+        """Chunking results summary."""
+        if self.phase_result and self.phase_result.counters:
+            return self.phase_result.counters.get('chunking', {})
+        return {}
+
+    @property
+    def counters(self) -> Dict[str, Any]:
+        """Direct access to counters for backward compatibility."""
+        if self.phase_result:
+            return self.phase_result.counters or {}
+        return {}
+
+    @property
+    def errors(self) -> List[Dict[str, object]]:
+        """Direct access to errors for backward compatibility."""
+        if self.phase_result:
+            return self.phase_result.errors or []
+        return []
 
 
 class RagIngestionTask:
@@ -188,6 +270,7 @@ class RagIngestionTask:
         self.ml_services = ml_services
         self.data_source_repository = data_source_repository
         self.verbose = verbose
+        self.tracker = PerformanceTracker()
 
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
@@ -942,7 +1025,15 @@ class RagIngestionTask:
         run_id: str,
         errors: List[Dict[str, object]],
     ) -> tuple[List[StorageObject], Dict[str, int], int, List[UUID]]:
-        """Execute extraction, normalization, enrichment, validation, and persistence."""
+        """Execute extraction, normalization, enrichment, validation, and persistence.
+
+        Tracks timing for each processing stage:
+        - extract_content: Content extraction using Docling/Tika
+        - normalize_content: Text normalization and tokenization
+        - enrich_metadata: Keyword and entity extraction
+        - validate_quality: Quality scoring
+        - store_document: Storage and repository persistence
+        """
         stored_objects: List[StorageObject] = []
         origin_counts: Dict[str, int] = {}
         skipped = 0
@@ -957,11 +1048,16 @@ class RagIngestionTask:
                     logger.debug(f"🔧 INGESTION VERBOSE: Processing document {i+1}/{len(documents)}: {doc.uri or doc.path or 'inline'}")
                     logger.debug(f"🔧 INGESTION VERBOSE: Document origin: {doc.origin}, content_type: {doc.content_type}")
 
-                content = await self._extract_content(doc, spec, use_cases)
+                # Stage 1: Extract Content
+                async with self.tracker.with_tracker("extract_content"):
+                    content = await self._extract_content(doc, spec, use_cases)
+
                 base_text = content.markdown or content.text or ""
 
                 if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Extracted content length: {len(base_text)} characters")
+                    extract_stats = self.tracker.get_stats("extract_content")
+                    if extract_stats:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Extracted content length: {len(base_text)} characters (took {extract_stats.get('average', 0):.3f}s)")
 
                 if not base_text:
                     if self.verbose:
@@ -969,29 +1065,32 @@ class RagIngestionTask:
                     skipped += 1
                     continue
 
-                if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Starting normalization for document {i+1}")
-
-                normalized = await self._normalize_content(base_text, use_cases)
-
-                if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Normalization complete - tokens: {len(normalized.tokens) if normalized.tokens else 0}")
+                # Stage 2: Normalize Content
+                async with self.tracker.with_tracker("normalize_content"):
+                    normalized = await self._normalize_content(base_text, use_cases)
 
                 if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Starting metadata enrichment for document {i+1}")
+                    normalize_stats = self.tracker.get_stats("normalize_content")
+                    if normalize_stats:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Normalization complete - tokens: {len(normalized.tokens) if normalized.tokens else 0} (took {normalize_stats.get('average', 0):.3f}s)")
 
-                enriched = await self._enrich_content(normalized.normalized, use_cases)
-
-                if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Metadata enrichment complete - keywords: {len(enriched.keywords) if enriched.keywords else 0}, entities: {len(enriched.entities) if enriched.entities else 0}")
-
-                if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Starting quality validation for document {i+1}")
-
-                quality = await self._validate_content(normalized.normalized, use_cases)
+                # Stage 3: Enrich Metadata
+                async with self.tracker.with_tracker("enrich_metadata"):
+                    enriched = await self._enrich_content(normalized.normalized, use_cases)
 
                 if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Quality validation complete - score: {quality.overall_score:.4f}, level: {quality.quality_level}")
+                    enrich_stats = self.tracker.get_stats("enrich_metadata")
+                    if enrich_stats:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Metadata enrichment complete - keywords: {len(enriched.keywords) if enriched.keywords else 0}, entities: {len(enriched.entities) if enriched.entities else 0} (took {enrich_stats.get('average', 0):.3f}s)")
+
+                # Stage 4: Validate Quality
+                async with self.tracker.with_tracker("validate_quality"):
+                    quality = await self._validate_content(normalized.normalized, use_cases)
+
+                if self.verbose:
+                    validate_stats = self.tracker.get_stats("validate_quality")
+                    if validate_stats:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Quality validation complete - score: {quality.overall_score:.4f}, level: {quality.quality_level} (took {validate_stats.get('average', 0):.3f}s)")
 
                 now = datetime.now(timezone.utc)
                 dated = now.strftime("%Y/%m/%d")
@@ -1010,46 +1109,53 @@ class RagIngestionTask:
                     "run_id": run_id,
                 }
 
-                try:
-                    result = client.put_object(
-                        spec.storage.bucket,
-                        object_key,
-                        payload,
-                        content_type="text/markdown",
-                        metadata=metadata,
-                        tags=tags,
-                    )
-                except Exception as exc:
-                    raise StorageWriteError(
-                        "Failed to write processed document to storage",
-                        stage="storage",
-                        source=doc.uri or doc.path,
-                        detail=str(exc),
-                    ) from exc
+                # Stage 5: Store Document (MinIO + Repository)
+                async with self.tracker.with_tracker("store_document"):
+                    try:
+                        result = client.put_object(
+                            spec.storage.bucket,
+                            object_key,
+                            payload,
+                            content_type="text/markdown",
+                            metadata=metadata,
+                            tags=tags,
+                        )
+                    except Exception as exc:
+                        raise StorageWriteError(
+                            "Failed to write processed document to storage",
+                            stage="storage",
+                            source=doc.uri or doc.path,
+                            detail=str(exc),
+                        ) from exc
 
-                stored_objects.append(
-                    StorageObject(
-                        bucket=result.bucket,
-                        key=result.key,
-                        size=result.size,
-                        metadata={k: str(v) for k, v in metadata.items()},
-                        tags=tags,
+                    stored_objects.append(
+                        StorageObject(
+                            bucket=result.bucket,
+                            key=result.key,
+                            size=result.size,
+                            metadata={k: str(v) for k, v in metadata.items()},
+                            tags=tags,
+                        )
                     )
-                )
 
-                document_entity = self._build_document_entity(
-                    doc=doc,
-                    normalized=normalized,
-                    enriched=enriched,
-                    quality=quality,
-                    content=content,
-                    object_key=object_key,
-                    payload_size=result.size,
-                    run_id=run_id,
-                )
-                await use_cases.document_repository.save(document_entity)
-                processed_document_ids.append(document_entity.id)
-                origin_counts[doc.origin] = origin_counts.get(doc.origin, 0) + 1
+                    document_entity = self._build_document_entity(
+                        doc=doc,
+                        normalized=normalized,
+                        enriched=enriched,
+                        quality=quality,
+                        content=content,
+                        object_key=object_key,
+                        payload_size=result.size,
+                        run_id=run_id,
+                    )
+                    await use_cases.document_repository.save(document_entity)
+                    processed_document_ids.append(document_entity.id)
+                    origin_counts[doc.origin] = origin_counts.get(doc.origin, 0) + 1
+
+                if self.verbose:
+                    store_stats = self.tracker.get_stats("store_document")
+                    if store_stats:
+                        logger.debug(f"🔧 INGESTION VERBOSE: Document stored - key: {object_key}, size: {result.size} bytes (took {store_stats.get('average', 0):.3f}s)")
             except ProcessingError as exc:
                 logger.error(
                     "Processing error at stage '%s' for %s: %s",
@@ -1069,6 +1175,11 @@ class RagIngestionTask:
                         "detail": repr(exc),
                     }
                 )
+
+        # Log stage timing summary using PerformanceTracker
+        all_stats = self.tracker.get_all_stats()
+        for operation, stats in all_stats.items():
+            logger.info(f"Processing stage - {operation}: avg={stats['average']:.3f}s, total={stats['total']:.2f}s")
 
         return stored_objects, origin_counts, skipped, processed_document_ids
 
@@ -1123,9 +1234,8 @@ class RagIngestionTask:
                 logger.debug(f"🔧 INGESTION VERBOSE: Chunking config - replace_existing: {replace_existing}")
                 logger.debug(f"🔧 INGESTION VERBOSE: Starting semantic chunking for {len(processed_document_ids)} documents")
 
-            # Priority 3: Add timing instrumentation
-            chunk_start = time.perf_counter()
-            chunk_response = await use_cases.chunk_documents.execute(
+            # Use PerformanceTracker for chunking timing
+            chunk_result = await self.tracker.measure("chunking", use_cases.chunk_documents.execute,
                 SemanticChunkingRequest(
                     document_ids=processed_document_ids,
                     replace_existing_chunks=replace_existing,
@@ -1134,7 +1244,8 @@ class RagIngestionTask:
                     metadata_overrides=metadata_overrides,
                 )
             )
-            chunk_duration = time.perf_counter() - chunk_start
+            chunk_response = chunk_result.result
+            chunk_duration = chunk_result.duration
 
             if self.verbose:
                 logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed in {chunk_duration:.2f}s - results: {len(chunk_response.results)}, total_chunks: {chunk_response.total_chunks}")
@@ -1187,10 +1298,13 @@ class RagIngestionTask:
             dry_run: Run in dry-run mode (skip actual storage)
 
         Returns:
-            RagIngestionTaskReport with processing results, stored documents, and timing
+            RagIngestionTaskReport with processing results, stored documents, and timing breakdown
         """
         phase_start_time = datetime.now(timezone.utc)
         logger.info("Running ingestion with shared document repository...")
+
+        # Track timing for each pipeline step
+        timing_breakdown: Dict[str, float] = {}
 
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting ingestion phase with verbose logging")
@@ -1212,17 +1326,21 @@ class RagIngestionTask:
 
         # Phase 1: Infrastructure setup
         logger.info("pipeline initialization started | phase=setup")
-        await self._init_pipeline(spec, use_cases)
+        async with self.tracker.with_tracker("setup"):
+            await self._init_pipeline(spec, use_cases)
 
         # Phase 2: Discovery
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting document discovery phase")
 
-        documents, errors = await self._discover_documents(spec, use_cases)
-        discovery_error_count = len(errors)
+        async with self.tracker.with_tracker("discovery"):
+            documents, errors = await self._discover_documents(spec, use_cases)
 
+        discovery_error_count = len(errors)
         if self.verbose:
-            logger.debug(f"🔧 INGESTION VERBOSE: Discovery completed - found {len(documents)} documents, {discovery_error_count} errors")
+            discovery_stats = self.tracker.get_stats("discovery")
+            if discovery_stats:
+                logger.debug(f"🔧 INGESTION VERBOSE: Discovery completed - found {len(documents)} documents, {discovery_error_count} errors (took {discovery_stats.get('total', 0):.2f}s)")
 
         # Phase 3: Processing
         client = self._storage_client(spec)
@@ -1231,35 +1349,41 @@ class RagIngestionTask:
             logger.debug("🔧 INGESTION VERBOSE: Starting document processing phase")
             logger.debug(f"🔧 INGESTION VERBOSE: Storage client created for provider: {spec.storage.provider}")
 
-        stored_objects, origin_counts, skipped, processed_document_ids = (
-            await self._process_documents(
-                documents=documents,
-                spec=spec,
-                use_cases=use_cases,
-                client=client,
-                run_id=run_id,
-                errors=errors,
+        async with self.tracker.with_tracker("processing"):
+            stored_objects, origin_counts, skipped, processed_document_ids = (
+                await self._process_documents(
+                    documents=documents,
+                    spec=spec,
+                    use_cases=use_cases,
+                    client=client,
+                    run_id=run_id,
+                    errors=errors,
+                )
             )
-        )
 
         if self.verbose:
-            logger.debug(f"🔧 INGESTION VERBOSE: Processing completed - stored: {len(stored_objects)}, skipped: {skipped}, processed_ids: {len(processed_document_ids)}")
+            processing_stats = self.tracker.get_stats("processing")
+            if processing_stats:
+                logger.debug(f"🔧 INGESTION VERBOSE: Processing completed - stored: {len(stored_objects)}, skipped: {skipped}, processed_ids: {len(processed_document_ids)} (took {processing_stats.get('total', 0):.2f}s)")
 
         # Phase 4: Post-processing (chunking)
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting chunking phase")
 
-        chunk_summary = await self._maybe_chunk_documents(
-            processed_document_ids=processed_document_ids,
-            use_cases=use_cases,
-            spec=spec,
-            run_id=run_id,
-            dry_run=dry_run,
-            errors=errors,
-        )
+        async with self.tracker.with_tracker("chunking"):
+            chunk_summary = await self._maybe_chunk_documents(
+                processed_document_ids=processed_document_ids,
+                use_cases=use_cases,
+                spec=spec,
+                run_id=run_id,
+                dry_run=dry_run,
+                errors=errors,
+            )
 
         if self.verbose:
-            logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - documents: {chunk_summary.get('documents', 0)}, chunks: {chunk_summary.get('total_chunks', 0)}, enabled: {chunk_summary.get('enabled', False)}")
+            chunking_stats = self.tracker.get_stats("chunking")
+            if chunking_stats:
+                logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - documents: {chunk_summary.get('documents', 0)}, chunks: {chunk_summary.get('total_chunks', 0)}, enabled: {chunk_summary.get('enabled', False)} (took {chunking_stats.get('total', 0):.2f}s)")
 
         # Build summary
         processing_failures = max(len(errors) - discovery_error_count, 0)
@@ -1291,6 +1415,13 @@ class RagIngestionTask:
         phase_end_time = datetime.now(timezone.utc)
         execution_time = (phase_end_time - phase_start_time).total_seconds()
 
+        # Get pipeline timing breakdown from PerformanceTracker
+        pipeline_stats = self.tracker.get_all_stats()
+        timing_breakdown = {op: stats['total'] for op, stats in pipeline_stats.items()}
+
+        # Log timing summary
+        logger.info(f"Pipeline timing breakdown: setup={timing_breakdown.get('setup', 0):.2f}s, discovery={timing_breakdown.get('discovery', 0):.2f}s, processing={timing_breakdown.get('processing', 0):.2f}s, chunking={timing_breakdown.get('chunking', 0):.2f}s, total={execution_time:.2f}s")
+
         return RagIngestionTaskReport(
             success=summary.processed > 0,
             execution_time_seconds=execution_time,
@@ -1299,4 +1430,5 @@ class RagIngestionTask:
             phase_result=summary,
             total_errors=len(summary.errors),
             total_warnings=0,
+            timing_breakdown=timing_breakdown,
         )

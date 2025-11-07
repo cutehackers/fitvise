@@ -16,6 +16,9 @@ Usage:
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases ingestion
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases embedding
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases infrastructure ingestion
+    
+    # Run  specific phase with --dry-run
+    python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases ingestion --dry-run 
 
     # Other options
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --verbose --output-dir ./reports
@@ -136,11 +139,11 @@ async def main() -> int:
                 print("\n" + "=" * 60)
                 print("DOCUMENT INGESTION SUMMARY")
                 print("=" * 60)
-                print(f"Documents Discovered: {ingestion_summary.counters.get('discovered', 0)}")
-                print(f"Documents Processed: {ingestion_summary.processed}")
-                print(f"Documents Skipped: {ingestion_summary.skipped}")
-                print(f"Documents Failed: {ingestion_summary.failed}")
-                print(f"Chunks Generated: {ingestion_summary.counters.get('chunking', {}).get('total_chunks', 0)}")
+                print(f"Documents discovered: {ingestion_summary.discovered}")
+                print(f"Documents processed: {ingestion_summary.processed}")
+                print(f"Documents skipped: {ingestion_summary.skipped}")
+                print(f"Documents failed: {ingestion_summary.failed}")
+                print(f"Chunks generated: {ingestion_summary.chunking_summary.get('total_chunks', 0)}")
 
                 if ingestion_summary.errors:
                     print(f"\n⚠️  DOCUMENT INGESTION ERRORS ({len(ingestion_summary.errors)} issues):")

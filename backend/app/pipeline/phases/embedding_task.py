@@ -194,6 +194,7 @@ class RagEmbeddingTask:
         max_retries: int = 3,
         show_progress: bool = True,
         document_limit: Optional[int] = None,
+        skip_chunking: bool = True,
     ) -> RagEmbeddingTaskReport:
         """Execute embedding generation phase.
 
@@ -204,6 +205,9 @@ class RagEmbeddingTask:
             max_retries: Maximum retry attempts for failed operations
             show_progress: Whether to show progress during processing
             document_limit: Optional limit on documents to process
+            skip_chunking: If True, load existing chunks from repository instead of re-chunking.
+                          Defaults to True for optimization (reuse chunks from Task 2).
+                          Set to False to force re-chunking with current configuration.
 
         Returns:
             RagEmbeddingTaskReport with comprehensive statistics and timing
@@ -281,9 +285,15 @@ class RagEmbeddingTask:
                 max_retries=max_retries,
                 show_progress=show_progress,
                 replace_existing_embeddings=False,  # Incremental approach
+                skip_chunking=skip_chunking,  # Use parameter value (default True for optimization)
             )
 
-            logger.info(f"Processing {len(document_ids)} documents...")
+            if skip_chunking:
+                logger.info(f"Processing {len(document_ids)} documents with skip_chunking=True")
+                logger.info("Chunks will be loaded from repository (created in Task 2)")
+            else:
+                logger.info(f"Processing {len(document_ids)} documents with skip_chunking=False")
+                logger.info("Documents will be re-chunked with current configuration")
 
             # Execute pipeline
             pipeline_response = await build_use_case.execute(pipeline_request)

@@ -88,7 +88,7 @@ from app.infrastructure.external_services.data_sources.database_connectors impor
 from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
-from app.infrastructure.ml_services import MLServicesContainer
+from app.infrastructure.external_services import ExternalServicesContainer
 from app.config.ml_models import get_chunking_config
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
@@ -250,8 +250,8 @@ class RagIngestionTask:
 
     def __init__(
         self,
+        external_services: ExternalServicesContainer,
         document_repository: DocumentRepository,
-        ml_services: MLServicesContainer,
         data_source_repository: Optional[DataSourceRepository] = None,
         verbose: bool = False,
     ):
@@ -261,13 +261,13 @@ class RagIngestionTask:
             document_repository: Shared document repository instance (required).
                                 Should be provided by the workflow orchestrator
                                 to ensure data continuity across pipeline phases.
-            ml_services: ML services container with embedding model.
-                        Ensures single embedding model initialization.
+            external_services: External services container with embedding model and other services.
+                        Ensures single service initialization.
             data_source_repository: Optional shared data source repository
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
-        self.ml_services = ml_services
+        self.external_services = external_services
         self.data_source_repository = data_source_repository
         self.verbose = verbose
         self.tracker = PerformanceTracker()
@@ -300,7 +300,7 @@ class RagIngestionTask:
             document_apis=DocumentExternalApisUseCase(repository),
             chunk_documents=SemanticChunkingUseCase(
                 document_repository=self.document_repository,
-                embedding_model=self.ml_services.embedding_model,  # Use injected embedding model
+                embedding_model=self.external_services.embedding_model,  # Use injected embedding model
             ),
         )
 

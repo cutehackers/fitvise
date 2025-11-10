@@ -22,6 +22,7 @@ from app.domain.entities.processing_job import (
     JobType,
     ProcessingJob,
 )
+from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.exceptions.chunking_exceptions import ChunkingError
 from app.domain.exceptions.embedding_exceptions import (
     DeduplicationError,
@@ -55,7 +56,7 @@ class BuildIngestionPipelineRequest:
     retry_backoff_factor: float = 1.0
     show_progress: bool = True
     replace_existing_embeddings: bool = False
-    skip_chunking: bool = False  # If True, load existing chunks from repository instead of re-chunking
+    chunk_load_policy: ChunkLoadPolicy = ChunkLoadPolicy.EXISTING_ONLY  # Policy for loading chunks from Task 2
 
 
 @dataclass
@@ -103,32 +104,44 @@ class BuildIngestionPipelineResponse:
 class BuildIngestionPipelineUseCase:
     """Use case for building embedding ingestion pipeline (Task 2.3.3).
 
-    Orchestrates the complete embedding ingestion workflow:
-    1. Document chunking (reuses existing SemanticChunkingUseCase)
+    Orchestrates the embedding generation workflow for Task 3:
+    1. Load existing chunks from repository (created by Task 2)
     2. Content deduplication (SHA256-based)
     3. Embedding generation (reuses existing EmbedDocumentChunksUseCase)
     4. Vector storage (handled by embedding use case)
-    
+
+    **Architecture Note**:
+    - Primary flow: Loads chunks from repository (ChunkLoadPolicy.EXISTING_ONLY)
+    - Fallback optional: Re-chunks via SemanticChunkingUseCase if chunks missing (explicit opt-in)
+    - Task 2 (Ingestion) is responsible for all primary chunking operations
+    - Task 3 (Embedding) should always find existing chunks from Task 2
+
+    **Chunk Load Policies**:
+    - EXISTING_ONLY (default): Strict mode - fails immediately if chunks missing
+    - SENTENCE_FALLBACK: Fallback to sentence splitter if chunks missing
+    - SEMANTIC_FALLBACK: Fallback to semantic splitter if chunks missing
+
     Pipeline Flow:
 
-     Documents → Semantic Chunking → SHA256 Deduplication → Embedding Generation → Weaviate Storage
-         ↓              ↓                    ↓                    ↓                    ↓
-       Validation    Chunk Stats        Dedup Stats        Retry Logic         Job Completion
+     Repository Chunks → SHA256 Deduplication → Embedding Generation → Weaviate Storage
+            ↓                   ↓                      ↓                      ↓
+       Validation          Dedup Stats           Retry Logic           Job Completion
+
+     Fallback Path (only with SENTENCE_FALLBACK or SEMANTIC_FALLBACK):
+     Documents → Semantic Chunking (fallback) → continues with normal flow
 
     Examples:
         >>> use_case = BuildIngestionPipelineUseCase(
         ...     document_repository=document_repo,
-        ...     chunking_use_case=chunking_use_case,
+        ...     chunking_use_case=chunking_use_case,  # Used only as fallback
         ...     embedding_use_case=embedding_use_case
         ... )
         >>> request = BuildIngestionPipelineRequest(
         ...     document_ids=[uuid4(), uuid4()],
-        ...     batch_size=32
+        ...     chunk_load_policy=ChunkLoadPolicy.EXISTING_ONLY  # Default - strict mode
         ... )
         >>> response = await use_case.execute(request)
         >>> response.success
-        True
-        >>> response.deduplication_stats.unique_chunks > 0
         True
     """
 
@@ -142,7 +155,8 @@ class BuildIngestionPipelineUseCase:
 
         Args:
             document_repository: Repository for document operations
-            chunking_use_case: Use case for semantic chunking
+            chunking_use_case: Use case for semantic chunking (used as fallback only when
+                              chunks from Task 2 are missing - should rarely be needed)
             embedding_use_case: Use case for embedding generation and storage
         """
         self._document_repository = document_repository
@@ -186,7 +200,7 @@ class BuildIngestionPipelineUseCase:
                     document_count=0
                 )
 
-            # Step 1: Generate chunks from documents
+            # Step 1: Get chunks from documents
             try:
                 self._current_job.update_progress(25, "Generating semantic chunks...")
                 chunks = await self._get_chunks(request)
@@ -257,7 +271,7 @@ class BuildIngestionPipelineUseCase:
                     operation=self._generate_embeddings,
                     max_retries=request.max_retries,
                     backoff_factor=request.retry_backoff_factor,
-                    unique_chunks=unique_chunks,
+                    chunks=unique_chunks,
                     request=request
                 )
                 results["embeddings_generated"] = embedding_result.embedded_count
@@ -339,84 +353,145 @@ class BuildIngestionPipelineUseCase:
         """
         all_chunks = []
         failed_loads = 0
+        conversion_errors = 0
+        total_chunks_processed = 0
 
         for doc_id in document_ids:
             try:
                 doc = await self._document_repository.find_by_id(doc_id)
                 if doc and hasattr(doc, 'chunks') and doc.chunks:
+                    doc_chunks_count = len(doc.chunks)
+                    logger.debug(f"Document {doc_id}: Found {doc_chunks_count} serialized chunks")
+                    total_chunks_processed += doc_chunks_count
+
                     # Convert stored chunk dictionaries to Chunk objects
-                    for chunk_data in doc.chunks:
+                    for i, chunk_data in enumerate(doc.chunks):
                         try:
-                            # Assume Chunk has a from_dict classmethod or can be instantiated
+                            # Use Chunk.from_dict method for proper deserialization
                             if hasattr(Chunk, 'from_dict'):
                                 chunk = Chunk.from_dict(chunk_data)
+                                all_chunks.append(chunk)
                             else:
                                 # Fallback: direct instantiation from dict
                                 chunk = Chunk(**chunk_data)
-                            all_chunks.append(chunk)
+                                all_chunks.append(chunk)
                         except Exception as e:
-                            logger.warning(f"Failed to convert chunk from document {doc_id}: {e}")
+                            conversion_errors += 1
+                            logger.error(f"Failed to convert chunk {i} from document {doc_id}: {e}")
+                            logger.debug(f"Chunk data keys: {list(chunk_data.keys()) if isinstance(chunk_data, dict) else type(chunk_data)}")
                             continue
+                else:
+                    logger.warning(f"Document {doc_id}: No chunks property or empty chunks")
             except Exception as e:
-                logger.warning(f"Failed to load document {doc_id}: {e}")
+                logger.error(f"Failed to load document {doc_id}: {e}")
                 failed_loads += 1
                 continue
+
+        if conversion_errors > 0:
+            logger.error(f"❌ Failed to convert {conversion_errors} chunks due to deserialization errors")
+            logger.error("   This indicates a serialization/deserialization mismatch between Task 2 and Task 3")
 
         if failed_loads > 0:
             logger.warning(f"Failed to load chunks from {failed_loads} documents")
 
-        logger.info(f"Loaded {len(all_chunks)} existing chunks from {len(document_ids) - failed_loads}/{len(document_ids)} documents")
+        success_rate = (len(all_chunks) / total_chunks_processed * 100) if total_chunks_processed > 0 else 0
+        logger.info(f"✅ Loaded {len(all_chunks)} existing chunks from {len(document_ids) - failed_loads}/{len(document_ids)} documents")
+        logger.info(f"   Conversion success rate: {success_rate:.1f}% ({len(all_chunks)}/{total_chunks_processed})")
+
         return all_chunks
 
     async def _get_chunks(self, request: BuildIngestionPipelineRequest) -> List[Chunk]:
-        """Get chunks from documents - load existing or generate new.
+        """Get chunks from documents based on chunk load policy.
 
-        Strategy:
-        1. If skip_chunking=True, load existing chunks from repository
-        2. Otherwise, generate new chunks using SemanticChunkingUseCase
-        3. Fallback to generation if no existing chunks found
+        **Chunk Load Policies**:
+        - EXISTING_ONLY (default): Load existing chunks only, fail if missing
+        - SENTENCE_FALLBACK: Load existing or fallback to sentence splitter
+        - SEMANTIC_FALLBACK: Load existing or fallback to semantic splitter
+
+        **Primary Path (Task 3 - Embedding Generation)**:
+        1. Load existing chunks from repository (created by Task 2)
+        2. Chunks should always exist if Task 2 completed successfully
+
+        **Fallback Path (only with SENTENCE_FALLBACK or SEMANTIC_FALLBACK)**:
+        1. If no existing chunks found → Generate new chunks via SemanticChunkingUseCase
+        2. This indicates Task 2 may not have completed properly
 
         Args:
-            request: Pipeline request with document IDs and configuration
+            request: Pipeline request with document IDs and chunk load policy
 
         Returns:
             List of chunks (either loaded or generated)
 
         Raises:
-            ChunkingError: If chunking fails
+            ChunkingError: If chunks are missing and policy is EXISTING_ONLY, or if fallback chunking fails
         """
         if not request.document_ids:
             raise ChunkingError("No document IDs provided for chunking")
 
-        # Try loading existing chunks first if skip_chunking enabled
-        if request.skip_chunking:
-            logger.info("Loading existing chunks from repository (skip_chunking=True)")
-            chunks = await self._load_chunks(request.document_ids)
+        # Always try loading existing chunks first
+        logger.info(f"📥 Loading existing chunks from repository (Task 2 → Task 3 handover)")
+        logger.info(f"   Policy: {request.chunk_load_policy}")
+        chunks = await self._load_chunks(request.document_ids)
 
-            if chunks:
-                logger.info(f"✅ Reusing {len(chunks)} existing chunks from ingestion phase")
-                return chunks
-            else:
-                logger.warning("⚠️ No existing chunks found, falling back to chunking")
+        if chunks:
+            logger.info(f"✅ Successfully loaded {len(chunks)} existing chunks from Task 2 (Ingestion)")
+            return chunks
 
-        # Generate new chunks (original behavior or fallback)
-        logger.info("Generating new chunks using SemanticChunkingUseCase")
+        # Handle missing chunks based on policy
+        logger.warning("=" * 80)
+        logger.warning("⚠️  WARNING: No existing chunks found in repository!")
+        logger.warning("   This indicates Task 2 (Ingestion) may not have completed successfully")
+        logger.warning(f"   Current policy: {request.chunk_load_policy}")
+
+        if request.chunk_load_policy == ChunkLoadPolicy.EXISTING_ONLY:
+            # Strict mode - fail immediately
+            logger.error("   Policy is EXISTING_ONLY - failing immediately (no fallback allowed)")
+            logger.error("   Recommendation: Verify Task 2 completed successfully and re-run if needed")
+            logger.warning("=" * 80)
+            raise ChunkingError(
+                "No existing chunks found and chunk_load_policy is EXISTING_ONLY. "
+                "Task 2 (Ingestion) must complete successfully before Task 3 (Embedding). "
+                "Please run Task 2 first or change chunk_load_policy to allow fallback.",
+                document_id=str(request.document_ids)
+            )
+
+        # Fallback mode - generate new chunks
+        if not request.chunk_load_policy.requires_fallback():
+            # Should not reach here, but safety check
+            logger.error("   Invalid policy state - no fallback allowed")
+            logger.warning("=" * 80)
+            raise ChunkingError(
+                f"Invalid chunk load policy: {request.chunk_load_policy}",
+                document_id=str(request.document_ids)
+            )
+
+        # Determine chunking method based on policy
+        use_semantic = request.chunk_load_policy.uses_semantic_chunking()
+        chunking_method = "semantic (with embeddings)" if use_semantic else "sentence (no embeddings)"
+        logger.warning(f"   Falling back to re-chunking using: {chunking_method}")
+        logger.warning("   Recommendation: Verify Task 2 completed and re-run if needed")
+        logger.warning("=" * 80)
+
+        logger.info(f"🔄 Generating new chunks using SemanticChunkingUseCase (fallback mode: {chunking_method})")
         chunking_request = SemanticChunkingRequest(
             document_ids=request.document_ids,
             include_failed=False,  # Don't include failed chunks in pipeline
-            replace_existing_chunks=True
+            replace_existing_chunks=True,
+            enable_semantic=use_semantic  # Use chunking method specified by policy
         )
 
         chunking_response = await self._chunking_use_case.execute(chunking_request)
 
         if not chunking_response.success:
             raise ChunkingError(
-                f"Chunking failed",
+                f"Fallback chunking failed - Task 2 chunks missing and re-chunking unsuccessful",
                 document_id=str(request.document_ids)
             )
 
         # Load chunks from documents after chunking
-        return await self._load_chunks(request.document_ids)
+        generated_chunks = await self._load_chunks(request.document_ids)
+        logger.info(f"✅ Fallback chunking generated {len(generated_chunks)} chunks")
+        return generated_chunks
 
     async def _deduplicate_chunks(
         self,

@@ -163,7 +163,7 @@ async def main() -> int:
                     if len(ingestion_report.errors) > 5:
                         print(f"   ... and {len(ingestion_report.errors) - 5} more errors")
 
-                    print(f"\n📊 SUMMARY: {ingestionreporty.processed} processed, {ingestionreporty.failed} failed, {ingestionreporty.skipped} skipped")
+                    print(f"\n📊 SUMMARY: {ingestion_report.processed} processed, {ingestion_report.failed} failed, {ingestion_report.skipped} skipped")
                     success = False
 
             # Phase 3: Embedding generation
@@ -182,22 +182,22 @@ async def main() -> int:
                 print("EMBEDDING GENERATION SUMMARY")
                 print("=" * 60)
                 print(f"Success: {'✅ YES' if embedding_report.success else '❌ NO'}")
-                print(f"Documents Processed: {embedding_report.documents_processed}")
-                print(f"Total Chunks: {embedding_report.total_chunks}")
-                print(f"Unique Chunks: {embedding_report.unique_chunks}")
-                print(f"Duplicates Removed: {embedding_report.duplicates_removed}")
-                print(f"Embeddings Generated: {embedding_report.embeddings_generated}")
-                print(f"Embeddings Stored: {embedding_report.embeddings_stored}")
-                print(f"Processing Time: {embedding_report.processing_time_seconds:.2f}s")
+                print(f"Documents Processed: {embedding_report.phase_result.documents_processed}")
+                print(f"Total Chunks: {embedding_report.phase_result.total_chunks}")
+                print(f"Unique Chunks: {embedding_report.phase_result.unique_chunks}")
+                print(f"Duplicates Removed: {embedding_report.phase_result.duplicates_removed}")
+                print(f"Embeddings Generated: {embedding_report.phase_result.embeddings_generated}")
+                print(f"Embeddings Stored: {embedding_report.phase_result.embeddings_stored}")
+                print(f"Processing Time: {embedding_report.phase_result.processing_time_seconds:.2f}s")
 
-                if embedding_report.warnings:
-                    print(f"\n⚠️  {len(embedding_report.warnings)} warnings:")
-                    for warning in embedding_report.warnings:
+                if embedding_report.phase_result.warnings:
+                    print(f"\n⚠️  {len(embedding_report.phase_result.warnings)} warnings:")
+                    for warning in embedding_report.phase_result.warnings:
                         print(f"   - {warning}")
 
-                if embedding_report.errors:
-                    print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_report.errors)} issues):")
-                    for i, error in enumerate(embedding_report.errors[:5], 1):
+                if embedding_report.phase_result.errors:
+                    print(f"\n❌ EMBEDDING GENERATION ERRORS ({len(embedding_report.phase_result.errors)} issues):")
+                    for i, error in enumerate(embedding_report.phase_result.errors[:5], 1):
                         print(f"   {i}. {error}")
 
                         # Provide actionable suggestions for common embedding errors
@@ -211,8 +211,8 @@ async def main() -> int:
                         elif "model" in error_str:
                             print(f"      💡 SOLUTION: Ensure embedding model is downloaded and accessible")
 
-                    if len(embedding_report.errors) > 5:
-                        print(f"   ... and {len(embedding_report.errors) - 5} more errors")
+                    if len(embedding_report.phase_result.errors) > 5:
+                        print(f"   ... and {len(embedding_report.phase_result.errors) - 5} more errors")
 
                     success = False
 

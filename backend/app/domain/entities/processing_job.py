@@ -507,9 +507,34 @@ class ProcessingJob:
         """Get job duration in seconds."""
         if not self._started_at:
             return None
-        
+
         end_time = self._completed_at or datetime.utcnow()
         return (end_time - self._started_at).total_seconds()
+
+    def get_progress_dict(self) -> Dict[str, Any]:
+        """Get progress tracking information as a dictionary.
+
+        Returns:
+            Dictionary containing progress, status, and timing information
+        """
+        return {
+            "progress_percentage": self._progress_percentage,
+            "current_step": self._current_step,
+            "completed_steps": self._completed_steps,
+            "total_steps": self._total_steps,
+            "status": self._status.value,
+            "started_at": self._started_at.isoformat() if self._started_at else None,
+            "completed_at": self._completed_at.isoformat() if self._completed_at else None,
+            "updated_at": self._updated_at.isoformat(),
+            "execution_time_seconds": self.get_duration(),
+            "memory_usage_mb": self._memory_usage_mb,
+            "cpu_usage_percent": self._cpu_usage_percent,
+            "retry_count": self._retry_count,
+            "max_retries": self._max_retries,
+            "has_error": self._error_message is not None,
+            "error_message": self._error_message,
+            "log_count": len(self._logs)
+        }
     
     def get_status_summary(self) -> dict:
         """Get comprehensive status summary."""

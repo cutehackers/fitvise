@@ -57,3 +57,40 @@ class Chunk:
             payload["attributes"] = self.attributes
         payload["length"] = self.length
         return payload
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Chunk":
+        """Create Chunk from dictionary representation."""
+        # Handle field name mapping from serialized data
+        chunk_data = data.copy()
+
+        # Map "id" to "chunk_id" if needed (as used in as_dict serialization)
+        if "id" in chunk_data and "chunk_id" not in chunk_data:
+            chunk_data["chunk_id"] = chunk_data.pop("id")
+
+        # Convert document_id back to UUID if it's a string
+        if isinstance(chunk_data.get("document_id"), str):
+            chunk_data["document_id"] = UUID(chunk_data["document_id"])
+
+        # Reconstruct ChunkMetadata from its dictionary representation
+        metadata_dict = chunk_data.pop("metadata", {})
+        metadata = ChunkMetadata.from_dict(metadata_dict) if metadata_dict else ChunkMetadata.from_dict({
+            "sequence": 0,
+            "start": 0,
+            "end": len(chunk_data.get("text", ""))
+        })
+
+        # Handle default values and optional fields
+        chunk_id = chunk_data.get("chunk_id")
+        if not chunk_id:
+            chunk_id = str(UUID(bytes=bytes(16)))  # Generate a random UUID
+
+        return cls(
+            chunk_id=chunk_id,
+            document_id=chunk_data["document_id"],
+            text=chunk_data["text"],
+            metadata=metadata,
+            embedding_vector_id=chunk_data.get("embedding_vector_id"),
+            score=chunk_data.get("score"),
+            attributes=chunk_data.get("attributes", {})
+        )

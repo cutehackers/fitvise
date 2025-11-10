@@ -56,3 +56,37 @@ class ChunkMetadata:
         if self.extra:
             payload["extra"] = self.extra
         return payload.copy()
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ChunkMetadata":
+        """Create ChunkMetadata from dictionary representation."""
+        # Extract required fields
+        sequence = data["sequence"]
+        start = data["start"]
+        end = data["end"]
+
+        # Extract optional fields with defaults
+        token_count = data.get("token_count")
+        section = data.get("section")
+        heading_path = data.get("heading_path")
+        page_number = data.get("page_number")
+        source_type = data.get("source_type")
+        similarity_score = data.get("similarity_score")
+        extra = data.get("extra", {})
+
+        # Handle nested list conversion for heading_path
+        if heading_path and isinstance(heading_path, list):
+            heading_path = [str(item) for item in heading_path]
+
+        return cls(
+            sequence=sequence,
+            start=start,
+            end=end,
+            token_count=token_count,
+            section=section,
+            heading_path=heading_path,
+            page_number=page_number,
+            source_type=source_type,
+            similarity_score=similarity_score,
+            extra=extra,
+        )

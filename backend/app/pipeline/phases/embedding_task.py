@@ -14,6 +14,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from app.infrastructure.external_services import ExternalServicesContainer
 from app.pipeline.config import PipelineSpec
 from app.application.use_cases.indexing.build_ingestion_pipeline import (
     BuildIngestionPipelineUseCase,
@@ -25,6 +26,7 @@ from app.application.use_cases.chunking.semantic_chunking import (
 from app.application.use_cases.embedding.embed_document_chunks import (
     EmbedDocumentChunksUseCase,
 )
+from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
 
 logger = logging.getLogger(__name__)
@@ -134,16 +136,19 @@ class RagEmbeddingTask:
 
     def __init__(
         self,
+        external_services: ExternalServicesContainer,
         document_repository: DocumentRepository,
         verbose: bool = False,
     ):
         """Initialize the embedding phase.
 
         Args:
+            external_services: External services container with all required services (ML models, embedding services, etc.)
             document_repository: Shared document repository instance
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
+        self.external_services = external_services
         self.verbose = verbose
 
         if verbose:
@@ -164,8 +169,8 @@ class RagEmbeddingTask:
             EmbeddingPipelineError: If document retrieval fails
         """
         try:
-            # Get all documents from the SHARED repository
-            documents = self.document_repository.list_all()
+            # Get all processed documents from the SHARED repository
+            documents = await self.document_repository.find_processed_documents()
 
             # Convert to document IDs
             document_ids = (
@@ -186,6 +191,58 @@ class RagEmbeddingTask:
             logger.error(f"Failed to get processed document IDs: {str(e)}")
             raise EmbeddingPipelineError(f"Document retrieval failed: {str(e)}")
 
+    async def _validate_chunk_availability(
+        self, document_ids: List[UUID]
+    ) -> Dict[str, Any]:
+        """Validate that chunks exist for all documents from Task 2 (Ingestion).
+
+        This method verifies the handover from Task 2 by checking that all documents
+        have been properly chunked and are ready for embedding generation.
+
+        Args:
+            document_ids: List of document IDs to validate
+
+        Returns:
+            Dict with chunk statistics:
+                - total_documents: Total number of documents checked
+                - documents_with_chunks: Number of documents that have chunks
+                - total_chunks: Total number of chunks available
+                - documents_without_chunks: List of document IDs missing chunks
+
+        Raises:
+            EmbeddingPipelineError: If chunk validation fails critically
+        """
+        logger.info("🔍 Validating chunk availability from Task 2 (Ingestion)...")
+
+        chunk_stats = {
+            "total_documents": len(document_ids),
+            "documents_with_chunks": 0,
+            "total_chunks": 0,
+            "documents_without_chunks": []
+        }
+
+        try:
+            for doc_id in document_ids:
+                # Get document from repository and access chunks property
+                doc = await self.document_repository.find_by_id(doc_id)
+
+                # Check if document exists and has chunks
+                if doc and hasattr(doc, 'chunks') and doc.chunks:
+                    chunks = doc.chunks
+                    chunk_stats["documents_with_chunks"] += 1
+                    chunk_stats["total_chunks"] += len(chunks)
+                    if self.verbose:
+                        logger.debug(f"✅ Document {doc_id}: {len(chunks)} chunks found")
+                else:
+                    chunk_stats["documents_without_chunks"].append(str(doc_id))
+                    logger.warning(f"⚠️ Document {doc_id}: No chunks found")
+
+            return chunk_stats
+
+        except Exception as e:
+            logger.error(f"Failed to validate chunk availability: {str(e)}")
+            raise EmbeddingPipelineError(f"Chunk validation failed: {str(e)}")
+
     async def execute(
         self,
         spec: PipelineSpec,
@@ -194,9 +251,12 @@ class RagEmbeddingTask:
         max_retries: int = 3,
         show_progress: bool = True,
         document_limit: Optional[int] = None,
-        skip_chunking: bool = True,
+        chunk_load_policy: ChunkLoadPolicy = ChunkLoadPolicy.EXISTING_ONLY,
     ) -> RagEmbeddingTaskReport:
         """Execute embedding generation phase.
+
+        This phase (Task 3) assumes that documents have already been chunked by Task 2 (Ingestion).
+        It validates chunk availability, then generates and stores embeddings for existing chunks.
 
         Args:
             spec: Pipeline specification
@@ -205,9 +265,11 @@ class RagEmbeddingTask:
             max_retries: Maximum retry attempts for failed operations
             show_progress: Whether to show progress during processing
             document_limit: Optional limit on documents to process
-            skip_chunking: If True, load existing chunks from repository instead of re-chunking.
-                          Defaults to True for optimization (reuse chunks from Task 2).
-                          Set to False to force re-chunking with current configuration.
+            chunk_load_policy: Policy for loading chunks from Task 2.
+                             - EXISTING_ONLY (default): Strict mode - fail if chunks missing
+                             - SENTENCE_FALLBACK: Use sentence splitter as fallback
+                             - SEMANTIC_FALLBACK: Use semantic splitter as fallback
+                             Default is EXISTING_ONLY for production-safe fail-fast behavior.
 
         Returns:
             RagEmbeddingTaskReport with comprehensive statistics and timing
@@ -219,7 +281,7 @@ class RagEmbeddingTask:
         phase_start_time = datetime.now(timezone.utc)
         start_time = time.time()
 
-        logger.info("Starting RAG embedding pipeline...")
+        logger.info("Starting RAG embedding pipeline (Task 3: Embedding Generation)...")
         if self.verbose:
             logger.info(
                 f"Configuration: batch_size={batch_size}, deduplication={deduplication_enabled}, max_retries={max_retries}"
@@ -227,19 +289,36 @@ class RagEmbeddingTask:
 
         try:
             # Initialize use cases with SHARED repository
-            logger.info("Initializing use cases with shared repository...")
+            logger.info("Initializing embedding use cases...")
 
-            # Chunking use case with shared repository
-            chunking_use_case = SemanticChunkingUseCase(
-                document_repository=self.document_repository
+            # Ensure embedding service is initialized before use
+            embedding_service = self.external_services.sentence_transformer_service
+            logger.info(f"Initializing embedding model: {embedding_service.model_name}")
+            try:
+                await embedding_service.initialize()
+                logger.info("Embedding model initialized successfully")
+            except Exception as init_error:
+                error_msg = f"Failed to initialize embedding model '{embedding_service.model_name}': {str(init_error)}"
+                logger.error(error_msg)
+                raise EmbeddingPipelineError(error_msg) from init_error
+
+            # Embedding use case with injected services
+            embedding_use_case = EmbedDocumentChunksUseCase(
+                embedding_service=embedding_service,
+                embedding_repository=self.external_services.embedding_repository,
+                domain_service=self.external_services.embedding_domain_service,
             )
 
-            # Embedding use case
-            embedding_use_case = EmbedDocumentChunksUseCase()
-
             # Build ingestion pipeline use case with shared repository
+            # Note: This still requires chunking_use_case for BuildIngestionPipelineUseCase interface
+            # but chunks will be loaded from repository, not re-chunked
+            chunking_use_case = SemanticChunkingUseCase(
+                document_repository=self.document_repository,
+                embedding_model=self.external_services.embedding_model
+            )
+
             build_use_case = BuildIngestionPipelineUseCase(
-                document_repository=self.document_repository,  # Use shared repository!
+                document_repository=self.document_repository,
                 chunking_use_case=chunking_use_case,
                 embedding_use_case=embedding_use_case,
             )
@@ -277,7 +356,67 @@ class RagEmbeddingTask:
                     total_warnings=1,
                 )
 
+            # Validate chunk handover from Task 2 (Ingestion)
+            logger.info("=" * 80)
+            logger.info("📦 CHUNK HANDOVER VALIDATION (Task 2 → Task 3)")
+            logger.info("=" * 80)
+
+            chunk_stats = await self._validate_chunk_availability(document_ids)
+
+            logger.info("📊 Chunk Statistics:")
+            logger.info(f"   Documents processed: {chunk_stats['total_documents']}")
+            logger.info(f"   Documents with chunks: {chunk_stats['documents_with_chunks']}")
+            logger.info(f"   Total chunks available: {chunk_stats['total_chunks']}")
+
+            if chunk_stats['documents_without_chunks']:
+                logger.warning(
+                    f"⚠️ {len(chunk_stats['documents_without_chunks'])} documents have no chunks"
+                )
+                if self.verbose:
+                    logger.warning(
+                        f"   Missing chunk documents (first 5): {chunk_stats['documents_without_chunks'][:5]}"
+                    )
+
+            if chunk_stats['total_chunks'] == 0:
+                logger.error("❌ No chunks available for embedding generation")
+                logger.error("   Possible causes:")
+                logger.error("   1. Task 2 (Ingestion) not completed")
+                logger.error("   2. Chunking failed during Task 2")
+                logger.error("   3. Repository connection issue")
+
+                # Return early with clear error
+                from datetime import timezone
+                phase_end_time = datetime.now(timezone.utc)
+                execution_time = (phase_end_time - phase_start_time).total_seconds()
+
+                error_result = EmbeddingResult(
+                    success=False,
+                    documents_processed=len(document_ids),
+                    total_chunks=0,
+                    unique_chunks=0,
+                    duplicates_removed=0,
+                    embeddings_generated=0,
+                    embeddings_stored=0,
+                    processing_time_seconds=time.time() - start_time,
+                    errors=["No chunks available for embedding generation - Task 2 may not have completed"],
+                )
+
+                return RagEmbeddingTaskReport(
+                    success=False,
+                    execution_time_seconds=execution_time,
+                    start_time=phase_start_time,
+                    end_time=phase_end_time,
+                    phase_result=error_result,
+                    total_errors=1,
+                    total_warnings=0,
+                )
+
+            logger.info(f"✅ Chunk handover validated: {chunk_stats['total_chunks']} chunks ready")
+            logger.info("🚀 Proceeding to embedding generation...")
+            logger.info("=" * 80)
+
             # Create pipeline request
+            # Note: Chunks will be loaded from repository (created in Task 2)
             pipeline_request = BuildIngestionPipelineRequest(
                 document_ids=document_ids,
                 batch_size=batch_size,
@@ -285,15 +424,16 @@ class RagEmbeddingTask:
                 max_retries=max_retries,
                 show_progress=show_progress,
                 replace_existing_embeddings=False,  # Incremental approach
-                skip_chunking=skip_chunking,  # Use parameter value (default True for optimization)
+                chunk_load_policy=chunk_load_policy,  # Policy for loading chunks from Task 2
             )
 
-            if skip_chunking:
-                logger.info(f"Processing {len(document_ids)} documents with skip_chunking=True")
-                logger.info("Chunks will be loaded from repository (created in Task 2)")
-            else:
-                logger.info(f"Processing {len(document_ids)} documents with skip_chunking=False")
-                logger.info("Documents will be re-chunked with current configuration")
+            logger.info(f"📝 Processing Configuration:")
+            logger.info(f"   Documents: {len(document_ids)}")
+            logger.info(f"   Available chunks: {chunk_stats['total_chunks']}")
+            logger.info(f"   Batch size: {batch_size}")
+            logger.info(f"   Deduplication: {deduplication_enabled}")
+            logger.info(f"   Max retries: {max_retries}")
+            logger.info(f"   Chunk load policy: {chunk_load_policy} ({str(chunk_load_policy)})")
 
             # Execute pipeline
             pipeline_response = await build_use_case.execute(pipeline_request)

@@ -496,6 +496,7 @@ self.ingestion_phase = RagIngestionTask(
     data_source_repository=self.repositories.data_source_repository,
 )
 self.embedding_phase = RagEmbeddingTask(
+    ml_services=self.ml_services,
     document_repository=self.repositories.document_repository,  # Same instance!
 )
 

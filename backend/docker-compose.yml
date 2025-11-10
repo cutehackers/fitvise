@@ -5,36 +5,46 @@ services:
     container_name: fitvise-weaviate
     ports:
       - "8080:8080"
-      - "50051:50051"  # gRPC endpoint
+      - "50051:50051" # gRPC endpoint
     environment:
       # Basic Configuration
       QUERY_DEFAULTS_LIMIT: 25
-      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
-      PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
 
       # Performance & Resources
-      DEFAULT_VECTORIZER_MODULE: 'none'  # We provide embeddings
-      ENABLE_MODULES: ''
+      DEFAULT_VECTORIZER_MODULE: "none" # We provide embeddings
+      ENABLE_MODULES: ""
 
       # Cluster Configuration
-      CLUSTER_HOSTNAME: 'node1'
+      CLUSTER_HOSTNAME: "node1"
 
       # Performance Tuning
-      LIMIT_RESOURCES: 'false'
-      GOMEMLIMIT: '2GiB'
+      LIMIT_RESOURCES: "false"
+      GOMEMLIMIT: "2GiB"
 
       # Logging
-      LOG_LEVEL: 'info'
+      LOG_LEVEL: "info"
 
       # HNSW Index Configuration (Optimized for Performance)
       # These match our WeaviateSchema settings
-      VECTOR_INDEX_TYPE: 'hnsw'
+      VECTOR_INDEX_TYPE: "hnsw"
+
+      # Metrics (Prometheus-compatible format)
+      PROMETHEUS_MONITORING_ENABLED: "true"
 
     volumes:
       - weaviate_data:/var/lib/weaviate
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/v1/.well-known/ready"]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8080/v1/.well-known/ready",
+        ]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -69,7 +79,7 @@ services:
 
       # CORS Configuration
       CORS_ORIGINS: http://localhost:3000,http://localhost:8000
-      CORS_ALLOW_CREDENTIALS: 'true'
+      CORS_ALLOW_CREDENTIALS: "true"
 
     volumes:
       - ./app:/app/app

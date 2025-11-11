@@ -30,20 +30,20 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ### Testing and Validation
 
 **Test Structure**:
-All tests are located in the `/backend/tests/` directory following this structure:
+All tests are located in the `/tests/` directory organized by type:
 ```
 tests/
 ├── unit/                    # Unit tests for individual components
-│   ├── table_serialization/ # Table serialization module tests
-│   │   ├── fixtures/        # Test data fixtures
-│   │   │   └── sample_tables.py
-│   │   ├── conftest.py      # Local test configuration
-│   │   └── test_serializers.py
+│   ├── pipeline/            # Pipeline phase tests (RAG workflow)
+│   ├── application/         # Use case and business logic tests
+│   ├── infrastructure/      # Repository and service tests
+│   ├── domain/              # Entity and value object tests
 │   └── ...
-├── integration/             # Integration tests
-├── e2e/                     # End-to-end tests
-├── fixtures/                # Shared test fixtures
-├── utils/                   # Test utilities
+├── integration/             # Integration tests for component interactions
+├── e2e/                     # End-to-end tests for complete workflows
+├── fixtures/                # Shared test fixtures and sample data
+├── utils/                   # Test utilities and helpers
+├── performance/             # Performance and load tests
 └── conftest.py             # Global pytest configuration
 ```
 
@@ -53,29 +53,32 @@ tests/
 pytest tests/
 
 # Run specific test module
-pytest tests/unit/table_serialization/
+pytest tests/unit/pipeline/test_rag_embedding_task.py -v
 
-# Run with verbose output
-pytest tests/unit/table_serialization/test_serializers.py -v
+# Run specific test class
+pytest tests/unit/pipeline/test_rag_embedding_task.py::TestEmbeddingExecution -v
 
 # Run with coverage
 pytest tests/ --cov=app --cov-report=html
 
-# Test configuration loading (legacy)
-python test_settings.py
+# Run with detailed output and short tracebacks
+pytest tests/ -vv --tb=short
 
-# Test API endpoints (legacy)
-python api_example.py
-
-# Test LLM service directly (legacy)
-python example_usage.py
+# Run only fast tests (exclude slow tests)
+pytest tests/ -m "not slow"
 ```
 
 **Test Organization Rules**:
 - ✅ **Unit tests**: `/tests/unit/` - Test individual components in isolation
 - ✅ **Integration tests**: `/tests/integration/` - Test component interactions
 - ✅ **E2E tests**: `/tests/e2e/` - Test complete user workflows
+- ✅ **Pipeline tests**: `/tests/unit/pipeline/` - RAG pipeline phase tests
 - ❌ **Never** place tests inside `app/` directory - they belong in `/tests/`
+
+**Recent Test Additions**:
+- `tests/unit/pipeline/test_rag_embedding_task.py` - 30 comprehensive tests for embedding generation phase
+- `tests/unit/pipeline/test_rag_ingestion_task.py` - Tests for document ingestion phase
+- All new pipeline tests follow TDD with comprehensive mocking and async support
 
 ### Environment Configuration
 The service requires a comprehensive `.env` file. Copy the existing `.env` and modify as needed. Key configuration areas:
@@ -87,7 +90,40 @@ The service requires a comprehensive `.env` file. Copy the existing `.env` and m
 
 ## Architecture Overview
 
-This is a FastAPI-based AI fitness service with modular architecture and comprehensive LLM integration.
+This is a FastAPI-based AI fitness service with modular architecture, comprehensive LLM integration, and a production-grade RAG (Retrieval-Augmented Generation) pipeline.
+
+### RAG Pipeline Architecture
+
+The RAG pipeline orchestrates document processing, embedding, and retrieval in three distinct phases:
+
+**Phase 1: Infrastructure Setup** (`RagInfrastructureTask`)
+- Initializes vector databases and storage systems
+- Validates external service connectivity
+- Prepares system for data ingestion
+
+**Phase 2: Document Ingestion** (`RagIngestionTask`)
+- Discovers and retrieves documents from multiple sources (files, databases, APIs, web)
+- Processes documents through multi-stage pipeline: extract → normalize → enrich → validate
+- Chunks documents using semantic, recursive, or sentence-based strategies
+- Stores processed documents in shared repository for Phase 3
+
+**Phase 3: Embedding Generation** (`RagEmbeddingTask`)
+- Validates chunk availability from Phase 2 (Task 2 → Task 3 handover)
+- Generates embeddings using sentence transformer models
+- Deduplicates chunks and stores embeddings in vector database
+- Tracks statistics: documents processed, chunks deduped, embeddings stored
+
+**Workflow Orchestration** (`RagWorkflow`)
+- Coordinates all phases with shared repository state
+- Provides unified execution interface with progress tracking
+- Generates comprehensive execution reports
+- Handles error recovery and phase dependencies
+
+**Key Components**:
+- `app/pipeline/workflow.py` - Main orchestrator
+- `app/pipeline/phases/` - Individual phase implementations
+- `app/pipeline/config.py` - Pipeline configuration
+- `app/domain/entities/chunk_load_policy.py` - Chunk loading strategies for fallback handling
 
 ### Core Service Architecture
 The service follows a layered architecture with clear separation of concerns:
@@ -140,9 +176,36 @@ Pydantic models provide comprehensive validation and auto-documentation:
 - **Vector Store**: ChromaDB for embeddings (configurable to FAISS)
 - **Database**: SQLite by default, configurable to PostgreSQL/MySQL
 
+### Domain-Driven Design (DDD) Structure
+
+The codebase follows DDD principles with clear domain boundaries:
+
+**Domain Layer** (`app/domain/`)
+- **Entities**: Core domain objects (Document, Chunk, Embedding, ProcessingJob)
+- **Value Objects**: Immutable domain concepts (ChunkMetadata, DocumentMetadata, ChunkLoadPolicy)
+- **Repositories**: Abstract interfaces for data persistence
+- **Exceptions**: Domain-specific exceptions for error handling
+
+**Application Layer** (`app/application/`)
+- **Use Cases**: Business logic orchestration
+- **DTOs**: Data transfer objects for internal communication
+- **Query Handlers**: Query processing for read operations
+
+**Infrastructure Layer** (`app/infrastructure/`)
+- **Repository Implementations**: Concrete repository implementations
+- **External Services**: ML services, LLM integration, vector stores
+- **Database**: SQLAlchemy models and async session management
+
+**API Layer** (`app/api/`)
+- **Schemas**: Pydantic models for request/response validation
+- **Routes**: HTTP endpoints with proper error handling
+- **Dependencies**: FastAPI dependency injection
+
 ### Key Design Patterns
 - **Dependency Injection**: Services injected through FastAPI's dependency system
 - **Repository Pattern**: Data access abstraction through RepositoryContainer
+- **Domain-Driven Design**: Clear separation between domain, application, and infrastructure
+- **Value Objects**: Immutable domain concepts with validation
 - **Async Operations**: Non-blocking I/O throughout the stack
 - **Configuration as Code**: All settings externalized to environment variables
 - **Comprehensive Error Handling**: Graceful degradation with meaningful error messages
@@ -481,3 +544,45 @@ The service is designed around external LLM APIs with fitness-specific system pr
 - Health monitoring of the LLM service
 
 When modifying LLM integration, ensure compatibility with the expected request/response format and maintain the existing error handling patterns.
+
+## Critical Development Patterns
+
+### Async/Await Usage
+- **All database operations are async** - Use `await` with repository methods
+- **All external service calls are async** - LLM service, embedding service, vector store operations
+- **Use AsyncMock in tests** - Not Mock, for async methods
+- **AsyncSession context managers** - Properly manage SQLAlchemy async sessions
+- **Never use sync operations in async functions** - This will block event loop
+
+### RAG Pipeline Testing
+- **Mock external dependencies** - Embedding services, vector stores, repositories
+- **Use real dataclasses** - EmbeddingResult, RagEmbeddingTaskReport are real models
+- **Test both success and failure paths** - Especially Task 2 → Task 3 handover
+- **Validate chunk availability** - Phase 3 assumes Phase 2 completed successfully
+- **Track deduplication stats** - Validate duplicate removal calculations
+
+### Repository Access Patterns
+- **Use RepositoryContainer for dependency injection** - Provides consistent repository access
+- **Access repositories via dependency injection** - `Depends(get_repository_container)`
+- **In scripts, create RepositoryContainer manually** - With Settings and AsyncSession
+- **In tests, mock repositories with AsyncMock** - Realistic return values
+
+### Error Handling
+- **Domain exceptions for business logic failures** - ChunkingError, EmbeddingGenerationError, etc.
+- **Custom pipeline exceptions** - EmbeddingPipelineError, IngestionPipelineError
+- **Catch and log at boundaries** - FastAPI routes, pipeline orchestrator
+- **Return structured error responses** - Always include error details for debugging
+
+### Testing Strategy
+- **Use pytest with async support** - `@pytest.mark.asyncio` decorator
+- **Conftest for shared fixtures** - Global fixtures in `conftest.py`, module-specific in local `conftest.py`
+- **Organize by layer** - Tests mirror application structure (unit/pipeline, unit/domain, integration/api)
+- **Test configuration in isolation** - Settings validation before service startup
+- **Mock at boundaries** - Mock external services and repositories, not internal logic
+
+### Performance Considerations
+- **Connection pooling enabled** - AsyncPG for PostgreSQL, aiosqlite for SQLite
+- **Batch operations preferred** - Processing documents in batches when possible
+- **Lazy loading in repositories** - Repository patterns should fetch data on demand
+- **Vector database indexing** - ChromaDB/Weaviate handle embedding search optimization
+- **Monitor embedding model memory** - Sentence transformers can be memory-intensive

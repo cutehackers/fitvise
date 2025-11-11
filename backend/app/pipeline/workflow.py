@@ -39,6 +39,7 @@ from scripts.rag_summary import (
     create_ingestion_phase_result,
     create_embedding_phase_result,
 )
+from app.pipeline.chunking_config_resolver import resolve_chunking_configuration
 
 logger = logging.getLogger(__name__)
 
@@ -53,25 +54,6 @@ class RepositoryBundle:
 
     document_repository: DocumentRepository
     data_source_repository: DataSourceRepository
-
-
-def get_chunking_configs_for_workflow(spec: PipelineSpec) -> dict:
-    """Get the effective chunking configurations from PipelineSpec.
-
-    Args:
-        spec: Pipeline specification containing chunking configuration
-
-    Returns:
-        Chunking configurations dictionary with YAML overrides applied
-    """
-    preset_name = spec.chunking.preset or "balanced"
-    preset_config = get_chunking_config(preset_name)
-
-    # Apply YAML enable_semantic override if specified
-    if spec.chunking.enable_semantic is not None:
-        preset_config["enable_semantic"] = spec.chunking.enable_semantic
-
-    return preset_config
 
 
 class RAGWorkflow:
@@ -442,7 +424,7 @@ class RAGWorkflow:
         logger.info(f"Output Directory: {output_dir or 'default'}")
         logger.info(f"Dry Run: {dry_run}")
         # Get chunking preset for logging
-        chunking_config = get_chunking_configs_for_workflow(spec)
+        chunking_config = resolve_chunking_configuration(spec)
         logger.info(f"Chunking Configurations: {chunking_config}")
         logger.info(f"Semantic Chunking: {chunking_config.get('enable_semantic', True)}")
 
@@ -607,7 +589,7 @@ class RAGWorkflow:
         try:
             # Determine chunk load policy based on the preset used in Task 2
             # This ensures fallback (if triggered) matches Task 2's chunking method
-            chunking_config = get_chunking_configs_for_workflow(spec)
+            chunking_config = resolve_chunking_configuration(spec)
             enable_semantic = chunking_config.get('enable_semantic', True)
             chunk_load_policy = (
                 ChunkLoadPolicy.SEMANTIC_FALLBACK

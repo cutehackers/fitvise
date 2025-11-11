@@ -108,7 +108,7 @@ class LlamaIndexChunker:
         self,
         config: Optional[LlamaIndexChunkerConfig] = None,
         *,
-        embed_model: BaseEmbedding,
+        embed_model: Optional[BaseEmbedding] = None,
         require_llama_index: bool = False,
     ) -> None:
         """Initialize semantic chunker with pre-initialized embedding model.
@@ -116,7 +116,7 @@ class LlamaIndexChunker:
         Args:
             config: Chunking configuration. Defaults to LlamaIndexChunkerConfig().
             embed_model: Pre-initialized HuggingFaceEmbedding model instance.
-                        MANDATORY - ensures single model initialization per pipeline.
+                        Optional - only required when enable_semantic is True.
             require_llama_index: Raise error if llama_index unavailable
 
         Raises:

@@ -90,6 +90,7 @@ from app.infrastructure.storage.object_storage.minio_client import ObjectStorage
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
 from app.infrastructure.external_services import ExternalServicesContainer
 from app.config.ml_models import get_chunking_config
+from app.pipeline.chunking_config_resolver import resolve_chunking_configuration, requires_embedding_model
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.core.settings import get_settings
@@ -277,10 +278,13 @@ class RagIngestionTask:
 
     # ==================== Helper Methods ====================
 
-    def _build_use_cases(self) -> UseCaseBundle:
+    def _build_use_cases(self, spec: PipelineSpec) -> UseCaseBundle:
         """Instantiate repositories and use cases required for pipeline run.
 
         Uses injected document repository for data continuity.
+
+        Args:
+            spec: Pipeline specification needed to configure chunking use case
         """
         repository = self.data_source_repository or InMemoryDataSourceRepository()
 
@@ -298,11 +302,35 @@ class RagIngestionTask:
             audit_sources=AuditDataSourcesUseCase(repository),
             categorize_sources=CategorizeSourcesUseCase(repository, SklearnDocumentCategorizer()),
             document_apis=DocumentExternalApisUseCase(repository),
-            chunk_documents=SemanticChunkingUseCase(
-                document_repository=self.document_repository,
-                embedding_model=self.external_services.embedding_model,  # Use injected embedding model
-            ),
+            # Only create SemanticChunkingUseCase with embedding model if semantic chunking is enabled
+            # This prevents unnecessary loading of the embedding model when using sentence-based chunking
+            chunk_documents=self._create_chunking_use_case(spec),
         )
+
+    def _create_chunking_use_case(self, spec: PipelineSpec) -> SemanticChunkingUseCase:
+        """Create chunking use case based on configuration.
+
+        Only creates with embedding model if semantic chunking is enabled,
+        preventing unnecessary model loading when using sentence-based chunking.
+        """
+        # Check if semantic chunking is enabled (respects YAML overrides)
+        enable_semantic = requires_embedding_model(spec)
+
+        if self.verbose:
+            logger.debug(f"🔧 INGESTION VERBOSE: Creating chunking use case with enable_semantic={enable_semantic}")
+
+        if enable_semantic:
+            # Semantic chunking requires embedding model
+            return SemanticChunkingUseCase(
+                document_repository=self.document_repository,
+                embedding_model=self.external_services.embedding_model,
+            )
+        else:
+            # Sentence-based chunking doesn't need embedding model
+            return SemanticChunkingUseCase(
+                document_repository=self.document_repository,
+                embedding_model=None,  # No embedding model for sentence-based chunking
+            )
 
     def _guess_content_type(self, path: Path) -> Optional[str]:
         """Map a file extension to a best-effort MIME type."""
@@ -1217,17 +1245,20 @@ class RagIngestionTask:
             if self.verbose:
                 logger.debug(f"🔧 INGESTION VERBOSE: Loading chunking configuration for preset: {getattr(chunk_options, 'preset', None)}")
 
-            chunk_config = get_chunking_config(getattr(chunk_options, "preset", None))
+            # Get resolved chunking configuration with all overrides applied
+            chunk_config = resolve_chunking_configuration(spec)
+
+            # Apply additional overrides from chunk_options (if any)
             overrides = getattr(chunk_options, "overrides", {}) if chunk_options else {}
             if overrides:
                 if self.verbose:
-                    logger.debug(f"🔧 INGESTION VERBOSE: Applying chunking config overrides: {list(overrides.keys())}")
+                    logger.debug(f"🔧 INGESTION VERBOSE: Applying additional chunking config overrides: {list(overrides.keys())}")
                 chunk_config.update(overrides)
 
-            # Use enable_semantic from preset configuration (no override from workflow level)
+            # Use enable_semantic from configuration with YAML override applied
             enable_semantic = chunk_config.get("enable_semantic", True)
             chunking_method = "semantic (with embeddings)" if enable_semantic else "sentence (no embeddings)"
-            logger.info(f"📝 Chunking method: {chunking_method} (from preset: {summary['preset']})")
+            logger.info(f"📝 Chunking method: {chunking_method} (from preset: {summary['preset']}, YAML overrides applied)")
 
             metadata_overrides = {"run_id": run_id}
             extra_metadata = getattr(chunk_options, "metadata_overrides", {}) if chunk_options else {}
@@ -1321,7 +1352,7 @@ class RagIngestionTask:
             logger.debug(f"🔧 INGESTION VERBOSE: spec.storage.bucket={spec.storage.bucket}")
 
         # Build use case bundle with injected repositories
-        use_cases = self._build_use_cases()
+        use_cases = self._build_use_cases(spec)
         run_id = datetime.now(timezone.utc).isoformat()
 
         if self.verbose:

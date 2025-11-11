@@ -1191,7 +1191,6 @@ class RagIngestionTask:
         run_id: str,
         dry_run: bool,
         errors: List[Dict[str, object]],
-        enable_semantic_chunking: bool = False,
     ) -> Dict[str, Any]:
         """Apply semantic chunking to processed documents when chunking is enabled."""
         chunk_options = getattr(spec, "chunking", None)
@@ -1225,10 +1224,10 @@ class RagIngestionTask:
                     logger.debug(f"🔧 INGESTION VERBOSE: Applying chunking config overrides: {list(overrides.keys())}")
                 chunk_config.update(overrides)
 
-            # Add enable_semantic configuration (controlled from workflow level)
-            chunk_config["enable_semantic"] = enable_semantic_chunking
-            chunking_method = "semantic (with embeddings)" if enable_semantic_chunking else "sentence (no embeddings)"
-            logger.info(f"📝 Chunking method: {chunking_method}")
+            # Use enable_semantic from preset configuration (no override from workflow level)
+            enable_semantic = chunk_config.get("enable_semantic", True)
+            chunking_method = "semantic (with embeddings)" if enable_semantic else "sentence (no embeddings)"
+            logger.info(f"📝 Chunking method: {chunking_method} (from preset: {summary['preset']})")
 
             metadata_overrides = {"run_id": run_id}
             extra_metadata = getattr(chunk_options, "metadata_overrides", {}) if chunk_options else {}
@@ -1289,7 +1288,7 @@ class RagIngestionTask:
     # ==================== Main Execute Method ====================
 
     async def execute(
-        self, spec: PipelineSpec, dry_run: bool = False, enable_semantic_chunking: bool = False
+        self, spec: PipelineSpec, dry_run: bool = False
     ) -> RagIngestionTaskReport:
         """Execute document ingestion phase.
 
@@ -1297,14 +1296,11 @@ class RagIngestionTask:
         1. Infrastructure setup (storage, audits, categorization)
         2. Document discovery (files, databases, web, APIs)
         3. Document processing (extract, normalize, enrich, validate, store)
-        4. Post-processing (semantic chunking)
+        4. Post-processing (chunking based on preset)
 
         Args:
             spec: Pipeline specification
             dry_run: Run in dry-run mode (skip actual storage)
-            enable_semantic_chunking: If True, use semantic splitter with embeddings for chunk boundaries.
-                                     If False, use sentence splitter (faster, no embeddings).
-                                     Defaults to False for performance.
 
         Returns:
             RagIngestionTaskReport with processing results, stored documents, and timing breakdown
@@ -1387,7 +1383,6 @@ class RagIngestionTask:
                 run_id=run_id,
                 dry_run=dry_run,
                 errors=errors,
-                enable_semantic_chunking=enable_semantic_chunking,
             )
 
         if self.verbose:

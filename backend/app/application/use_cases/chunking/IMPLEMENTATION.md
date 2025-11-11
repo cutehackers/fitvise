@@ -367,7 +367,7 @@ class RecursiveChunkingUseCase:
 
 **Add Preset**:
 ```python
-"hierarchical": ChunkingPreset(
+"hierarchical": ChunkingConfigurations(
     name="hierarchical",
     description="Recursive chunking preserving policy/section/paragraph hierarchy",
     chunk_sizes=[2048, 512, 128],

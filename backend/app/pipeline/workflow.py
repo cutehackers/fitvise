@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.pipeline.config import PipelineSpec
 from app.pipeline.phases import RagInfrastructureTask, RagIngestionTask, RagEmbeddingTask
+from app.config.ml_models.chunking_configs import get_chunking_config
 from app.pipeline.phases.rag_infrastructure_task import (
     InfrastructureResult,
     RagInfrastructureTaskReport,
@@ -54,6 +55,25 @@ class RepositoryBundle:
     data_source_repository: DataSourceRepository
 
 
+def get_chunking_configs_for_workflow(spec: PipelineSpec) -> dict:
+    """Get the effective chunking configurations from PipelineSpec.
+
+    Args:
+        spec: Pipeline specification containing chunking configuration
+
+    Returns:
+        Chunking configurations dictionary with YAML overrides applied
+    """
+    preset_name = spec.chunking.preset or "balanced"
+    preset_config = get_chunking_config(preset_name)
+
+    # Apply YAML enable_semantic override if specified
+    if spec.chunking.enable_semantic is not None:
+        preset_config["enable_semantic"] = spec.chunking.enable_semantic
+
+    return preset_config
+
+
 class RAGWorkflow:
     """Orchestrates the complete RAG build pipeline with dependency injection.
 
@@ -66,23 +86,28 @@ class RAGWorkflow:
 
     ## Pipeline Configuration Options
 
-    The RAGWorkflow provides two key configuration options that significantly impact
-    the pipeline flow and performance:
+    The RAGWorkflow uses chunking presets and overrides defined in the PipelineSpec to control
+    the chunking strategy during document ingestion. The chunking behavior is determined by:
+    1. Base preset (spec.chunking.preset)
+    2. YAML override for semantic chunking (spec.chunking.enable_semantic)
+    3. Additional parameter overrides (spec.chunking.overrides)
 
-    ### enable_semantic_chunking (Task 2 - Document Ingestion)
+    ### Chunking Configuration (Task 2 - Document Ingestion)
 
-    **Purpose**: Controls the chunking strategy used during document ingestion.
+    **Purpose**: Controls the chunking strategy used during document ingestion through YAML presets and overrides.
 
-    **Impact on Pipeline Flow**:
+    **Configuration Options**:
+    ```yaml
+    chunking:
+      enabled: true                              # Enable/disable chunking
+      preset: balanced                           # Base preset: balanced, short_form, long_form, hierarchical
+      enable_semantic: null                      # Override: true=semantic, false=sentence, null=use preset default
+      overrides: {}                              # Additional parameter overrides
+    ```
 
-    When **enable_semantic_chunking=False** (Default - Performance Mode):
-    - Uses sentence-based splitting with fixed size boundaries
-    - No embedding generation required during chunking
-    - Faster processing, lower computational cost
-    - Chunks are created based on sentence boundaries and size limits
-    - Optimal for: Large document sets, processing speed prioritized, initial indexing
+    **Available Presets**:
 
-    When **enable_semantic_chunking=True** (Quality Mode):
+    **balanced** (Default - Quality Mode):
     - Uses semantic chunking with embedding analysis
     - Generates temporary embeddings to determine semantic boundaries
     - Chunks are created where topic shifts occur (based on embedding similarity)
@@ -90,9 +115,26 @@ class RAGWorkflow:
     - Optimal for: High-quality retrieval, document sets where context matters,
                   academic/technical content requiring coherent chunks
 
+    **short_form** (Performance Mode):
+    - Uses sentence-based splitting with fixed size boundaries
+    - No embedding generation required during chunking
+    - Faster processing, lower computational cost
+    - Chunks are created based on sentence boundaries and size limits
+    - Optimal for: Large document sets, processing speed prioritized, initial indexing
+
+    **long_form**:
+    - Semantic chunking optimized for long documents
+    - Larger chunk sizes for better context preservation
+    - Optimal for: Manuals, research papers, technical documentation
+
+    **hierarchical**:
+    - Multi-level chunking preserving document structure
+    - Creates nested chunks at different granularity levels
+    - Optimal for: Complex documents with clear hierarchical structure
+
     **Performance Considerations**:
-    - False: 2-3x faster processing, minimal resource usage
-    - True: Slower processing due to embedding generation, higher memory/CPU usage
+    - short_form: 2-3x faster processing, minimal resource usage
+    - balanced/long_form/hierarchical: Slower processing due to embedding generation
 
     ### Task Separation (Chunking in Task 2, Embedding in Task 3)
 
@@ -101,7 +143,7 @@ class RAGWorkflow:
     **Task 2 (Ingestion)**: Responsible for all chunking operations
     - Processes documents and generates chunks
     - Stores chunks in repository for Task 3 to consume
-    - Uses semantic or sentence splitter based on `enable_semantic_chunking`
+    - Uses chunking strategy defined in spec.chunking.preset
 
     **Task 3 (Embedding Generation)**: Consumes chunks from Task 2
     - Loads existing chunks from repository (created in Task 2)
@@ -110,60 +152,65 @@ class RAGWorkflow:
     - Does NOT perform any chunking operations
 
     **Important**: If you need to change chunking strategy, re-run Task 2 (Ingestion) with
-    new parameters. Task 3 will always use chunks created by Task 2.
+    a different preset. Task 3 will always use chunks created by Task 2.
 
     ### Recommended Configurations
 
-    **Production Pipeline (Default)**:
-    ```python
-    await workflow.run_complete_pipeline(
-        spec=spec,
-        enable_semantic_chunking=False,  # Fast sentence-based chunking in Task 2
-    )
+    **Production Pipeline (Fast - short_form preset)**:
+    ```yaml
+    chunking:
+      preset: short_form
+      enable_semantic: false  # Explicit sentence-based chunking
     ```
 
-    **High-Quality Pipeline**:
-    ```python
-    await workflow.run_complete_pipeline(
-        spec=spec,
-        enable_semantic_chunking=True,   # Semantic boundaries in Task 2
-    )
+    **High-Quality Pipeline (balanced preset with override)**:
+    ```yaml
+    chunking:
+      preset: short_form     # Start with fast preset
+      enable_semantic: true  # Override to enable semantic chunking
     ```
 
-    **Parameter Experimentation**:
-    ```python
-    # Run ingestion once with semantic chunking
-    await workflow.run_ingestion(
-        spec=spec,
-        enable_semantic_chunking=True
-    )
+    **Hybrid Pipeline (balanced preset with sentence override)**:
+    ```yaml
+    chunking:
+      preset: balanced
+      enable_semantic: false  # Override balanced to use sentence splitting
+    ```
 
-    # Test different embedding parameters using existing chunks
-    await workflow.run_embedding(
-        spec=spec,
-        batch_size=64,  # Test different batch size
-        enable_semantic_chunking=True  # Match Task 2 setting for fallback consistency
+    **Pipeline Experimentation**:
+    ```python
+    # Run ingestion with different configurations
+    spec_fast = PipelineSpec(
+        documents=DocumentOption(path="./data"),
+        chunking=ChunkingOptions(preset="short_form", enable_semantic=False)
     )
+    await workflow.run_ingestion(spec_fast)
+
+    spec_quality = PipelineSpec(
+        documents=DocumentOption(path="./data"),
+        chunking=ChunkingOptions(preset="balanced", enable_semantic=True)
+    )
+    await workflow.run_ingestion(spec_quality)
+
+    spec_hybrid = PipelineSpec(
+        documents=DocumentOption(path="./data"),
+        chunking=ChunkingOptions(preset="balanced", enable_semantic=False)
+    )
+    await workflow.run_ingestion(spec_hybrid)
     ```
 
     **Pipeline Debugging**:
     ```python
-    # Re-run ingestion if chunking issues detected
-    await workflow.run_ingestion(
-        spec=spec,
-        enable_semantic_chunking=False,  # Try different chunking strategy
-        document_limit=10  # Test on subset first
+    # Test with small document limit and explicit configuration
+    spec_debug = PipelineSpec(
+        documents=DocumentOption(path="./data"),
+        chunking=ChunkingOptions(preset="short_form", enable_semantic=False),
+        limits=LimitOptions(max_files=10)
     )
-
-    # Then run embedding on new chunks (matching chunking strategy)
-    await workflow.run_embedding(
-        spec=spec,
-        document_limit=10,
-        enable_semantic_chunking=False  # Match Task 2 setting
-    )
+    await workflow.run_ingestion(spec_debug)
     ```
 
-    These options provide fine-grained control over the quality-performance tradeoff
+    The chunking presets provide fine-grained control over the quality-performance tradeoff
     and enable flexible pipeline execution patterns for different use cases.
     """
 
@@ -273,16 +320,13 @@ class RAGWorkflow:
             raise
 
     async def run_ingestion(
-        self, spec: PipelineSpec, dry_run: bool = False, enable_semantic_chunking: bool = False
+        self, spec: PipelineSpec, dry_run: bool = False
     ) -> RagIngestionTaskReport:
         """Run Task 2: Document ingestion independently.
 
         Args:
             spec: Pipeline specification
             dry_run: Run in dry-run mode (skip actual storage)
-            enable_semantic_chunking: If True, use semantic splitter with embeddings for chunk boundaries.
-                                     If False, use sentence splitter (faster, no embeddings).
-                                     Defaults to False for performance.
 
         Returns:
             RagIngestionTaskReport with task execution results and timing
@@ -300,7 +344,7 @@ class RAGWorkflow:
 
             # Task now returns TaskReport directly
             task_report = await self.ingestion_task.execute(
-                spec, dry_run=dry_run, enable_semantic_chunking=enable_semantic_chunking
+                spec, dry_run=dry_run
             )
 
             documents_processed = (
@@ -377,7 +421,6 @@ class RAGWorkflow:
         batch_size: int = 32,
         document_limit: Optional[int] = None,
         output_dir: Optional[str] = None,
-        enable_semantic_chunking: bool = False,
     ) -> RagBuildSummary:
         """Run the complete RAG pipeline (all 3 tasks sequentially).
 
@@ -387,9 +430,6 @@ class RAGWorkflow:
             batch_size: Batch size for embedding generation
             document_limit: Optional limit on documents to process
             output_dir: Directory to save reports and outputs
-            enable_semantic_chunking: If True, Task 2 uses semantic splitter with embeddings.
-                                     If False, uses sentence splitter (faster, no embeddings).
-                                     Defaults to False for performance.
 
         Returns:
             RagBuildSummary with comprehensive results from all tasks
@@ -401,7 +441,10 @@ class RAGWorkflow:
         logger.info(f"Configuration: {spec}")
         logger.info(f"Output Directory: {output_dir or 'default'}")
         logger.info(f"Dry Run: {dry_run}")
-        logger.info(f"Semantic Chunking (Task 2): {enable_semantic_chunking}")
+        # Get chunking preset for logging
+        chunking_config = get_chunking_configs_for_workflow(spec)
+        logger.info(f"Chunking Configurations: {chunking_config}")
+        logger.info(f"Semantic Chunking: {chunking_config.get('enable_semantic', True)}")
 
         # Create output directory if specified
         if output_dir:
@@ -413,11 +456,11 @@ class RAGWorkflow:
             await self._run_infrastructure_with_tracking(spec, output_dir)
 
             # Task 2: Document Ingestion (performs all chunking)
-            await self._run_ingestion_with_tracking(spec, dry_run, output_dir, enable_semantic_chunking)
+            await self._run_ingestion_with_tracking(spec, dry_run, output_dir)
 
             # Task 3: Embedding Generation (loads chunks from Task 2, uses same chunking method for fallback)
             await self._run_embedding_with_tracking(
-                spec, batch_size, document_limit, output_dir, enable_semantic_chunking
+                spec, batch_size, document_limit, output_dir
             )
 
             # Complete pipeline
@@ -485,18 +528,19 @@ class RAGWorkflow:
             raise
 
     async def _run_ingestion_with_tracking(
-        self, spec: PipelineSpec, dry_run: bool, output_dir: Optional[str], enable_semantic_chunking: bool
+        self, spec: PipelineSpec, dry_run: bool, output_dir: Optional[str]
     ) -> None:
         """Run ingestion task with result tracking.
 
         Args:
-            enable_semantic_chunking: If True, use semantic splitter with embeddings.
-                                     If False, use sentence splitter (faster, no embeddings).
+            spec: Pipeline specification containing chunking configuration
+            dry_run: Run in dry-run mode
+            output_dir: Optional output directory for reports
         """
         try:
             # Task now returns TaskReport directly with all timing
             task_report = await self.ingestion_task.execute(
-                spec, dry_run=dry_run, enable_semantic_chunking=enable_semantic_chunking
+                spec, dry_run=dry_run
             )
 
             # Extract ingestion summary from task report
@@ -549,23 +593,25 @@ class RAGWorkflow:
         batch_size: int,
         document_limit: Optional[int],
         output_dir: Optional[str],
-        enable_semantic_chunking: bool,
     ) -> None:
         """Run embedding task with result tracking.
 
         This task loads existing chunks from Task 2 (Ingestion) and generates embeddings.
 
         Args:
-            enable_semantic_chunking: Used to determine chunk_load_policy.
-                                     Maps to SEMANTIC_FALLBACK if True, SENTENCE_FALLBACK if False.
-                                     This ensures fallback (if triggered) matches Task 2's chunking method.
+            spec: Pipeline specification containing chunking configuration
+            batch_size: Batch size for embedding generation
+            document_limit: Optional limit on documents to process
+            output_dir: Optional output directory for reports
         """
         try:
-            # Map enable_semantic_chunking to appropriate chunk load policy
-            # This preserves backward compatibility while using the new enum
+            # Determine chunk load policy based on the preset used in Task 2
+            # This ensures fallback (if triggered) matches Task 2's chunking method
+            chunking_config = get_chunking_configs_for_workflow(spec)
+            enable_semantic = chunking_config.get('enable_semantic', True)
             chunk_load_policy = (
                 ChunkLoadPolicy.SEMANTIC_FALLBACK
-                if enable_semantic_chunking
+                if enable_semantic
                 else ChunkLoadPolicy.SENTENCE_FALLBACK
             )
 

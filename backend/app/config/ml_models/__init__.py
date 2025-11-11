@@ -1,7 +1,7 @@
 """Model-related configuration helpers."""
 
 from .chunking_configs import (
-    ChunkingPreset,
+    ChunkingConfigurations,
     get_chunking_config,
     list_chunking_presets,
 )
@@ -13,7 +13,7 @@ from .embedding_model_configs import (
 )
 
 __all__ = [
-    "ChunkingPreset",
+    "ChunkingConfigurations",
     "get_chunking_config",
     "list_chunking_presets",
     "CacheStrategy",

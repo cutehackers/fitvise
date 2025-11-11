@@ -17,6 +17,13 @@ processors:
   pdf: docling
   non_pdf: tika
   normalize: spacy
+chunking:
+  enabled: true
+  preset: balanced
+  enable_semantic: false  # disable semantic chunking
+  overrides: {}
+  replace_existing_chunks: true
+  metadata_overrides: {}
 limits:
   since: null
   max_files: 1000

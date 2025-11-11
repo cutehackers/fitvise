@@ -25,6 +25,7 @@ storage:
 chunking:
   enabled: true
   preset: balanced    # Options: minimal, balanced, comprehensive
+  enable_semantic: null  # Override preset setting: true=semantic chunking, false=sentence splitting, null=use preset default
   overrides: {}       # Optional chunking parameter overrides
 
 # Infrastructure limits

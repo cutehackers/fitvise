@@ -6,7 +6,7 @@ from typing import Dict, Iterable, List
 
 
 @dataclass(frozen=True)
-class ChunkingPreset:
+class ChunkingConfigurations:
     """Configuration template for a chunking strategy."""
 
     name: str
@@ -37,17 +37,17 @@ class ChunkingPreset:
         return result
 
 
-_PRESETS: Dict[str, ChunkingPreset] = {
-    "balanced": ChunkingPreset(
+_PRESETS: Dict[str, ChunkingConfigurations] = {
+    "balanced": ChunkingConfigurations(
         name="balanced",
         description="Balanced splitter for mixed knowledge base documents.",
-        chunk_size=1024,
+        chunk_size=768,
         chunk_overlap=128,
-        min_chunk_chars=120,
-        max_chunk_chars=2048,
+        min_chunk_chars=512,
+        max_chunk_chars=3072,
         enable_semantic=True,  # Semantic for mixed content types
     ),
-    "short_form": ChunkingPreset(
+    "short_form": ChunkingConfigurations(
         name="short_form",
         description="Shorter chunks for FAQ or policy snippets.",
         chunk_size=512,
@@ -56,7 +56,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         max_chunk_chars=1200,
         enable_semantic=False,  # Fast sentence-based for short content
     ),
-    "long_form": ChunkingPreset(
+    "long_form": ChunkingConfigurations(
         name="long_form",
         description="Long-form content such as manuals or research papers.",
         chunk_size=1536,
@@ -65,7 +65,7 @@ _PRESETS: Dict[str, ChunkingPreset] = {
         max_chunk_chars=3072,
         enable_semantic=True,  # Semantic for better coherence in long content
     ),
-    "hierarchical": ChunkingPreset(
+    "hierarchical": ChunkingConfigurations(
         name="hierarchical",
         description="Recursive chunking preserving policy/section/paragraph hierarchy.",
         chunk_size=2048,  # Largest level (root/document context)

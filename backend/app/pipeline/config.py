@@ -49,7 +49,8 @@ class ProcessorOptions(BaseModel):
 
 class ChunkingOptions(BaseModel):
     enabled: bool = True
-    preset: Optional[str] = Field(None, description="Chunking preset name (balanced, short_form, long_form)")
+    preset: Optional[str] = Field(None, description="Chunking preset name (balanced, short_form, long_form, hierarchical)")
+    enable_semantic: Optional[bool] = Field(None, description="Override semantic chunking setting. If not specified, uses preset's default. True=semantic boundaries, False=sentence splitting.")
     overrides: Dict[str, Any] = Field(default_factory=dict, description="Override chunker config values")
     replace_existing_chunks: bool = True
     metadata_overrides: Dict[str, Any] = Field(default_factory=dict)

@@ -16,15 +16,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.pipeline.config import PipelineSpec
 from app.pipeline.phases import RagInfrastructureTask, RagIngestionTask, RagEmbeddingTask
-from app.pipeline.phases.infrastructure_task import (
+from app.pipeline.phases.rag_infrastructure_task import (
     InfrastructureResult,
     RagInfrastructureTaskReport,
 )
-from app.pipeline.phases.embedding_task import (
+from app.pipeline.phases.rag_embedding_task import (
     EmbeddingResult,
     RagEmbeddingTaskReport,
 )
-from app.pipeline.phases.ingestion_task import RagIngestionTaskReport
+from app.pipeline.phases.rag_ingestion_task import RagIngestionTaskReport
 from app.pipeline.contracts import RunSummary
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository

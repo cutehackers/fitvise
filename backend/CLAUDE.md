@@ -228,7 +228,7 @@ if __name__ == "__main__":
 
 **Usage in Pipeline Phases**:
 ```python
-from app.pipeline.phases.ingestion_phase import IngestionPhase
+from app.pipeline.phases.rag_ingestion_task import IngestionPhase
 
 async def run_pipeline():
     """Run pipeline with repository container."""

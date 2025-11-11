@@ -1,44 +1,84 @@
 # Fitvise - AI-Powered Fitness Assistant
 
-> **Intelligent Fitness Coaching** through conversational AI and personalized workout guidance
+> **Intelligent Fitness Coaching** through conversational AI, personalized workout guidance, and advanced RAG-powered document retrieval
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-009688.svg?style=flat&logo=FastAPI)](https://fastapi.tiangolo.com)
 [![Flutter](https://img.shields.io/badge/Flutter-3.8+-02569B.svg?style=flat&logo=Flutter)](https://flutter.dev)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Testing](https://img.shields.io/badge/pytest-comprehensive-green.svg)](https://pytest.org/)
 
 ## 🌟 Overview
 
-Fitvise is a comprehensive AI-powered fitness platform that provides personalized workout plans, nutrition guidance, and health coaching through intelligent conversational interfaces. The platform leverages Large Language Models (LLMs) to deliver tailored fitness advice across multiple client applications.
+Fitvise is a comprehensive AI-powered fitness platform that provides personalized workout plans, nutrition guidance, and health coaching through intelligent conversational interfaces. Built with Domain-Driven Design principles, the platform features a production-grade RAG (Retrieval-Augmented Generation) pipeline for intelligent document processing and retrieval. It leverages Large Language Models (LLMs) to deliver tailored fitness advice across multiple client applications.
 
 ### Key Features
 
 🤖 **AI-Powered Coaching** - Personalized workout plans, nutrition advice, and exercise recommendations
-📱 **Multi-Platform Support** - Native mobile apps (Flutter)
-🏗️ **Production-Ready Backend** - Scalable FastAPI architecture with comprehensive health monitoring
+📱 **Multi-Platform Support** - Native mobile apps (Flutter) and web interfaces
+🏗️ **Domain-Driven Design** - Modular FastAPI architecture with clear separation of concerns and DDD principles
+📚 **RAG Pipeline** - Multi-phase document ingestion, embedding generation, and intelligent retrieval system
 🎯 **Conversational Interface** - Natural language interaction with quick replies and voice input
 ⚡ **Real-Time Chat** - Typing indicators, message editing, and responsive user experience
 🔒 **Type-Safe Architecture** - Full validation with Pydantic (backend) and type-safe models (frontend)
+🧪 **Comprehensive Testing** - Unit, integration, and E2E tests with 30+ tests for RAG pipeline phases
 
 ## 🏗️ Architecture
 
-Fitvise follows a microservices architecture with two main components:
+Fitvise follows a sophisticated microservices architecture with RAG pipeline and Domain-Driven Design principles:
 
 ```
-┌─────────────────┐    ┌─────────────────┐
-│                 │    │                 │
-│  Flutter App    │◄───┤  FastAPI        │
-│  (Mobile)       │    │  Backend        │
-│                 │    │                 │
-└─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                      ┌─────────────────┐
-                      │                 │
-                      │  LLM Service    │
-                      │  (Ollama)       │
-                      │                 │
-                      └─────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                           CLIENT LAYER                               │
+├──────────────────┬─────────────────────────┬─────────────────────────┤
+│  Flutter App     │   React Web App         │   Mobile/Web            │
+│  (iOS/Android)   │   (Browser)             │   Platforms             │
+└────────┬─────────┴────────────┬────────────┴─────────────────────────┘
+         │                      │
+         └──────────┬───────────┘
+                    │
+                    ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                    FASTAPI BACKEND (DDD ARCHITECTURE)                │
+├──────────────────────────────────────────────────────────────────────┤
+│  API Layer (Endpoints) │ Schemas │ Routing                           │
+├──────────────────────────────────────────────────────────────────────┤
+│  Application Layer     │ Use Cases │ DTOs │ Orchestration            │
+├──────────────────────────────────────────────────────────────────────┤
+│  Domain Layer          │ Entities │ Value Objects │ Repositories     │
+├──────────────────────────────────────────────────────────────────────┤
+│  Infrastructure Layer  │ DB │ Services │ External Integrations       │
+└──────────────────────────────────────────────────────────────────────┘
+         │                      │                      │
+         │                      │                      │
+         ▼                      ▼                      ▼
+  ┌─────────────┐       ┌──────────────┐      ┌──────────────┐
+  │ LLM Service │       │ RAG Pipeline │      │   Vector DB  │
+  │  (Ollama)   │       │              │      │  (Weaviate)  │
+  └─────────────┘       └──────────────┘      └──────────────┘
+                               │
+                ┌──────────────┼──────────────┐
+                │              │              │
+                ▼              ▼              ▼
+         Phase 1: Infra  Phase 2: Ingest  Phase 3: Embed
+         Initialize      Document         Generate
+         Services        Processing       Embeddings
 ```
+
+### Architecture Overview
+
+**Client Layer**: Native mobile (Flutter) and web (React) applications
+**FastAPI Backend**: Layered architecture following Domain-Driven Design principles
+- **API Layer**: RESTful endpoints with Pydantic validation
+- **Application Layer**: Business logic, use cases, and DTOs
+- **Domain Layer**: Core entities, value objects, and repository interfaces
+- **Infrastructure Layer**: Database, external services, and implementations
+
+**RAG Pipeline**: Three-phase intelligent document processing system
+- **Phase 1 (Infrastructure)**: Initialize vector databases and validate services
+- **Phase 2 (Ingestion)**: Document discovery, processing, and chunking
+- **Phase 3 (Embedding)**: Embedding generation and vector storage
+
+**External Services**: LLM integration and vector database for intelligent retrieval
 
 ### Project Structure
 
@@ -174,20 +214,23 @@ ollama serve  # Runs on localhost:11434
 
 ### Backend (FastAPI)
 
-**Production-ready REST API** with comprehensive features:
+**Production-ready REST API** with sophisticated architecture:
 
-- **Framework**: FastAPI with async operations
-- **Validation**: Pydantic models for type safety
+- **Framework**: FastAPI with async operations and comprehensive error handling
+- **Architecture**: Domain-Driven Design with clear layer separation (domain, application, infrastructure, API)
+- **Validation**: Pydantic models for type safety and comprehensive data validation
+- **RAG Pipeline**: Multi-phase document processing with intelligent embedding and retrieval
 - **Documentation**: Auto-generated OpenAPI/Swagger docs
-- **Architecture**: Modular structure with separated concerns
-- **Monitoring**: Health checks and service monitoring
-- **Integration**: LLM service with connection pooling
+- **Monitoring**: Health checks, service availability monitoring, and performance metrics
+- **Integration**: LLM service with connection pooling, embedding service, and vector database
 
-**Core Services**:
-- `LLMService` - AI model integration with error handling
-- `WorkoutEndpoints` - Fitness-specific API endpoints
-- Configuration management with environment variables
-- CORS support for cross-origin requests
+**Core Components**:
+- **RAG Pipeline** - Three-phase orchestration (infrastructure setup, document ingestion, embedding generation)
+- **Domain Layer** - Entities, value objects, repositories, and domain-specific exceptions
+- **Application Layer** - Use cases, business logic orchestration, and DTOs
+- **Infrastructure Layer** - Repository implementations, database management, external service integrations
+- **LLMService** - AI model integration with error handling and health monitoring
+- **WorkoutEndpoints** - Fitness-specific API endpoints with comprehensive validation
 
 ## 🔌 API Integration
 
@@ -392,23 +435,27 @@ flutter packages pub run build_runner watch      # Watch for changes
 
 ## 🚀 Project Status
 
-**Current Development Status**: Active development with functional components
+**Current Development Status**: Active development with advanced features and production-grade architecture
 
-✅ **Backend**: Production-ready FastAPI server with LLM integration  
-✅ **React Web App**: Full-featured web interface with modern UI  
-✅ **Flutter Mobile**: Cross-platform mobile app with native performance  
+✅ **Backend**: Production-ready FastAPI server with Domain-Driven Design architecture, LLM integration, and RAG pipeline
+✅ **React Web App**: Full-featured web interface with modern UI, voice input, and file upload capabilities
+✅ **Flutter Mobile**: Cross-platform mobile app with native performance and comprehensive feature support
 
 **Key Achievements**:
-- Complete AI-powered fitness coaching backend
-- Responsive web interface with voice input and file upload
-- Cross-platform mobile app with speech-to-text integration
-- Type-safe API integration across all platforms
-- Comprehensive health monitoring and error handling
+- **AI-Powered Fitness Coaching**: Complete backend with personalized workout and nutrition guidance
+- **RAG Pipeline**: Production-grade document processing with 3-phase orchestration (infrastructure, ingestion, embedding)
+- **Domain-Driven Design**: Modular architecture with clear separation of concerns (domain, application, infrastructure layers)
+- **Comprehensive Testing**: 30+ tests for RAG pipeline phases, unit, integration, and E2E test coverage
+- **Responsive UI**: Web interface with voice input, file upload, and modern design patterns
+- **Cross-Platform Mobile**: Native performance on iOS, Android with speech-to-text integration
+- **Type-Safe Integration**: Type-safe API integration across all platforms with Pydantic, Freezed, and native type systems
+- **Production Monitoring**: Comprehensive health monitoring, performance metrics, and structured logging
 
 ## 📚 Documentation
 
 - **[Backend API Documentation](backend/API.md)** - Comprehensive endpoint documentation with examples
 - **[Backend README](backend/README.md)** - Backend setup, architecture, and development guide
+- **[Backend Development Guide](backend/CLAUDE.md)** - Comprehensive RAG pipeline, DDD architecture, and critical development patterns
 - **[React README](frontend-react/README.md)** - Web app features, setup, and customization
 - **[Flutter Documentation](frontend/CLAUDE.md)** - Mobile app architecture and development guide
 - **Interactive API Docs** - Available at `/docs` when backend is running

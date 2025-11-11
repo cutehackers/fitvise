@@ -104,7 +104,7 @@ The service requires a comprehensive `.env` file. Copy the existing `.env` and m
 - **LLM Integration**: `LLM_BASE_URL`, `LLM_MODEL` (requires Ollama or compatible service)
 - **API Settings**: `API_HOST`, `API_PORT`, CORS configuration
 - **Database**: `DATABASE_URL` (SQLite by default)
-- **Vector Store**: ChromaDB configuration for embeddings
+- **Vector Store**: Weaviate configuration for semantic search and embeddings
 - **Security**: JWT configuration, file upload limits
 
 ## Architecture Overview
@@ -192,7 +192,7 @@ Pydantic models provide comprehensive validation and auto-documentation:
 
 ### External Dependencies
 - **LLM Service**: Requires Ollama or compatible service running on configured URL
-- **Vector Store**: ChromaDB for embeddings (configurable to FAISS)
+- **Vector Store**: Weaviate for vector embeddings and semantic search
 - **Database**: SQLite by default, configurable to PostgreSQL/MySQL
 
 ### Domain-Driven Design (DDD) Structure
@@ -603,5 +603,5 @@ When modifying LLM integration, ensure compatibility with the expected request/r
 - **Connection pooling enabled** - AsyncPG for PostgreSQL, aiosqlite for SQLite
 - **Batch operations preferred** - Processing documents in batches when possible
 - **Lazy loading in repositories** - Repository patterns should fetch data on demand
-- **Vector database indexing** - ChromaDB/Weaviate handle embedding search optimization
+- **Vector database indexing** - Weaviate handles embedding search optimization with advanced indexing strategies
 - **Monitor embedding model memory** - Sentence transformers can be memory-intensive

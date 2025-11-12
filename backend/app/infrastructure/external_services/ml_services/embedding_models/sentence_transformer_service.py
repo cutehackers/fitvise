@@ -163,7 +163,6 @@ class SentenceTransformerService(BaseEmbeddingService):
                     lambda: SentenceTransformer(
                         self.model_name,
                         device=self._device,
-                        trust_remote_code=True,
                         **self.config.model_kwargs,
                     ),
                 )

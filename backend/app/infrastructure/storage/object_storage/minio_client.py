@@ -67,11 +67,40 @@ class ObjectStorageClient:
             return bool(self._minio.bucket_exists(bucket))
         return self._local.bucket_exists(bucket)  # type: ignore[union-attr]
 
+    async def list_buckets(self):
+        """List all buckets."""
+        if self._minio is not None:
+            buckets = self._minio.list_buckets()
+            return buckets
+        else:
+            # For local storage, return buckets as directories in base_dir
+            if self._local and hasattr(self._local, 'base_dir') and self._local.base_dir:
+                base_path = Path(self._local.base_dir)
+                if base_path.exists():
+                    # Create a simple bucket-like object for directories
+                    class LocalBucket:
+                        def __init__(self, name):
+                            self.name = name
+
+                    return [LocalBucket(d.name) for d in base_path.iterdir() if d.is_dir()]
+            return []
+
+    async def create_bucket(self, bucket_name: str) -> None:
+        """Create a new bucket."""
+        if self._minio is not None:
+            if not self._minio.bucket_exists(bucket_name):
+                self._minio.make_bucket(bucket_name)
+        else:
+            # For local storage, create directory
+            if self._local and hasattr(self._local, 'base_dir') and self._local.base_dir:
+                bucket_path = Path(self._local.base_dir) / bucket_name
+                bucket_path.mkdir(parents=True, exist_ok=True)
+
     # ---------------------------- object operations --------------------------
-    def put_object(
+    async def put_object(
         self,
-        bucket: str,
-        key: str,
+        bucket_name: str,
+        object_key: str,
         data: bytes,
         *,
         content_type: Optional[str] = None,
@@ -84,8 +113,8 @@ class ObjectStorageClient:
 
             length = len(data)
             self._minio.put_object(
-                bucket,
-                key,
+                bucket_name,
+                object_key,
                 BytesIO(data),
                 length=length,
                 content_type=content_type,
@@ -94,27 +123,86 @@ class ObjectStorageClient:
             # Apply tags if available in client
             try:
                 if tags:
-                    self._minio.set_object_tags(bucket, key, tags)
+                    self._minio.set_object_tags(bucket_name, object_key, tags)
             except Exception:
                 pass
             # For consistent return type, also write a local metadata shadow only if local configured
             # Here we just return a lightweight result
             return PutObjectResult(
-                bucket=bucket,
-                key=key,
+                bucket=bucket_name,
+                key=object_key,
                 size=length,
                 content_type=content_type,
                 metadata_path=Path("/dev/null"),
-                object_path=Path(f"s3://{bucket}/{key}"),
+                object_path=Path(f"s3://{bucket_name}/{object_key}"),
             )
 
         # Local fallback
         return self._local.put_object(  # type: ignore[union-attr]
-            bucket,
-            key,
+            bucket_name,
+            object_key,
             data,
             content_type=content_type,
             metadata=metadata,
             tags=tags,
         )
+
+    async def get_object(self, bucket: str, key: str):
+        """Get an object from storage."""
+        if self._minio is not None:
+            from io import BytesIO
+
+            response = self._minio.get_object(bucket, key)
+            data = response.read()
+            response.close()
+            response.release_conn()
+
+            # Create a simple result object with data attribute
+            class GetObjectResult:
+                def __init__(self, data: bytes):
+                    self.data = data
+
+            return GetObjectResult(data)
+        else:
+            # Local fallback
+            if self._local and hasattr(self._local, 'get_object'):
+                result = self._local.get_object(bucket, key)
+                # Local storage returns a tuple (data, metadata)
+                if isinstance(result, tuple) and len(result) >= 1:
+                    data = result[0]
+                else:
+                    data = result
+
+                class GetObjectResult:
+                    def __init__(self, data: bytes):
+                        self.data = data
+
+                return GetObjectResult(data)
+            else:
+                # Simple local file read
+                if self._local and hasattr(self._local, 'base_dir') and self._local.base_dir:
+                    file_path = Path(self._local.base_dir) / bucket / key
+                    if file_path.exists():
+                        class GetObjectResult:
+                            def __init__(self, data: bytes):
+                                self.data = data
+
+                        with open(file_path, 'rb') as f:
+                            return GetObjectResult(f.read())
+                raise FileNotFoundError(f"Object {key} not found in bucket {bucket}")
+
+    async def delete_object(self, bucket: str, key: str) -> None:
+        """Delete an object from storage."""
+        if self._minio is not None:
+            self._minio.remove_object(bucket, key)
+        else:
+            # Local fallback
+            if self._local and hasattr(self._local, 'delete_object'):
+                self._local.delete_object(bucket, key)
+            else:
+                # Simple local file deletion
+                if self._local and hasattr(self._local, 'base_dir') and self._local.base_dir:
+                    file_path = Path(self._local.base_dir) / bucket / key
+                    if file_path.exists():
+                        file_path.unlink()
 

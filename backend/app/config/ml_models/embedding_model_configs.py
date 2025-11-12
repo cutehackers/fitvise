@@ -75,7 +75,7 @@ class EmbeddingModelConfig:
     cache_strategy: CacheStrategy = CacheStrategy.MEMORY
     num_workers: int = 4
     show_progress: bool = True
-    model_kwargs: Dict[str, Any] = field(default_factory=dict)
+    model_kwargs: Dict[str, Any] = field(default_factory=lambda: {"trust_remote_code": True})
     encode_kwargs: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -144,15 +144,36 @@ class EmbeddingModelConfig:
         Returns:
             EmbeddingModelConfig instance
         """
-        # Convert string enums
-        if "device" in config_dict and isinstance(config_dict["device"], str):
-            config_dict["device"] = DeviceType(config_dict["device"])
-        if "cache_strategy" in config_dict and isinstance(
-            config_dict["cache_strategy"], str
-        ):
-            config_dict["cache_strategy"] = CacheStrategy(config_dict["cache_strategy"])
+        # Extract known fields and handle model_kwargs separately
+        known_fields = {
+            "model_name", "model_dimension", "device", "batch_size",
+            "max_seq_length", "normalize_embeddings", "cache_strategy",
+            "num_workers", "show_progress"
+        }
 
-        return cls(**config_dict)
+        # Separate known fields from model_kwargs
+        init_kwargs = {}
+        model_kwargs = {}
+
+        for key, value in config_dict.items():
+            if key in known_fields:
+                init_kwargs[key] = value
+            else:
+                model_kwargs[key] = value
+
+        # Convert string enums
+        if "device" in init_kwargs and isinstance(init_kwargs["device"], str):
+            init_kwargs["device"] = DeviceType(init_kwargs["device"])
+        if "cache_strategy" in init_kwargs and isinstance(
+            init_kwargs["cache_strategy"], str
+        ):
+            init_kwargs["cache_strategy"] = CacheStrategy(init_kwargs["cache_strategy"])
+
+        # Set model_kwargs if any
+        if model_kwargs:
+            init_kwargs["model_kwargs"] = model_kwargs
+
+        return cls(**init_kwargs)
 
     def as_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary.

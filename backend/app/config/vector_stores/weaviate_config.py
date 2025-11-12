@@ -159,6 +159,27 @@ class WeaviateConfig:
         Returns:
             WeaviateConfig instance
         """
+        # Handle URL parameter - parse it into host, port, scheme
+        if "url" in config_dict:
+            from urllib.parse import urlparse
+            parsed_url = urlparse(config_dict["url"])
+            if parsed_url.hostname:
+                config_dict["host"] = parsed_url.hostname
+            if parsed_url.port:
+                config_dict["port"] = parsed_url.port
+            if parsed_url.scheme:
+                config_dict["scheme"] = parsed_url.scheme
+            # Remove 'url' from dict as it's not a dataclass field
+            del config_dict["url"]
+
+        # Handle timeout_config tuple
+        if "timeout_config" in config_dict:
+            timeout_tuple = config_dict["timeout_config"]
+            if isinstance(timeout_tuple, (tuple, list)) and len(timeout_tuple) >= 2:
+                config_dict["connection_timeout"] = float(timeout_tuple[0])
+                config_dict["timeout"] = float(timeout_tuple[1])
+                del config_dict["timeout_config"]
+
         # Convert string enums
         if "auth_type" in config_dict and isinstance(config_dict["auth_type"], str):
             config_dict["auth_type"] = WeaviateAuthType(config_dict["auth_type"])

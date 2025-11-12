@@ -96,6 +96,35 @@ class RagInfrastructureTaskReport:
         """Convert to JSON string."""
         return json.dumps(self.as_dict(), indent=indent, default=str)
 
+    @property
+    def errors(self) -> List[str]:
+        """Get errors list for backward compatibility."""
+        return self.phase_result.errors if self.phase_result else []
+
+    @property
+    def warnings(self) -> List[str]:
+        """Get warnings list for backward compatibility."""
+        return self.phase_result.warnings if self.phase_result else []
+
+    @property
+    def validation_results(self) -> Dict[str, Any]:
+        """Get validation results for backward compatibility."""
+        return self.phase_result.validation_results if self.phase_result else {}
+
+    @property
+    def total_components(self) -> int:
+        """Get total components count for backward compatibility."""
+        if self.phase_result:
+            return len(self.phase_result.validation_results)
+        return 0
+
+    @property
+    def failed_components(self) -> int:
+        """Get failed components count for backward compatibility."""
+        if self.phase_result and self.phase_result.errors:
+            return len([e for e in self.phase_result.errors if "Critical:" in e])
+        return 0
+
 
 class RagInfrastructureTask:
     """Task 1: Infrastructure Setup and Validation.

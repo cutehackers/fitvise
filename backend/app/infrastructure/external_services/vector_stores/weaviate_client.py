@@ -95,7 +95,6 @@ class WeaviateClient:
                     cluster_url=self.config.get_url(),
                     auth_credentials=auth_config,
                     headers=self.config.additional_headers,
-                    timeout_config=(self.config.connection_timeout, self.config.read_timeout),
                 )
             else:
                 # Local HTTP connection
@@ -105,7 +104,6 @@ class WeaviateClient:
                     grpc_port=self.config.grpc_port,
                     auth_credentials=auth_config,
                     headers=self.config.additional_headers,
-                    timeout_config=(self.config.connection_timeout, self.config.read_timeout),
                 )
 
             # Test connection

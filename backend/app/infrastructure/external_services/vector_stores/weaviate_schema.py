@@ -65,7 +65,7 @@ class WeaviateSchema:
         distance_metric: str = "cosine",
         description: str = "Document chunks with embeddings for RAG system",
     ) -> None:
-        """Create Chunk class for storing embedded chunks.
+        """Create Chunk class for storing embedded chunks using Weaviate v4 API.
 
         Args:
             dimension: Embedding vector dimension
@@ -75,21 +75,56 @@ class WeaviateSchema:
         Raises:
             EmbeddingStorageError: If class creation fails
         """
-        class_schema = create_chunk_class_schema(
-            dimension=dimension,
-            distance_metric=distance_metric,
-            description=description,
-        )
-
         try:
             # Check if class already exists
             if await self.class_exists("Chunk"):
                 logger.info("Chunk class already exists, skipping creation")
                 return
 
-            # Create class
-            self._client.schema.create_class(class_schema)
-            logger.info(f"Created Chunk class (dimension={dimension})")
+            # Create comprehensive properties for RAG system
+            properties = [
+                # Core Properties
+                Property(name="text", data_type=DataType.TEXT, description="Chunk text content"),
+                Property(name="chunk_id", data_type=DataType.UUID, description="Unique chunk identifier"),
+                Property(name="document_id", data_type=DataType.UUID, description="Source document identifier"),
+                Property(name="sequence", data_type=DataType.INT, description="Chunk sequence in document"),
+
+                # Model Metadata
+                Property(name="model_name", data_type=DataType.TEXT, description="Embedding model name"),
+                Property(name="model_version", data_type=DataType.TEXT, description="Embedding model version"),
+
+                # Document Metadata
+                Property(name="doc_type", data_type=DataType.TEXT, description="Document type (pdf, docx, txt, md, etc.)"),
+                Property(name="source_type", data_type=DataType.TEXT, description="Source type (chunk, query, etc.)"),
+                Property(name="file_name", data_type=DataType.TEXT, description="Source file name"),
+                Property(name="section", data_type=DataType.TEXT, description="Document section or chapter"),
+                Property(name="category", data_type=DataType.TEXT, description="Document category for filtering"),
+                Property(name="department", data_type=DataType.TEXT, description="Department or team for access control"),
+                Property(name="author", data_type=DataType.TEXT, description="Document author or creator"),
+                Property(name="language", data_type=DataType.TEXT, description="Content language (en, es, fr, etc.)"),
+
+                # Hierarchical Context
+                Property(name="parent_chunk_id", data_type=DataType.UUID, description="Parent chunk for hierarchical retrieval"),
+                Property(name="tags", data_type=DataType.TEXT_ARRAY, description="Tags for flexible categorization"),
+
+                # Quality Metrics
+                Property(name="token_count", data_type=DataType.INT, description="Token count in chunk"),
+                Property(name="confidence_score", data_type=DataType.NUMBER, description="Chunking confidence score (0-1)"),
+                Property(name="quality_score", data_type=DataType.NUMBER, description="Content quality score (0-1)"),
+
+                # Timestamps
+                Property(name="created_at", data_type=DataType.DATE, description="Creation timestamp"),
+                Property(name="updated_at", data_type=DataType.DATE, description="Last update timestamp"),
+            ]
+
+            # Create class using v4 API
+            self._client.collections.create(
+                name="Chunk",
+                vectorizer_config=Configure.Vectorizer.none(),
+                generative_config=Configure.Generative.none(),
+                properties=properties,
+            )
+            logger.info(f"Created Chunk class with {len(properties)} properties (dimension={dimension})")
 
         except WeaviateBaseError as e:
             raise EmbeddingStorageError(
@@ -108,9 +143,8 @@ class WeaviateSchema:
             True if class exists
         """
         try:
-            schema = self._client.schema.get()
-            classes = schema.get("classes", [])
-            return any(cls["class"] == class_name for cls in classes)
+            # In Weaviate v4, use collections.exists instead of schema.get
+            return self._client.collections.exists(class_name)
 
         except WeaviateBaseError as e:
             logger.error(f"Failed to check if class exists: {e}")
@@ -126,7 +160,8 @@ class WeaviateSchema:
             Class definition if found, None otherwise
         """
         try:
-            return self._client.schema.get(class_name)
+            # In Weaviate v4, collections.config.get returns collection configuration
+            return self._client.collections.config.get(class_name)
 
         except WeaviateBaseError as e:
             if "not found" in str(e).lower():
@@ -154,7 +189,8 @@ class WeaviateSchema:
                 logger.warning(f"Class {class_name} does not exist")
                 return False
 
-            self._client.schema.delete_class(class_name)
+            # In Weaviate v4, use collections.delete instead of schema.delete_class
+            self._client.collections.delete(class_name)
             logger.info(f"Deleted class {class_name}")
             return True
 
@@ -172,233 +208,13 @@ class WeaviateSchema:
             List of class names
         """
         try:
-            schema = self._client.schema.get()
-            classes = schema.get("classes", [])
-            return [cls["class"] for cls in classes]
+            # In Weaviate v4, use collections.list_all to get all collections
+            collections = self._client.collections.list_all()
+            return [collection.name for collection in collections]
 
         except WeaviateBaseError as e:
             logger.error(f"Failed to get classes: {e}")
             return []
-
-
-def create_chunk_class_schema(
-    dimension: int = 768,
-    distance_metric: str = "cosine",
-    description: str = "Document chunks with embeddings for RAG system",
-) -> Dict[str, Any]:
-    """Create Chunk class schema definition (Task 2.3.2).
-
-    Defines schema for storing document chunks with embeddings and metadata.
-    Optimized for hybrid search with rich metadata support.
-
-    Core Properties:
-        - text (text): Chunk text content
-        - chunk_id (uuid): Unique chunk identifier
-        - document_id (uuid): Source document identifier
-        - sequence (int): Chunk sequence in document
-
-    Model Metadata:
-        - model_name (string): Embedding model name
-        - model_version (string): Embedding model version
-
-    Document Metadata:
-        - doc_type (string): Document type (pdf, docx, txt, md, etc.)
-        - source_type (string): Source type (chunk, query, etc.)
-        - file_name (string): Source file name
-        - section (string): Document section or chapter
-        - category (string): Document category for filtering
-        - department (string): Department or team for access control
-        - author (string): Document author or creator
-        - language (string): Content language (en, es, fr, etc.)
-
-    Hierarchical Context:
-        - parent_chunk_id (uuid): Parent chunk for hierarchical retrieval
-        - tags (string[]): Tags for flexible categorization
-
-    Quality Metrics:
-        - token_count (int): Token count in chunk
-        - confidence_score (number): Chunking confidence score (0-1)
-        - quality_score (number): Content quality score (0-1)
-
-    Timestamps:
-        - created_at (date): Creation timestamp
-        - updated_at (date): Last update timestamp
-
-    Vector Configuration:
-        - Vectorizer: none (we provide embeddings)
-        - Index: HNSW for performance
-        - Distance: cosine similarity
-
-    Args:
-        dimension: Embedding vector dimension
-        distance_metric: Distance metric (cosine, dot, l2-squared)
-        description: Class description
-
-    Returns:
-        Weaviate class schema dictionary
-
-    Examples:
-        >>> schema = create_chunk_class_schema(dimension=768)
-        >>> schema["class"]
-        'Chunk'
-        >>> len(schema["properties"])
-        21
-        >>> schema["vectorIndexConfig"]["distance"]
-        'cosine'
-    """
-    return {
-        "class": "Chunk",
-        "description": description,
-        "vectorizer": "none",  # We provide embeddings
-        "vectorIndexConfig": {
-            "distance": distance_metric,  # cosine, dot, l2-squared
-            "ef": -1,  # Dynamic ef
-            "efConstruction": 128,  # Build-time ef
-            "maxConnections": 64,  # HNSW parameter
-            "vectorCacheMaxObjects": 1000000,  # Cache size
-        },
-        "properties": [
-            # Core Properties
-            {
-                "name": "text",
-                "dataType": ["text"],
-                "description": "Chunk text content",
-                "indexFilterable": True,
-                "indexSearchable": True,
-            },
-            {
-                "name": "chunk_id",
-                "dataType": ["uuid"],
-                "description": "Unique chunk identifier",
-                "indexFilterable": True,
-            },
-            {
-                "name": "document_id",
-                "dataType": ["uuid"],
-                "description": "Source document identifier",
-                "indexFilterable": True,
-            },
-            {
-                "name": "sequence",
-                "dataType": ["int"],
-                "description": "Chunk sequence in document",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-            # Model Metadata
-            {
-                "name": "model_name",
-                "dataType": ["string"],
-                "description": "Embedding model name",
-                "indexFilterable": True,
-            },
-            {
-                "name": "model_version",
-                "dataType": ["string"],
-                "description": "Embedding model version",
-                "indexFilterable": True,
-            },
-            # Document Metadata (Enhanced for RAG filtering)
-            {
-                "name": "doc_type",
-                "dataType": ["string"],
-                "description": "Document type (pdf, docx, txt, md, etc.)",
-                "indexFilterable": True,
-            },
-            {
-                "name": "source_type",
-                "dataType": ["string"],
-                "description": "Source type (chunk, query, etc.)",
-                "indexFilterable": True,
-            },
-            {
-                "name": "file_name",
-                "dataType": ["string"],
-                "description": "Source file name",
-                "indexFilterable": True,
-            },
-            {
-                "name": "section",
-                "dataType": ["string"],
-                "description": "Document section or chapter",
-                "indexFilterable": True,
-            },
-            {
-                "name": "category",
-                "dataType": ["string"],
-                "description": "Document category for filtering (e.g., policy, guide, report)",
-                "indexFilterable": True,
-            },
-            {
-                "name": "department",
-                "dataType": ["string"],
-                "description": "Department or team for access control",
-                "indexFilterable": True,
-            },
-            {
-                "name": "author",
-                "dataType": ["string"],
-                "description": "Document author or creator",
-                "indexFilterable": True,
-            },
-            {
-                "name": "language",
-                "dataType": ["string"],
-                "description": "Content language (en, es, fr, etc.)",
-                "indexFilterable": True,
-            },
-            # Hierarchical Context
-            {
-                "name": "parent_chunk_id",
-                "dataType": ["uuid"],
-                "description": "Parent chunk for hierarchical retrieval",
-                "indexFilterable": True,
-            },
-            {
-                "name": "tags",
-                "dataType": ["string[]"],
-                "description": "Tags for flexible categorization",
-                "indexFilterable": True,
-            },
-            # Quality Metrics
-            {
-                "name": "token_count",
-                "dataType": ["int"],
-                "description": "Token count in chunk",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-            {
-                "name": "confidence_score",
-                "dataType": ["number"],
-                "description": "Chunking confidence score (0-1)",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-            {
-                "name": "quality_score",
-                "dataType": ["number"],
-                "description": "Content quality score (0-1)",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-            # Timestamps
-            {
-                "name": "created_at",
-                "dataType": ["date"],
-                "description": "Creation timestamp",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-            {
-                "name": "updated_at",
-                "dataType": ["date"],
-                "description": "Last update timestamp",
-                "indexFilterable": True,
-                "indexRangeFilters": True,
-            },
-        ],
-    }
 
 
 def validate_chunk_metadata(metadata: Dict[str, Any]) -> None:

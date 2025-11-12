@@ -162,8 +162,11 @@ class ExternalServicesContainer:
         Returns a configured Weaviate client. Lazily initializes
         on first access and caches for subsequent accesses.
 
+        Note: The returned client requires manual connection via
+        await client.connect() or use ensure_weaviate_connected() method.
+
         Returns:
-            Configured WeaviateClient instance ready for use
+            Configured WeaviateClient instance (not connected)
 
         Raises:
             ExternalServicesError: If client initialization fails
@@ -179,6 +182,25 @@ class ExternalServicesContainer:
 
         return self._weaviate_client
 
+    async def ensure_weaviate_connected(self) -> WeaviateClient:
+        """Get Weaviate client instance and ensure it's connected.
+
+        Returns:
+            Connected WeaviateClient instance ready for use
+
+        Raises:
+            ExternalServicesError: If connection fails
+        """
+        client = self.weaviate_client
+        if not client.is_connected:
+            try:
+                await client.connect()
+            except Exception as exc:
+                raise ExternalServicesError(
+                    f"Failed to connect Weaviate client: {str(exc)}"
+                ) from exc
+        return client
+
     @property
     def embedding_repository(self) -> EmbeddingRepository:
         """Get embedding repository instance.
@@ -186,8 +208,11 @@ class ExternalServicesContainer:
         Returns a configured embedding repository. Lazily initializes
         on first access and caches for subsequent accesses.
 
+        Note: The repository uses a WeaviateClient that requires manual
+        connection before use. Call ensure_weaviate_connected() first.
+
         Returns:
-            Configured EmbeddingRepository instance ready for use
+            Configured EmbeddingRepository instance (WeaviateClient not connected)
 
         Raises:
             ExternalServicesError: If repository initialization fails
@@ -202,6 +227,19 @@ class ExternalServicesContainer:
                 ) from exc
 
         return self._embedding_repository
+
+    async def connected_embedding_repository(self) -> EmbeddingRepository:
+        """Get embedding repository with connected Weaviate client.
+
+        Returns:
+            EmbeddingRepository with connected WeaviateClient ready for use
+
+        Raises:
+            ExternalServicesError: If connection or repository initialization fails
+        """
+        # Ensure Weaviate client is connected
+        await self.ensure_weaviate_connected()
+        return self.embedding_repository
 
     @property
     def embedding_domain_service(self) -> EmbeddingService:

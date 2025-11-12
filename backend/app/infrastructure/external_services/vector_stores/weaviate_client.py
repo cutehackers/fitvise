@@ -13,6 +13,8 @@ from uuid import UUID
 
 import weaviate
 from weaviate.exceptions import WeaviateBaseError
+from weaviate.classes.config import Configure, Property, DataType
+from weaviate.classes.init import Auth
 
 from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.domain.exceptions.embedding_exceptions import (
@@ -65,11 +67,11 @@ class WeaviateClient:
             config: Weaviate configuration
         """
         self.config = config
-        self._client: Optional[weaviate.Client] = None
+        self._client = None
         self.is_connected = False
 
     async def connect(self) -> None:
-        """Connect to Weaviate server.
+        """Connect to Weaviate server using Weaviate v4 API.
 
         Raises:
             EmbeddingStorageError: If connection fails
@@ -81,49 +83,43 @@ class WeaviateClient:
         try:
             logger.info(f"Connecting to Weaviate at {self.config.get_url()}")
 
-            # Build authentication
+            # Build authentication for v4
             auth_config = None
             if self.config.auth_type.value == "api_key" and self.config.api_key:
-                auth_config = weaviate.AuthApiKey(api_key=self.config.api_key)
+                auth_config = Auth.api_key(api_key=self.config.api_key)
 
-            # Connect in thread pool to avoid blocking
-            loop = asyncio.get_event_loop()
-            self._client = await loop.run_in_executor(
-                None,
-                lambda: weaviate.Client(
-                    url=self.config.get_url(),
-                    auth_client_secret=auth_config,
-                    timeout_config=(
-                        self.config.connection_timeout,
-                        self.config.read_timeout,
-                    ),
-                    additional_headers=self.config.additional_headers,
-                ),
-            )
+            # Connect using v4+ API
+            if self.config.scheme == "https" and self.config.port == 443:
+                # Production HTTPS connection
+                self._client = weaviate.connect_to_weaviate_cloud(
+                    cluster_url=self.config.get_url(),
+                    auth_credentials=auth_config,
+                    headers=self.config.additional_headers,
+                    timeout_config=(self.config.connection_timeout, self.config.read_timeout),
+                )
+            else:
+                # Local HTTP connection
+                self._client = weaviate.connect_to_local(
+                    host=self.config.host,
+                    port=self.config.port,
+                    grpc_port=self.config.grpc_port,
+                    auth_credentials=auth_config,
+                    headers=self.config.additional_headers,
+                    timeout_config=(self.config.connection_timeout, self.config.read_timeout),
+                )
 
             # Test connection
-            is_ready = await loop.run_in_executor(
-                None, lambda: self._client.is_ready()
-            )
-
-            if not is_ready:
-                raise EmbeddingStorageError(
-                    message="Weaviate server not ready",
-                    operation="connect",
-                )
+            self._client.collections.exists("test")  # Quick connectivity check
+            if not self._client.collections.exists("test"):
+                # Collection doesn't exist, which is expected - connection is working
+                pass
 
             self.is_connected = True
             logger.info("Successfully connected to Weaviate")
 
-        except WeaviateBaseError as e:
-            raise EmbeddingStorageError(
-                message="Failed to connect to Weaviate",
-                operation="connect",
-                details=str(e),
-            ) from e
         except Exception as e:
             raise EmbeddingStorageError(
-                message="Unexpected error connecting to Weaviate",
+                message="Failed to connect to Weaviate",
                 operation="connect",
                 details=str(e),
             ) from e
@@ -173,18 +169,23 @@ class WeaviateClient:
 
         try:
             loop = asyncio.get_event_loop()
+
+            # Convert string UUID to UUID object if provided
+            uuid_obj = UUID(uuid) if uuid else None
+
+            # Use v4 collections API
+            collection = self._client.collections.get(class_name)
             object_uuid = await loop.run_in_executor(
                 None,
-                lambda: self._client.data_object.create(
-                    class_name=class_name,
-                    data_object=properties,
+                lambda: collection.data.insert(
+                    properties=properties,
                     vector=vector,
-                    uuid=uuid,
+                    uuid=uuid_obj,
                 ),
             )
 
             logger.debug(f"Created object in {class_name}: {object_uuid}")
-            return object_uuid
+            return str(object_uuid)
 
         except WeaviateBaseError as e:
             raise EmbeddingStorageError(
@@ -230,6 +231,9 @@ class WeaviateClient:
             created_count = 0
             loop = asyncio.get_event_loop()
 
+            # Get collection for v4 API
+            collection = self._client.collections.get(class_name)
+
             # Process in batches
             for i in range(0, len(objects), batch_size):
                 batch_objects = objects[i : i + batch_size]
@@ -237,18 +241,20 @@ class WeaviateClient:
                     vectors[i : i + batch_size] if vectors else [None] * len(batch_objects)
                 )
                 batch_uuids = (
-                    uuids[i : i + batch_size] if uuids else [None] * len(batch_objects)
+                    [UUID(uuid) if uuid else None for uuid in uuids[i : i + batch_size]]
+                    if uuids else [None] * len(batch_objects)
                 )
 
-                # Configure batch
-                with self._client.batch.configure(batch_size=batch_size) as batch:
-                    for obj, vec, uuid in zip(batch_objects, batch_vectors, batch_uuids):
-                        batch.add_data_object(
-                            class_name=class_name,
-                            data_object=obj,
-                            vector=vec,
-                            uuid=uuid,
-                        )
+                # Use v4 batch API
+                for obj, vec, uuid_obj in zip(batch_objects, batch_vectors, batch_uuids):
+                    await loop.run_in_executor(
+                        None,
+                        lambda o=obj, v=vec, u=uuid_obj: collection.data.insert(
+                            properties=o,
+                            vector=v,
+                            uuid=u,
+                        ),
+                    )
 
                 created_count += len(batch_objects)
 
@@ -285,16 +291,39 @@ class WeaviateClient:
 
         try:
             loop = asyncio.get_event_loop()
+
+            # Convert string UUID to UUID object
+            uuid_obj = UUID(uuid)
+
+            # Use v4 collections API
+            collection = self._client.collections.get(class_name)
             obj = await loop.run_in_executor(
                 None,
-                lambda: self._client.data_object.get_by_id(
-                    uuid=uuid,
-                    class_name=class_name,
-                    with_vector=include_vector,
+                lambda: collection.query.fetch_object_by_id(
+                    uuid=uuid_obj,
+                    include_vector=include_vector,
                 ),
             )
 
-            return obj
+            # Convert v4 response to compatible format
+            if obj and obj.properties:
+                result = {
+                    "class": class_name,
+                    "id": str(obj.uuid),
+                    "properties": obj.properties,
+                }
+                if include_vector and hasattr(obj, 'vector') and obj.vector:
+                    result["vector"] = obj.vector
+                return result
+            elif obj:
+                # Object found but no properties
+                return {
+                    "class": class_name,
+                    "id": str(obj.uuid),
+                    "properties": {},
+                }
+
+            return None
 
         except WeaviateBaseError as e:
             if "not found" in str(e).lower():
@@ -323,16 +352,24 @@ class WeaviateClient:
 
         try:
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(
+
+            # Convert string UUID to UUID object
+            uuid_obj = UUID(uuid)
+
+            # Use v4 collections API
+            collection = self._client.collections.get(class_name)
+            result = await loop.run_in_executor(
                 None,
-                lambda: self._client.data_object.delete(
-                    uuid=uuid,
-                    class_name=class_name,
-                ),
+                lambda: collection.data.delete_by_id(uuid=uuid_obj),
             )
 
-            logger.debug(f"Deleted object from {class_name}: {uuid}")
-            return True
+            # v4 API returns boolean for successful deletion
+            deleted = bool(result)
+
+            if deleted:
+                logger.debug(f"Deleted object from {class_name}: {uuid}")
+
+            return deleted
 
         except WeaviateBaseError as e:
             if "not found" in str(e).lower():
@@ -377,29 +414,38 @@ class WeaviateClient:
                 f"limit={limit}, min_certainty={min_certainty})"
             )
 
-            # Build query
-            query = (
-                self._client.query.get(class_name)
-                .with_near_vector({"vector": vector, "certainty": min_certainty})
-                .with_limit(limit)
+            # Use v4 collections API
+            collection = self._client.collections.get(class_name)
+            loop = asyncio.get_event_loop()
+
+            # Build near vector query for v4
+            query = collection.query.near_vector(
+                near_vector=vector,
+                distance=min_certainty,  # v4 uses distance instead of certainty
+                limit=limit,
+                include_vector=include_vector,
             )
 
             # Add filters if provided
             if filters:
                 query = query.with_where(filters)
 
-            # Include vector if requested
-            if include_vector:
-                query = query.with_additional(["vector", "certainty", "distance"])
-            else:
-                query = query.with_additional(["certainty", "distance"])
-
             # Execute query in thread pool
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: query.do())
+            result = await loop.run_in_executor(None, lambda: query.objects)
 
-            # Extract results
-            objects = result.get("data", {}).get("Get", {}).get(class_name, [])
+            # Convert v4 results to compatible format
+            objects = []
+            for obj in result:
+                obj_data = {
+                    "class": class_name,
+                    "id": str(obj.uuid),
+                    "properties": obj.properties or {},
+                    "certainty": getattr(obj, 'certainty', None),
+                    "distance": getattr(obj, 'distance', None),
+                }
+                if include_vector and hasattr(obj, 'vector') and obj.vector:
+                    obj_data["vector"] = obj.vector
+                objects.append(obj_data)
 
             logger.debug(f"Found {len(objects)} similar objects")
             return objects
@@ -427,18 +473,16 @@ class WeaviateClient:
 
         try:
             loop = asyncio.get_event_loop()
+
+            # Use v4 collections API
+            collection = self._client.collections.get(class_name)
             result = await loop.run_in_executor(
                 None,
-                lambda: self._client.query.aggregate(class_name).with_meta_count().do(),
+                lambda: collection.aggregate.over_all(total_count=True),
             )
 
-            count = (
-                result.get("data", {})
-                .get("Aggregate", {})
-                .get(class_name, [{}])[0]
-                .get("meta", {})
-                .get("count", 0)
-            )
+            # v4 API returns the count directly
+            count = result.total_count if hasattr(result, 'total_count') else 0
 
             return count
 
@@ -466,16 +510,22 @@ class WeaviateClient:
 
         try:
             loop = asyncio.get_event_loop()
-            is_ready = await loop.run_in_executor(
-                None, lambda: self._client.is_ready()
-            )
-            is_live = await loop.run_in_executor(
-                None, lambda: self._client.is_live()
-            )
 
-            health["status"] = "healthy" if (is_ready and is_live) else "unhealthy"
-            health["ready"] = is_ready
-            health["live"] = is_live
+            # v4 API - check if we can access collections
+            try:
+                # Try to list collections to verify connectivity
+                collections = await loop.run_in_executor(
+                    None, lambda: self._client.collections.list_all()
+                )
+                health["status"] = "healthy"
+                health["collections_count"] = len(collections) if collections else 0
+                health["ready"] = True
+                health["live"] = True
+            except Exception as connectivity_error:
+                health["status"] = "unhealthy"
+                health["error"] = f"Connectivity issue: {str(connectivity_error)}"
+                health["ready"] = False
+                health["live"] = False
 
         except Exception as e:
             health["status"] = "error"

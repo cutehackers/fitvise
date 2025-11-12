@@ -292,7 +292,17 @@ class RagEmbeddingTask:
             # Initialize use cases with SHARED repository
             logger.info("Initializing embedding use cases...")
 
-            # Ensure embedding service is initialized before use
+            # Step 1: Ensure Weaviate client is connected
+            logger.info("🔗 Ensuring Weaviate client connection...")
+            try:
+                await self.external_services.ensure_weaviate_connected()
+                logger.info("✅ Weaviate client connected successfully")
+            except Exception as weaviate_error:
+                error_msg = f"Failed to connect Weaviate client: {str(weaviate_error)}"
+                logger.error(error_msg)
+                raise EmbeddingPipelineError(error_msg) from weaviate_error
+
+            # Step 2: Ensure embedding service is initialized before use
             embedding_service = self.external_services.sentence_transformer_service
             logger.info(f"Initializing embedding model: {embedding_service.model_name}")
             try:

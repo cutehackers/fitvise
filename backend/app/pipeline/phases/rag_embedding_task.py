@@ -16,6 +16,7 @@ from uuid import UUID
 
 from app.infrastructure.external_services import ExternalServicesContainer
 from app.pipeline.config import PipelineSpec
+from app.pipeline.chunking_config_resolver import resolve_chunking_configuration
 from app.application.use_cases.indexing.build_ingestion_pipeline import (
     BuildIngestionPipelineUseCase,
     BuildIngestionPipelineRequest,
@@ -415,7 +416,14 @@ class RagEmbeddingTask:
             logger.info("🚀 Proceeding to embedding generation...")
             logger.info("=" * 80)
 
-            # Create pipeline request
+            # Resolve chunking configuration (single source of truth for semantic chunking)
+            resolved_chunker_config = resolve_chunking_configuration(spec)
+            enable_semantic_chunking = resolved_chunker_config.get("enable_semantic_chunking", True)
+            logger.info(f"📋 Resolved Chunking Configuration:")
+            logger.info(f"   Method: {'semantic' if enable_semantic_chunking else 'sentence'}")
+            logger.info(f"   Source: {resolved_chunker_config.get('preset', 'default')}")
+
+            # Create pipeline request with resolved configuration
             # Note: Chunks will be loaded from repository (created in Task 2)
             pipeline_request = BuildIngestionPipelineRequest(
                 document_ids=document_ids,
@@ -425,6 +433,7 @@ class RagEmbeddingTask:
                 show_progress=show_progress,
                 replace_existing_embeddings=False,  # Incremental approach
                 chunk_load_policy=chunk_load_policy,  # Policy for loading chunks from Task 2
+                chunker_config=resolved_chunker_config,  # Single source of truth (from spec resolution)
             )
 
             logger.info(f"📝 Processing Configuration:")
@@ -434,6 +443,7 @@ class RagEmbeddingTask:
             logger.info(f"   Deduplication: {deduplication_enabled}")
             logger.info(f"   Max retries: {max_retries}")
             logger.info(f"   Chunk load policy: {chunk_load_policy} ({str(chunk_load_policy)})")
+            logger.info(f"   Chunking method: {'semantic (with embeddings)' if enable_semantic_chunking else 'sentence (no embeddings)'}")
 
             # Execute pipeline
             pipeline_response = await build_use_case.execute(pipeline_request)

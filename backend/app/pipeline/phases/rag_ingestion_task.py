@@ -314,12 +314,12 @@ class RagIngestionTask:
         preventing unnecessary model loading when using sentence-based chunking.
         """
         # Check if semantic chunking is enabled (respects YAML overrides)
-        enable_semantic = requires_embedding_model(spec)
+        enable_semantic_chunking = requires_embedding_model(spec)
 
         if self.verbose:
-            logger.debug(f"🔧 INGESTION VERBOSE: Creating chunking use case with enable_semantic={enable_semantic}")
+            logger.debug(f"🔧 INGESTION VERBOSE: Creating chunking use case with enable_semantic_chunking={enable_semantic_chunking}")
 
-        if enable_semantic:
+        if enable_semantic_chunking:
             # Semantic chunking requires embedding model
             return SemanticChunkingUseCase(
                 document_repository=self.document_repository,
@@ -1255,9 +1255,9 @@ class RagIngestionTask:
                     logger.debug(f"🔧 INGESTION VERBOSE: Applying additional chunking config overrides: {list(overrides.keys())}")
                 chunk_config.update(overrides)
 
-            # Use enable_semantic from configuration with YAML override applied
-            enable_semantic = chunk_config.get("enable_semantic", True)
-            chunking_method = "semantic (with embeddings)" if enable_semantic else "sentence (no embeddings)"
+            # Use enable_semantic_chunking from configuration with YAML override applied
+            enable_semantic_chunking = chunk_config.get("enable_semantic_chunking", True)
+            chunking_method = "semantic (with embeddings)" if enable_semantic_chunking else "sentence (no embeddings)"
             logger.info(f"📝 Chunking method: {chunking_method} (from preset: {summary['preset']}, YAML overrides applied)")
 
             metadata_overrides = {"run_id": run_id}

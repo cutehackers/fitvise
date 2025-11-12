@@ -20,7 +20,7 @@ processors:
 chunking:
   enabled: true
   preset: balanced
-  enable_semantic: false  # disable semantic chunking
+  enable_semantic_chunking: false
   overrides: {}
   replace_existing_chunks: true
   metadata_overrides: {}

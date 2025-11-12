@@ -71,7 +71,7 @@ class RAGWorkflow:
     The RAGWorkflow uses chunking presets and overrides defined in the PipelineSpec to control
     the chunking strategy during document ingestion. The chunking behavior is determined by:
     1. Base preset (spec.chunking.preset)
-    2. YAML override for semantic chunking (spec.chunking.enable_semantic)
+    2. YAML override for semantic chunking (spec.chunking.enable_semantic_chunking)
     3. Additional parameter overrides (spec.chunking.overrides)
 
     ### Chunking Configuration (Task 2 - Document Ingestion)
@@ -83,7 +83,7 @@ class RAGWorkflow:
     chunking:
       enabled: true                              # Enable/disable chunking
       preset: balanced                           # Base preset: balanced, short_form, long_form, hierarchical
-      enable_semantic: null                      # Override: true=semantic, false=sentence, null=use preset default
+      enable_semantic_chunking: null             # Override: true=semantic, false=sentence, null=use preset default
       overrides: {}                              # Additional parameter overrides
     ```
 
@@ -142,21 +142,21 @@ class RAGWorkflow:
     ```yaml
     chunking:
       preset: short_form
-      enable_semantic: false  # Explicit sentence-based chunking
+      enable_semantic_chunking: false  # Explicit sentence-based chunking
     ```
 
     **High-Quality Pipeline (balanced preset with override)**:
     ```yaml
     chunking:
       preset: short_form     # Start with fast preset
-      enable_semantic: true  # Override to enable semantic chunking
+      enable_semantic_chunking: true  # Override to enable semantic chunking
     ```
 
     **Hybrid Pipeline (balanced preset with sentence override)**:
     ```yaml
     chunking:
       preset: balanced
-      enable_semantic: false  # Override balanced to use sentence splitting
+      enable_semantic_chunking: false  # Override balanced to use sentence splitting
     ```
 
     **Pipeline Experimentation**:
@@ -164,19 +164,19 @@ class RAGWorkflow:
     # Run ingestion with different configurations
     spec_fast = PipelineSpec(
         documents=DocumentOption(path="./data"),
-        chunking=ChunkingOptions(preset="short_form", enable_semantic=False)
+        chunking=ChunkingOptions(preset="short_form", enable_semantic_chunking=False)
     )
     await workflow.run_ingestion(spec_fast)
 
     spec_quality = PipelineSpec(
         documents=DocumentOption(path="./data"),
-        chunking=ChunkingOptions(preset="balanced", enable_semantic=True)
+        chunking=ChunkingOptions(preset="balanced", enable_semantic_chunking=True)
     )
     await workflow.run_ingestion(spec_quality)
 
     spec_hybrid = PipelineSpec(
         documents=DocumentOption(path="./data"),
-        chunking=ChunkingOptions(preset="balanced", enable_semantic=False)
+        chunking=ChunkingOptions(preset="balanced", enable_semantic_chunking=False)
     )
     await workflow.run_ingestion(spec_hybrid)
     ```
@@ -186,7 +186,7 @@ class RAGWorkflow:
     # Test with small document limit and explicit configuration
     spec_debug = PipelineSpec(
         documents=DocumentOption(path="./data"),
-        chunking=ChunkingOptions(preset="short_form", enable_semantic=False),
+        chunking=ChunkingOptions(preset="short_form", enable_semantic_chunking=False),
         limits=LimitOptions(max_files=10)
     )
     await workflow.run_ingestion(spec_debug)
@@ -426,7 +426,7 @@ class RAGWorkflow:
         # Get chunking preset for logging
         chunking_config = resolve_chunking_configuration(spec)
         logger.info(f"Chunking Configurations: {chunking_config}")
-        logger.info(f"Semantic Chunking: {chunking_config.get('enable_semantic', True)}")
+        logger.info(f"Semantic Chunking: {chunking_config.get('enable_semantic_chunking', True)}")
 
         # Create output directory if specified
         if output_dir:
@@ -590,7 +590,7 @@ class RAGWorkflow:
             # Determine chunk load policy based on the preset used in Task 2
             # This ensures fallback (if triggered) matches Task 2's chunking method
             chunking_config = resolve_chunking_configuration(spec)
-            enable_semantic = chunking_config.get('enable_semantic', True)
+            enable_semantic = chunking_config.get('enable_semantic_chunking', True)
             chunk_load_policy = (
                 ChunkLoadPolicy.SEMANTIC_FALLBACK
                 if enable_semantic

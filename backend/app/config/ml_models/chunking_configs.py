@@ -19,7 +19,7 @@ class ChunkingConfigurations:
         default_factory=lambda: ("document_id", "source_id", "file_name", "doc_type")
     )
     chunk_sizes: Iterable[int] | None = None  # For hierarchical chunking (Task 2.1.3)
-    enable_semantic: bool = True  # Use semantic chunking with embeddings
+    enable_semantic_chunking: bool = True  # Use semantic chunking with embeddings
 
     def as_dict(self) -> Dict[str, int | List[str] | List[int] | str | bool]:
         result = {
@@ -30,7 +30,7 @@ class ChunkingConfigurations:
             "min_chunk_chars": self.min_chunk_chars,
             "max_chunk_chars": self.max_chunk_chars,
             "metadata_passthrough_fields": list(self.metadata_passthrough),
-            "enable_semantic": self.enable_semantic,
+            "enable_semantic_chunking": self.enable_semantic_chunking,
         }
         if self.chunk_sizes is not None:
             result["chunk_sizes"] = list(self.chunk_sizes)
@@ -45,7 +45,7 @@ _PRESETS: Dict[str, ChunkingConfigurations] = {
         chunk_overlap=128,
         min_chunk_chars=512,
         max_chunk_chars=3072,
-        enable_semantic=True,  # Semantic for mixed content types
+        enable_semantic_chunking=True,  # Semantic for mixed content types
     ),
     "short_form": ChunkingConfigurations(
         name="short_form",
@@ -54,7 +54,7 @@ _PRESETS: Dict[str, ChunkingConfigurations] = {
         chunk_overlap=64,
         min_chunk_chars=60,
         max_chunk_chars=1200,
-        enable_semantic=False,  # Fast sentence-based for short content
+        enable_semantic_chunking=False,  # Fast sentence-based for short content
     ),
     "long_form": ChunkingConfigurations(
         name="long_form",
@@ -63,7 +63,7 @@ _PRESETS: Dict[str, ChunkingConfigurations] = {
         chunk_overlap=256,
         min_chunk_chars=160,
         max_chunk_chars=3072,
-        enable_semantic=True,  # Semantic for better coherence in long content
+        enable_semantic_chunking=True,  # Semantic for better coherence in long content
     ),
     "hierarchical": ChunkingConfigurations(
         name="hierarchical",
@@ -73,7 +73,7 @@ _PRESETS: Dict[str, ChunkingConfigurations] = {
         min_chunk_chars=100,
         max_chunk_chars=2048,
         chunk_sizes=[2048, 512, 128],  # Multi-level: document → section → paragraph
-        enable_semantic=True,  # Semantic for document structure understanding
+        enable_semantic_chunking=True,  # Semantic for document structure understanding
     ),
 }
 

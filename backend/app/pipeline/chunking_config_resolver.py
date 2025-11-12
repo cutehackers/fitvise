@@ -36,9 +36,9 @@ def resolve_chunking_configuration(spec: PipelineSpec) -> Dict[str, Any]:
     preset_name = spec.chunking.preset or "balanced"
     chunk_config = get_chunking_config(preset_name)
 
-    # Apply user-specified enable_semantic override from YAML
-    if spec.chunking.enable_semantic is not None:
-        chunk_config["enable_semantic"] = spec.chunking.enable_semantic
+    # Apply user-specified enable_semantic_chunking override from YAML
+    if spec.chunking.enable_semantic_chunking is not None:
+        chunk_config["enable_semantic_chunking"] = spec.chunking.enable_semantic_chunking
 
     # Apply any additional configuration overrides from YAML
     overrides = getattr(spec.chunking, "overrides", {})
@@ -69,4 +69,4 @@ def requires_embedding_model(spec: PipelineSpec) -> bool:
         ...     print("Skip embedding model initialization")
     """
     config = resolve_chunking_configuration(spec)
-    return config.get("enable_semantic", True)
+    return config.get("enable_semantic_chunking", True)

@@ -57,6 +57,7 @@ class BuildIngestionPipelineRequest:
     show_progress: bool = True
     replace_existing_embeddings: bool = False
     chunk_load_policy: ChunkLoadPolicy = ChunkLoadPolicy.EXISTING_ONLY  # Policy for loading chunks from Task 2
+    chunker_config: Optional[Dict[str, Any]] = None  # Resolved chunking config from Task 3 spec (single source of truth)
 
 
 @dataclass
@@ -465,10 +466,21 @@ class BuildIngestionPipelineUseCase:
                 document_id=str(request.document_ids)
             )
 
-        # Determine chunking method based on policy
-        use_semantic = request.chunk_load_policy.uses_semantic_chunking()
-        chunking_method = "semantic (with embeddings)" if use_semantic else "sentence (no embeddings)"
-        logger.warning(f"   Falling back to re-chunking using: {chunking_method}")
+        # Determine chunking method based on configuration or policy
+        # Priority: explicit chunker_config (from spec) > policy-based decision
+        if request.chunker_config is not None:
+            # Use resolved config from Task 3 spec (single source of truth)
+            enable_semantic_chunking = request.chunker_config.get("enable_semantic_chunking", True)
+            config_source = "spec configuration"
+            chunker_config = request.chunker_config
+        else:
+            # Fallback to policy if not specified (backward compatibility)
+            enable_semantic_chunking = request.chunk_load_policy.uses_semantic_chunking()
+            config_source = f"{request.chunk_load_policy} policy"
+            chunker_config = {"enable_semantic_chunking": enable_semantic_chunking}
+
+        chunking_method = "semantic (with embeddings)" if enable_semantic_chunking else "sentence (no embeddings)"
+        logger.warning(f"   Falling back to re-chunking using: {chunking_method} (from {config_source})")
         logger.warning("   Recommendation: Verify Task 2 completed and re-run if needed")
         logger.warning("=" * 80)
 
@@ -477,7 +489,7 @@ class BuildIngestionPipelineUseCase:
             document_ids=request.document_ids,
             include_failed=False,  # Don't include failed chunks in pipeline
             replace_existing_chunks=True,
-            enable_semantic=use_semantic  # Use chunking method specified by policy
+            chunker_config=chunker_config  # Single source of truth: spec > policy
         )
 
         chunking_response = await self._chunking_use_case.execute(chunking_request)

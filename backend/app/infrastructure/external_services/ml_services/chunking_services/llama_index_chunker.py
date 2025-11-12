@@ -38,7 +38,7 @@ class LlamaIndexChunkerConfig:
     chunk_size: int = 1024
     chunk_overlap: int = 128
     separators: Sequence[str] = ("\n\n", "\n", " ")
-    enable_semantic: bool = True
+    enable_semantic_chunking: bool = True
     semantic_breakpoint_threshold: float = 0.85
     min_chunk_chars: int = 80
     max_chunk_chars: Optional[int] = None
@@ -116,7 +116,7 @@ class LlamaIndexChunker:
         Args:
             config: Chunking configuration. Defaults to LlamaIndexChunkerConfig().
             embed_model: Pre-initialized HuggingFaceEmbedding model instance.
-                        Optional - only required when enable_semantic is True.
+                        Optional - only required when enable_semantic_chunking is True.
             require_llama_index: Raise error if llama_index unavailable
 
         Raises:
@@ -159,7 +159,7 @@ class LlamaIndexChunker:
             if self._llama_available:
                 chunks = self._chunk_with_llama_index(normalized_text, merged_metadata)
             else:
-                if self.config.enable_semantic:
+                if self.config.enable_semantic_chunking:
                     logger.warning(
                         "Semantic chunking requested but llama_index is unavailable; using fallback splitter.",
                     )
@@ -201,7 +201,7 @@ class LlamaIndexChunker:
         nodes: List[Any] = []
         document = _LlamaDocument(text=text, metadata=metadata)
 
-        if self.config.enable_semantic and _SemanticSplitter is not None:
+        if self.config.enable_semantic_chunking and _SemanticSplitter is not None:
             try:
                 # SemanticSplitterNodeParser expects breakpoint_percentile_threshold as an integer (0-100)
                 # Convert from float (0-1) to integer (0-100) if needed

@@ -23,7 +23,7 @@ from app.pipeline.phases.rag_embedding_task import (
     EmbeddingResult,
     EmbeddingPipelineError,
 )
-from app.pipeline.config import PipelineSpec
+from app.pipeline.config import PipelineSpec, ChunkingOptions
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.entities.document import Document
 from app.domain.entities.chunk import Chunk
@@ -342,7 +342,9 @@ class TestEmbeddingExecution:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(spec)
 
             assert result.success is True
@@ -498,7 +500,9 @@ class TestEmbeddingExecution:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(spec, deduplication_enabled=True)
 
             assert result.success is True
@@ -548,7 +552,9 @@ class TestEmbeddingExecution:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(spec, batch_size=64)
 
             assert result.success is True
@@ -598,7 +604,9 @@ class TestEmbeddingExecution:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(
                 spec, chunk_load_policy=ChunkLoadPolicy.SEMANTIC_FALLBACK
             )
@@ -856,7 +864,9 @@ class TestEdgeCases:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(spec, max_retries=5)
 
             assert result.success is True
@@ -957,7 +967,9 @@ class TestEdgeCases:
                 document_repository=document_repository,
             )
 
+            # Create properly configured mock spec with chunking options
             spec = Mock(spec=PipelineSpec)
+            spec.chunking = ChunkingOptions(preset="balanced", enable_semantic_chunking=None)
             result = await task.execute(spec, document_limit=100)
 
             assert result.success is True

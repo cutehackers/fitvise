@@ -10,6 +10,7 @@ from typing import List
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
+from pydantic import ConfigDict
 
 from app.infrastructure.repositories.weaviate_search_repository import (
     WeaviateSearchRepository,
@@ -34,10 +35,9 @@ class WeaviateLangChainRetriever(BaseRetriever):
     top_k: int = 5
     similarity_threshold: float = 0.7
 
-    class Config:
-        """Pydantic config."""
-
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun

@@ -22,9 +22,9 @@ class ApiErrorResponse(BaseModel):
 class HealthResponse(BaseModel):
     """Response model for health check"""
 
-    status: str = Field(..., description="Service status", example="healthy")
-    service: str = Field(..., description="Service name", example="workout-api")
-    version: str = Field(..., description="API version", example="1.0.0")
+    status: str = Field(..., description="Service status", json_schema_extra={"example": "healthy"})
+    service: str = Field(..., description="Service name", json_schema_extra={"example": "workout-api"})
+    version: str = Field(..., description="API version", json_schema_extra={"example": "1.0.0"})
     llm_service_available: bool = Field(..., description="LLM service availability")
     timestamp: str = Field(..., description="Health check timestamp")
 
@@ -37,13 +37,13 @@ class PromptRequest(BaseModel):
         min_length=1,
         max_length=1000,
         description="User's fitness-related prompt or question",
-        example="Create a 30-minute upper body workout for beginners",
+        json_schema_extra={"example": "Create a 30-minute upper body workout for beginners"},
     )
     context: Optional[str] = Field(
         None,
         max_length=2000,
         description="Additional context about user's fitness level, preferences, or constraints",
-        example="I'm a beginner with limited equipment, only have dumbbells",
+        json_schema_extra={"example": "I'm a beginner with limited equipment, only have dumbbells"},
     )
     temperature: Optional[float] = Field(
         None,

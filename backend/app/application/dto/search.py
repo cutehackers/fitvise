@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class SearchFilter(BaseModel):
@@ -72,11 +72,11 @@ class SearchResult(BaseModel):
     quality_label: Optional[str] = Field(None, description="Quality assessment label")
     doc_type: Optional[str] = Field(None, description="Document type")
 
-    class Config:
-        """Pydantic configuration."""
-        json_encoders = {
+    model_config = ConfigDict(
+        json_encoders={
             # Add any custom encoders if needed
         }
+    )
 
 
 class SearchResponse(BaseModel):
@@ -98,7 +98,7 @@ class SearchResponse(BaseModel):
 class SimilarChunksRequest(BaseModel):
     """Find similar chunks request model."""
 
-    chunk_ids: List[str] = Field(..., min_items=1, max_items=50, description="Chunk IDs to find similar items for")
+    chunk_ids: List[str] = Field(..., min_length=1, max_length=50, description="Chunk IDs to find similar items for")
     top_k: int = Field(10, ge=1, le=100, description="Maximum results per chunk")
     min_similarity: float = Field(0.0, ge=0.0, le=1.0, description="Minimum similarity threshold")
 
@@ -152,7 +152,7 @@ class SearchFeedback(BaseModel):
     """Search feedback submission model."""
 
     query_id: str = Field(..., description="Search query identifier")
-    result_ids: List[str] = Field(..., min_items=1, description="Returned result IDs")
+    result_ids: List[str] = Field(..., min_length=1, description="Returned result IDs")
     clicked_result_id: Optional[str] = Field(None, description="ID of result user clicked")
     feedback_score: Optional[int] = Field(None, ge=1, le=5, description="User feedback score (1-5)")
     feedback_text: Optional[str] = Field(None, max_length=500, description="Text feedback")
@@ -190,7 +190,7 @@ class SearchHealthResponse(BaseModel):
 class BatchSearchRequest(BaseModel):
     """Batch search request model."""
 
-    queries: List[SearchRequest] = Field(..., min_items=1, max_items=10, description="Search queries to execute")
+    queries: List[SearchRequest] = Field(..., min_length=1, max_length=10, description="Search queries to execute")
     aggregation_method: str = Field("reciprocal_rank", description="Method for combining results")
     max_total_results: int = Field(50, ge=1, le=200, description="Maximum total results across all queries")
 
@@ -215,7 +215,7 @@ class BatchSearchRequest(BaseModel):
 class DocumentSearchRequest(BaseModel):
     """Search within specific documents request model."""
 
-    document_ids: List[str] = Field(..., min_items=1, max_items=100, description="Document IDs to search within")
+    document_ids: List[str] = Field(..., min_length=1, max_length=100, description="Document IDs to search within")
     query_text: Optional[str] = Field(None, min_length=1, max_length=1000, description="Optional query text")
     top_k: int = Field(50, ge=1, le=200, description="Maximum results per document")
 

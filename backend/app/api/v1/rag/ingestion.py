@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.application.use_cases.data_ingestion import (
     SetupAirflowUseCase,
@@ -75,8 +75,10 @@ class TikaDocumentPayload(BaseModel):
     file_name: Optional[str] = Field(None, description="File name to use for raw content parsing")
     content_base64: Optional[str] = Field(None, description="Base64 encoded content for inline docs")
 
-    @validator("file_name", always=True)
-    def validate_inputs(cls, v, values):  # type: ignore[override]
+    @field_validator("file_name", mode="before")
+    @classmethod
+    def validate_inputs(cls, v, info):  # type: ignore[override]
+        values = info.data if hasattr(info, 'data') else {}
         file_path = values.get("file_path")
         content_base64 = values.get("content_base64")
         if not file_path and not content_base64:
@@ -106,7 +108,7 @@ class DatabaseConnectorConfigModel(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     database: Optional[str] = None
-    schema: Optional[str] = None
+    database_schema: Optional[str] = Field(None, description="Database schema name (for PostgreSQL/MySQL)")
     params: Optional[Dict[str, Any]] = None
     use_ssl: bool = False
     sample_collection: Optional[str] = None

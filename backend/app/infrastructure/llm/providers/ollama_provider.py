@@ -215,6 +215,15 @@ class OllamaProvider(LLMProvider):
         """Get the name of this provider."""
         return "ollama"
 
+    @property
+    def llm_instance(self) -> ChatOllama:
+        """Get the underlying ChatOllama instance for direct operations.
+
+        Returns:
+            The ChatOllama client instance
+        """
+        return self._llm
+
     def _convert_messages_to_langchain(self, messages: list[Message]) -> list[Any]:
         """Convert domain messages to LangChain message format.
 
@@ -243,6 +252,7 @@ class OllamaProvider(LLMProvider):
 
         return langchain_messages
 
+    
     def _get_max_tokens_for_model(self, model_name: str) -> Optional[int]:
         """Get maximum token limit for a model.
 

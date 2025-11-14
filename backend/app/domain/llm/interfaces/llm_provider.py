@@ -86,3 +86,13 @@ class LLMProvider(ABC):
     def provider_name(self) -> str:
         """Get the name of this provider."""
         pass
+
+    @property
+    @abstractmethod
+    def llm_instance(self) -> Any:
+        """Get the underlying LLM instance for direct operations.
+
+        Returns:
+            The LLM client instance (e.g., ChatOllama, OpenAI client)
+        """
+        pass

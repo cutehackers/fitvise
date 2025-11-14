@@ -85,13 +85,18 @@ class LangChainOrchestrator(ChatOrchestrator):
             ("human", "{input}"),
         ])
 
-        # Message trimmer
+        # Get ChatOllama instance from provider for direct token counting
+        chat_ollama_instance = llm_provider.llm_instance
+
+        # Message trimmer with conservative context limit
+        max_context_tokens = 8192  # Conservative default for most models
+
         self._trimmer = trim_messages(
             max_tokens=MAX_TOKENS_TABLE.get(
                 llm_provider.get_model_info().name.lower(),
                 8192
             ),
-            token_counter=self._create_token_counter(),
+            token_counter=self._create_token_counter(chat_ollama_instance),
             strategy="last",
             # Most chat models expect that chat history starts with either:
             # (1) a HumanMessage or
@@ -306,12 +311,19 @@ class LangChainOrchestrator(ChatOrchestrator):
             logger.error("Chat orchestrator health check failed: %s", str(e))
             return False
 
-    def _create_token_counter(self):
-        """Create a token counter function for the trimmer."""
+    def _create_token_counter(self, chat_ollama_instance):
+        """Create a token counter function using ChatOllama instance directly."""
         def count_tokens(messages: List[BaseMessage]) -> int:
-            # Simple estimation - in production, use actual tokenizer
-            total_chars = sum(len(msg.content) for msg in messages if hasattr(msg, 'content'))
-            return total_chars // 4  # Rough estimate: 1 token ≈ 4 characters
+            # Use ChatOllama's native token counting for maximum accuracy
+            if hasattr(chat_ollama_instance, 'get_num_tokens_from_messages'):
+                return chat_ollama_instance.get_num_tokens_from_messages(messages)
+            elif hasattr(chat_ollama_instance, 'get_num_tokens'):
+                # Fallback for individual message token counting
+                return sum(chat_ollama_instance.get_num_tokens(msg) for msg in messages if hasattr(msg, 'content'))
+            else:
+                # Final fallback to simple character-based estimation
+                total_chars = sum(len(msg.content) for msg in messages if hasattr(msg, 'content'))
+                return total_chars // 4
 
         return count_tokens
     

@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import router
-from app.application import llm_service
 from app.core.settings import settings
 
 # Configure logging with structured format
@@ -47,7 +46,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down Fitvise Backend API...")
-    await llm_service.close()
+    # No cleanup needed with new architecture - resources are managed automatically
 
 
 # Create FastAPI application

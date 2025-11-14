@@ -2,7 +2,7 @@
 Workout API schemas for request/response models.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 
@@ -155,3 +155,48 @@ class ChatResponse(BaseModel):
         description="Internal flag indicating if the request was processed successfully.",
     )
     error: Optional[str] = Field(None, description="Internal error message if processing failed.")
+
+
+class SourceCitation(BaseModel):
+    """Source document citation for RAG responses."""
+
+    index: int = Field(description="Citation number [1], [2], etc.")
+    content: str = Field(description="Chunk text used as context")
+    similarity_score: float = Field(ge=0, le=1, description="Relevance score (0.0-1.0)")
+    document_id: str = Field(description="Source document ID")
+    chunk_id: str = Field(description="Source chunk ID")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+
+class RagChatResponse(BaseModel):
+    """Enhanced chat response with RAG sources.
+
+    Used when RAG is enabled to include source citations alongside
+    the generated response.
+    """
+
+    model: str = Field(..., description="Model used for generation")
+    created_at: str = Field(..., description="Response timestamp")
+    message: Optional[ChatMessage] = Field(None, description="Generated message")
+    done: bool = Field(..., description="Whether generation is complete")
+    done_reason: Optional[str] = Field(None, description="Completion reason")
+
+    # RAG-specific fields
+    sources: Optional[List[SourceCitation]] = Field(
+        None, description="Retrieved sources with citations"
+    )
+    rag_metadata: Optional[Dict[str, Any]] = Field(
+        None, description="RAG retrieval metadata (chunks retrieved, processing time, etc.)"
+    )
+
+    # Performance metadata
+    total_duration: Optional[int] = Field(None, description="Total duration (ns)")
+    load_duration: Optional[int] = Field(None, description="Model load duration (ns)")
+    prompt_eval_count: Optional[int] = Field(None, description="Prompt tokens")
+    prompt_eval_duration: Optional[int] = Field(None, description="Prompt evaluation duration (ns)")
+    eval_count: Optional[int] = Field(None, description="Response tokens")
+    eval_duration: Optional[int] = Field(None, description="Generation duration (ns)")
+
+    # Internal fields
+    success: bool = Field(True, description="Success flag")
+    error: Optional[str] = Field(None, description="Error message if failed")

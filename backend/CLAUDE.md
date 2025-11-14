@@ -2,6 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## NOTICE
+This project is in developement and is going to actively update the code base without support backward compatibility.
+
 ## Development Commands
 
 ### Environment Setup
@@ -586,3 +589,8 @@ When modifying LLM integration, ensure compatibility with the expected request/r
 - **Lazy loading in repositories** - Repository patterns should fetch data on demand
 - **Vector database indexing** - Weaviate handles embedding search optimization with advanced indexing strategies
 - **Monitor embedding model memory** - Sentence transformers can be memory-intensive
+
+### Python usage
+- If you know the attribute name, access it directly. If you need dynamic behavior, consider a dictionary or a strategy pattern instead of relying on attribute lookup(getattr) for control flow. use `getattr` only when you need to access attributes dynamically and when you need default or fallback value.
+- Avoid import statement using try-catch statement. It can cause circular import and unexpected behavior. declare import statement at the top of the file.
+- Always keep the code clean and tidy by using type-safe and definite coding styles.

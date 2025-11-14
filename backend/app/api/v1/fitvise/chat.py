@@ -9,13 +9,24 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.application.llm_service import LlmService, llm_service
+from app.application.use_cases.llm_infrastructure.setup_ollama_rag import (
+    SetupOllamaRagUseCase,
+)
+from app.api.v1.fitvise.dependencies import (
+    get_rag_use_case,
+    get_llm_health_monitor,
+)
+from app.infrastructure.llm.dependencies import ChatOrchestratorDep, LLMProviderDep
 from app.core.settings import settings
 from app.schemas.chat import (
     ApiErrorResponse,
     ChatRequest,
     HealthResponse,
+    RagChatResponse,
+    SourceCitation,
+    ChatMessage,
 )
+from app.domain.entities.message_role import MessageRole
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +34,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# Dependencies
-def get_llm_service() -> LlmService:
-    """Get LLM service instance dependency."""
-    return llm_service
 
 
 # Constants
@@ -107,19 +114,27 @@ def _on_llm_error(error_message: str) -> HTTPException:
     description="Check the health status of the workout API and LLM service",
     tags=["health"],
 )
-async def health(llm_service: LlmService = Depends(get_llm_service)) -> HealthResponse:
+async def health(
+    llm_provider: LLMProviderDep,
+    chat_orchestrator: ChatOrchestratorDep,
+) -> HealthResponse:
     """
     Perform comprehensive health check of the workout API service.
 
     Checks:
-        - LLM service availability
+        - LLM provider availability
+        - Chat orchestrator health
         - Overall service status determination
 
     Returns:
         HealthResponse: Service status and availability information
     """
     try:
-        llm_available = await llm_service.health()
+        # Check both LLM provider and chat orchestrator
+        provider_healthy = await llm_provider.health_check()
+        orchestrator_healthy = await chat_orchestrator.health_check()
+
+        llm_available = provider_healthy and orchestrator_healthy
         service_status = "healthy" if llm_available else "degraded"
 
         return _build_health_response(service_status, llm_available)
@@ -127,6 +142,80 @@ async def health(llm_service: LlmService = Depends(get_llm_service)) -> HealthRe
     except Exception as e:
         logger.error("Health check failed: %s", e)
         return _build_health_response("unhealthy", False)
+
+
+@router.get(
+    "/health/llm",
+    response_model=Dict[str, Any],
+    summary="LLM Health Check",
+    description="Detailed health check for Ollama LLM service with performance metrics",
+    tags=["health"],
+)
+async def llm_health(
+    health_monitor=Depends(get_llm_health_monitor),
+) -> Dict[str, Any]:
+    """
+    Perform detailed LLM health check.
+
+    Returns health status, response times, and success rates for the Ollama service.
+
+    Returns:
+        Dict: Detailed LLM health metrics including:
+            - status: healthy/unhealthy
+            - model: Model name
+            - response_time_ms: Current response time
+            - avg_response_time_ms: Average response time
+            - p95_response_time_ms: 95th percentile response time
+            - success_rate: Success rate percentage
+            - error: Error message if unhealthy
+    """
+    try:
+        health_status = await health_monitor.check_health()
+        return health_status
+
+    except Exception as e:
+        logger.error("LLM health check failed: %s", e)
+        return {
+            "status": "error",
+            "error": str(e),
+            "model": settings.llm_model,
+        }
+
+
+@router.get(
+    "/health/llm/metrics",
+    response_model=Dict[str, Any],
+    summary="LLM Performance Metrics",
+    description="Get LLM performance metrics without performing health check",
+    tags=["health"],
+)
+async def llm_metrics(
+    health_monitor=Depends(get_llm_health_monitor),
+) -> Dict[str, Any]:
+    """
+    Get current LLM performance metrics.
+
+    Returns accumulated metrics without performing a new health check.
+
+    Returns:
+        Dict: Performance metrics including:
+            - avg_response_time_ms: Average response time
+            - p95_response_time_ms: 95th percentile response time
+            - success_rate: Success rate percentage
+            - total_checks: Total health checks performed
+            - error_count: Number of errors
+            - last_check: Last check timestamp
+    """
+    try:
+        metrics = await health_monitor.get_metrics()
+        return metrics
+
+    except Exception as e:
+        logger.error("Failed to get LLM metrics: %s", e)
+        return {
+            "error": str(e),
+            "total_checks": 0,
+        }
 
 
 @router.get(
@@ -163,14 +252,14 @@ async def get_available_models() -> Dict[str, Any]:
 )
 async def chat(
     request: ChatRequest,
-    llm_service: LlmService = Depends(get_llm_service),
+    chat_orchestrator: ChatOrchestratorDep,
 ) -> StreamingResponse:
     """
     Handle chat requests with streaming responses.
 
     Args:
         request: Chat request with message history
-        llm_service: LLM service dependency
+        chat_orchestrator: Chat orchestrator dependency
 
     Returns:
         StreamingResponse: A stream of JSON objects with response chunks
@@ -189,10 +278,9 @@ async def chat(
 
         async def stream_generator():
             try:
-                async for chunk in llm_service.chat(request):
+                async for chunk in chat_orchestrator.chat(request):
                     yield f"{chunk.model_dump_json()}\n"
             except Exception as e:
-                # Handle any exceptions from the LLM service
                 error_response = _build_error_response(message=str(e), error_type="stream_error", code="STREAM_ERROR")
                 yield f"{error_response}\n"
 
@@ -203,6 +291,123 @@ async def chat(
 
     except Exception as e:
         logger.error("Unexpected error in chat endpoint: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=_build_error_response(
+                message="An unexpected error occurred",
+                error_type="internal_server_error",
+                code="UNEXPECTED_ERROR",
+            ),
+        )
+
+
+@router.post(
+    "/chat-rag",
+    response_class=StreamingResponse,
+    summary="Chat with RAG (Retrieval-Augmented Generation)",
+    description="Send a chat message and receive AI response enhanced with retrieved context from documents.",
+    tags=["chat", "rag"],
+)
+async def chat_with_rag(
+    request: ChatRequest,
+    rag_use_case: SetupOllamaRagUseCase = Depends(get_rag_use_case),
+) -> StreamingResponse:
+    """
+    Handle chat requests with RAG (Retrieval-Augmented Generation).
+
+    Retrieves relevant document chunks from the knowledge base and uses them
+    as context for generating responses. Sources are included in the final response.
+
+    Args:
+        request: Chat request with message
+        rag_use_case: RAG use case dependency
+
+    Returns:
+        StreamingResponse: Streaming JSON objects with response chunks and sources
+    """
+    try:
+        if not request.message or not request.message.content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_build_error_response(
+                    message="Message content cannot be empty",
+                    error_type="invalid_request_error",
+                    code="EMPTY_MESSAGE_CONTENT",
+                    param="message.content",
+                ),
+            )
+
+        query = request.message.content.strip()
+
+        async def stream_rag_generator():
+            """Generate streaming RAG response with sources."""
+            try:
+                # Execute RAG query
+                response_stream, sources = await rag_use_case.execute_rag_stream(
+                    query=query,
+                    top_k=settings.rag_retrieval_top_k,
+                    session_id=request.session_id,
+                )
+
+                # Stream response chunks
+                full_response = ""
+                async for chunk in response_stream:
+                    if chunk:
+                        full_response += chunk
+                        # Yield chunk as streaming response
+                        chunk_response = RagChatResponse(
+                            model=settings.llm_model,
+                            created_at=_get_current_timestamp(),
+                            message=ChatMessage(
+                                role=MessageRole.ASSISTANT.value, content=chunk
+                            ),
+                            done=False,
+                            sources=None,  # Don't send sources until done
+                        )
+                        yield f"{chunk_response.model_dump_json()}\n"
+
+                # Final response with sources
+                source_citations = [
+                    SourceCitation(
+                        index=i + 1,
+                        content=doc.page_content[:500],  # Limit content size
+                        similarity_score=doc.metadata.get("similarity_score", 0.0),
+                        document_id=doc.metadata.get("document_id", ""),
+                        chunk_id=doc.metadata.get("chunk_id", ""),
+                        metadata=doc.metadata,
+                    )
+                    for i, doc in enumerate(sources)
+                ]
+
+                final_response = RagChatResponse(
+                    model=settings.llm_model,
+                    created_at=_get_current_timestamp(),
+                    done=True,
+                    sources=source_citations,
+                    rag_metadata={
+                        "chunks_retrieved": len(sources),
+                        "query_length": len(query),
+                        "response_length": len(full_response),
+                    },
+                )
+                yield f"{final_response.model_dump_json()}\n"
+
+            except Exception as e:
+                logger.error("RAG streaming error: %s", str(e))
+                error_response = _build_error_response(
+                    message=f"RAG streaming failed: {str(e)}",
+                    error_type="rag_stream_error",
+                    code="RAG_STREAM_ERROR",
+                )
+                yield f"{error_response}\n"
+
+        return StreamingResponse(stream_rag_generator(), media_type="application/x-ndjson")
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error("Unexpected error in RAG chat endpoint: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=_build_error_response(

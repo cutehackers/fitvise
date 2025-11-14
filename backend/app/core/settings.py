@@ -1,6 +1,7 @@
 from pathlib import Path
-from typing import List, Literal
+from typing import List, Literal, Optional
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Get absolute path to .env file
@@ -9,7 +10,7 @@ _env_file = Path(__file__).parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
     """
-    Settings configuration class for application environment, domain, LLM, API, database, vector store, security, file upload, knowledge base, and logging.
+    Settings configuration class for application environment, domain, LLM, API, database, vector store, security, file upload, knowledge base, RAG-LLM integration, and logging.
 
     Attributes:
         model_config (SettingsConfigDict): Configuration for environment variables and settings parsing.
@@ -33,7 +34,7 @@ class Settings(BaseSettings):
         cors_allow_headers (str): Allowed CORS headers (comma-separated or "*").
         database_url (str): Database connection URL.
         database_echo (bool): Enable SQL query logging.
-        vector_store_type (Literal["chromadb", "faiss"]): Vector store type.
+        vector_store_type (Literal["chromadb", "faiss", "weaviate"]): Vector store type.
         vector_store_path (str): Path to vector store.
         embedding_model (str): Embedding model name.
         vector_dimension (int): Embedding vector dimension.
@@ -50,6 +51,15 @@ class Settings(BaseSettings):
         log_file (str): Log file path.
         log_rotation (str): Log rotation policy.
         log_retention (str): Log retention policy.
+        rag_retrieval_top_k (int): Number of chunks to retrieve for RAG.
+        rag_retrieval_similarity_threshold (float): Minimum similarity for retrieval.
+        llm_context_window (int): Maximum context tokens for LLM.
+        llm_reserve_tokens (int): Tokens reserved for response generation.
+        context_truncation_strategy (Literal["recent", "relevant", "summarize"]): Context truncation strategy.
+        llm_max_concurrent (int): Maximum concurrent LLM requests.
+        health_check_interval (int): Health check interval (seconds).
+        health_min_success_rate (float): Minimum success rate percentage.
+        health_max_response_time_ms (float): Maximum response time threshold.
 
     Properties:
         cors_origins_list (List[str]): List of allowed CORS origins.
@@ -125,8 +135,30 @@ class Settings(BaseSettings):
     vector_store_path: str
     embedding_model: str
     vector_dimension: int  # MiniLM embedding dimension
-    weaviate_url: str = ""
-    weaviate_api_key: str = ""
+
+    # Weaviate Vector Database Configuration (Task 2.2.1)
+    weaviate_host: str = "localhost"
+    weaviate_port: int = 8080
+    weaviate_scheme: Literal["http", "https"] = "http"
+    weaviate_auth_type: Literal["NONE", "API_KEY", "OIDC"] = "NONE"
+    weaviate_api_key: Optional[str] = None
+    weaviate_timeout: float = 30.0
+    weaviate_batch_size: int = 100
+
+    @property
+    def weaviate_url(self) -> str:
+        """Construct Weaviate URL from components."""
+        return f"{self.weaviate_scheme}://{self.weaviate_host}:{self.weaviate_port}"
+
+    # Sentence-Transformers Embedding Configuration (Task 2.2.1)
+    sentence_transformer_model: str = "Alibaba-NLP/gte-multilingual-base"
+    sentence_transformer_dimension: int = 768
+    sentence_transformer_device: Literal["AUTO", "CPU", "CUDA"] = "AUTO"
+    sentence_transformer_batch_size: int = 32
+    sentence_transformer_show_progress: bool = True
+    sentence_transformer_normalize: bool = True
+    sentence_transformer_cache_strategy: Literal["MEMORY", "DISK", "HYBRID", "NONE"] = "MEMORY"
+    sentence_transformer_cache_size_mb: int = 256
 
     # Search Configuration
     search_max_top_k: int = 1000  # Maximum results per search
@@ -195,6 +227,23 @@ class Settings(BaseSettings):
     rag_enable_quality_validation: bool = True
     rag_quality_threshold: float = 0.5
 
+    # RAG-LLM Integration Configuration (Task 3.1.1)
+    rag_retrieval_top_k: int = 5  # Number of chunks to retrieve
+    rag_retrieval_similarity_threshold: float = 0.7  # Minimum similarity for retrieval
+
+    # Context Window Configuration (Task 3.1.3)
+    llm_context_window: int = 4000  # Maximum context tokens (llama3.2:3b)
+    llm_reserve_tokens: int = 500  # Tokens reserved for response generation
+    context_truncation_strategy: Literal["recent", "relevant", "summarize"] = "relevant"
+
+    # LLM Performance Configuration
+    llm_max_concurrent: int = 10  # Maximum concurrent LLM requests
+
+    # Health Monitoring Configuration
+    health_check_interval: int = 60  # Health check interval (seconds)
+    health_min_success_rate: float = 95.0  # Minimum success rate percentage
+    health_max_response_time_ms: float = 5000.0  # Maximum response time threshold
+
     @property
     def rag_data_scan_paths_list(self) -> List[str]:
         """Convert comma-separated scan paths to list"""
@@ -224,6 +273,62 @@ class Settings(BaseSettings):
     def rag_ml_ngram_range(self) -> tuple:
         """Get ngram range as tuple"""
         return (self.rag_ml_ngram_range_min, self.rag_ml_ngram_range_max)
+
+    @field_validator('weaviate_port')
+    @classmethod
+    def validate_weaviate_port(cls, v):
+        """Validate Weaviate port is in valid range."""
+        if not 1 <= v <= 65535:
+            raise ValueError('Weaviate port must be between 1 and 65535')
+        return v
+
+    @field_validator('weaviate_timeout')
+    @classmethod
+    def validate_weaviate_timeout(cls, v):
+        """Validate Weaviate timeout is positive."""
+        if v <= 0:
+            raise ValueError('Weaviate timeout must be positive')
+        return v
+
+    @field_validator('weaviate_batch_size')
+    @classmethod
+    def validate_weaviate_batch_size(cls, v):
+        """Validate Weaviate batch size is positive."""
+        if v <= 0:
+            raise ValueError('Weaviate batch size must be positive')
+        return v
+
+    @field_validator('sentence_transformer_dimension')
+    @classmethod
+    def validate_sentence_transformer_dimension(cls, v):
+        """Validate sentence transformer dimension is positive."""
+        if v <= 0:
+            raise ValueError('Sentence transformer dimension must be positive')
+        return v
+
+    @field_validator('sentence_transformer_batch_size')
+    @classmethod
+    def validate_sentence_transformer_batch_size(cls, v):
+        """Validate sentence transformer batch size is positive."""
+        if v <= 0:
+            raise ValueError('Sentence transformer batch size must be positive')
+        return v
+
+    @field_validator('sentence_transformer_cache_size_mb')
+    @classmethod
+    def validate_sentence_transformer_cache_size(cls, v):
+        """Validate sentence transformer cache size is positive."""
+        if v <= 0:
+            raise ValueError('Sentence transformer cache size must be positive')
+        return v
+
+    def __hash__(self) -> int:
+        """Make Settings hashable by hashing its JSON representation.
+        
+        This is needed because FastAPI's dependency injection system may need to use
+        the Settings instance as a dictionary key internally.
+        """
+        return hash(self.model_dump_json())
 
 
 # Create a global settings instance

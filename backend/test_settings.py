@@ -48,7 +48,7 @@ def test_settings_import():
     print("-" * 25)
 
     try:
-        from core.config import Settings
+        from app.core.settings import Settings
 
         print("✅ Settings class imported successfully")
         return Settings
@@ -84,7 +84,7 @@ def test_settings_initialization(Settings):
             # Try to create with minimal config
             import os
 
-            from core.config import Settings
+            from app.core.settings import Settings
 
             # Set some required env vars if missing
             required_vars = {
@@ -152,7 +152,7 @@ def validate_configuration_fields(settings) -> Dict[str, Any]:
         "vector_store_type": {
             "type": str,
             "required": True,
-            "values": ["chromadb", "faiss"],
+            "values": ["chromadb", "faiss", "weaviate"],
         },
         "vector_store_path": {"type": str, "required": True},
         "embedding_model": {"type": str, "required": True},

@@ -8,10 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-try:
-    from langchain.schema import Document as LangChainDocument
-except ImportError:  # pragma: no cover
-    LangChainDocument = None  # type: ignore
+from langchain_core.documents import Document as LangChainDocument
 
 try:
     from llama_index.core.schema import TextNode

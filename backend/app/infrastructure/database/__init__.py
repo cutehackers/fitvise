@@ -7,7 +7,6 @@ from app.infrastructure.database.database import (
     get_async_session,
     init_db,
 )
-from app.infrastructure.persistence.models import DocumentModel
 
 __all__ = [
     "Base",
@@ -16,5 +15,4 @@ __all__ = [
     "get_async_session",
     "init_db",
     "close_db",
-    "DocumentModel",
 ]

@@ -9,7 +9,7 @@ from langchain_ollama.chat_models import ChatOllama
 
 from app.core.settings import Settings
 from app.domain.llm.entities.message import Message
-from backend.app.domain.llm.entities.model_spec import ModelSpec
+from app.domain.llm.entities.model_spec import ModelSpec
 from app.domain.llm.exceptions import LLMServiceError
 from app.domain.llm.interfaces.llm_service import LLMService
 

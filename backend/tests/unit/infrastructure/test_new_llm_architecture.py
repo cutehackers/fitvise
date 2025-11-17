@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator
 
 from app.domain.llm.entities.message import Message
-from backend.app.domain.llm.entities.model_spec import ModelSpec
+from app.domain.llm.entities.model_spec import ModelSpec
 from app.domain.llm.entities.session import ChatSession
 from app.domain.llm.exceptions import LLMProviderError, ChatOrchestratorError
 from app.domain.entities.message_role import MessageRole

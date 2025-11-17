@@ -50,8 +50,3 @@ def get_chat_orchestrator(
         turns_window=getattr(settings, 'chat_turns_window', 10),
         max_session_age_hours=getattr(settings, 'chat_max_session_age_hours', 24),
     )
-
-
-# Type aliases for cleaner dependency injection
-LLMProviderDep = Annotated[LLMProvider, Depends(get_llm_provider)]
-ChatOrchestratorDep = Annotated[ChatOrchestrator, Depends(get_chat_orchestrator)]

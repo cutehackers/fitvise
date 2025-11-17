@@ -16,7 +16,7 @@ from app.api.v1.fitvise.dependencies import (
     get_rag_use_case,
     get_llm_health_monitor,
 )
-from app.infrastructure.llm.dependencies import ChatOrchestratorDep, LLMProviderDep
+from app.infrastructure.llm.dependencies import get_chat_orchestrator, get_llm_provider
 from app.core.settings import settings
 from app.schemas.chat import (
     ApiErrorResponse,
@@ -115,8 +115,8 @@ def _on_llm_error(error_message: str) -> HTTPException:
     tags=["health"],
 )
 async def health(
-    llm_provider: LLMProviderDep,
-    chat_orchestrator: ChatOrchestratorDep,
+    llm_provider=Depends(get_llm_provider),
+    chat_orchestrator=Depends(get_chat_orchestrator),
 ) -> HealthResponse:
     """
     Perform comprehensive health check of the workout API service.
@@ -252,7 +252,7 @@ async def get_available_models() -> Dict[str, Any]:
 )
 async def chat(
     request: ChatRequest,
-    chat_orchestrator: ChatOrchestratorDep,
+    chat_orchestrator=Depends(get_chat_orchestrator),
 ) -> StreamingResponse:
     """
     Handle chat requests with streaming responses.

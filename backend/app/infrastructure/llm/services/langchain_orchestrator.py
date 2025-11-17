@@ -24,7 +24,6 @@ from app.domain.llm.interfaces.chat_orchestrator import ChatOrchestrator
 from app.domain.llm.interfaces.llm_provider import LLMProvider
 from app.domain.entities.message_role import MessageRole
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.infrastructure.llm.adapters import LangChainLLMAdapter
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +39,9 @@ MAX_TOKENS_TABLE = {
     "codellama:7b": 16384,
     "codellama:13b": 16384,
 }
+
+# Default max token length for models without specific limit
+DEFAULT_MAX_TOKEN_LENGTH = 8192
 
 
 def _get_current_timestamp() -> str:
@@ -85,18 +87,15 @@ class LangChainOrchestrator(ChatOrchestrator):
             ("human", "{input}"),
         ])
 
-        # Get ChatOllama instance from provider for direct token counting
-        chat_ollama_instance = llm_provider.llm_instance
-
-        # Message trimmer with conservative context limit
-        max_context_tokens = 8192  # Conservative default for most models
+        # Store LLM instance for direct access
+        self._llm = llm_provider.llm_instance
 
         self._trimmer = trim_messages(
             max_tokens=MAX_TOKENS_TABLE.get(
                 llm_provider.get_model_info().name.lower(),
-                8192
+                DEFAULT_MAX_TOKEN_LENGTH
             ),
-            token_counter=self._create_token_counter(chat_ollama_instance),
+            token_counter=self._create_token_counter(),
             strategy="last",
             # Most chat models expect that chat history starts with either:
             # (1) a HumanMessage or
@@ -109,20 +108,51 @@ class LangChainOrchestrator(ChatOrchestrator):
             include_system=True,
         )
 
-        # Create LangChain-compatible LLM adapter
-        self._llm_adapter = LangChainLLMAdapter(llm_provider=llm_provider)
+        # Performance optimization: Only apply trimming for conversations with more than 20 messages
+        # This avoids expensive token counting and processing for short conversations
+        self._trim_messages_threshold = 20
 
-        # Create chain with memory
-        # self.trimmer outputs a list (trimmed messages). ChatPromptTemplate expects a dict.
-        # So we transform the list into a dict with "history" as the key.
-        # The chain will use the trimmed history as input.
-        # The prompt expects a "history" key, which will be filled with the trimmed messages.
-        # The LLM will then generate a response based on the trimmed history.
-        self._chain = (
-            RunnablePassthrough.assign(
-                history=itemgetter("history") | self._trimmer
-            ) | self._prompt | self._llm_adapter
-        )
+        # Use ChatOllama instance directly (no adapter needed)
+        # The OllamaProvider's llm_instance returns a LangChain-compatible ChatOllama
+
+        # Create optimized prompt template with built-in history handling
+        # This eliminates the need for complex RunnablePassthrough.assign
+        self._prompt = ChatPromptTemplate([
+            ("system", "You are a helpful and versatile AI assistant. Answer user questions thoroughly and thoughtfully."),
+            MessagesPlaceholder(variable_name="history", optional=True),
+            ("human", "{input}"),
+        ])
+
+    def _should_apply_trimming(self, messages: List[BaseMessage]) -> bool:
+        """
+        Determine if message trimming should be applied based on conversation length.
+
+        Performance optimization: Skip trimming for short conversations to avoid
+        expensive token counting and processing overhead.
+
+        Args:
+            messages: List of messages to evaluate
+
+        Returns:
+            True if trimming should be applied, False otherwise
+        """
+        # Only apply trimming for conversations with more than the threshold number of messages
+        return len(messages) > self._trim_messages_threshold
+
+    def _get_smart_trimmer(self, messages: List[BaseMessage]) -> Any:
+        """
+        Get conditional trimmer that skips processing for short conversations.
+
+        Args:
+            messages: List of messages to potentially trim
+
+        Returns:
+            Either the trimmer or identity function (no-op) based on conversation length
+        """
+        if self._should_apply_trimming(messages):
+            return self._trimmer
+        # Return identity function for short conversations - no trimming needed
+        return lambda x: x
 
     async def chat(
         self,
@@ -146,10 +176,28 @@ class LangChainOrchestrator(ChatOrchestrator):
             # Get session history (creates new session if doesn't exist)
             session_history = self.get_session_history(request.session_id)
 
+            # Get current session history and apply conditional trimming
+            smart_trimmer = self._get_smart_trimmer(session_history.messages)
+
+            # Create simplified chain directly
+            # This eliminates the complex RunnablePassthrough.assign overhead
+            # The prompt template now handles history internally through MessagesPlaceholder
+            if smart_trimmer is self._trimmer:
+                # Apply trimming for long conversations before passing to prompt
+                trimmed_history = smart_trimmer(session_history.messages)
+                chain = (
+                    lambda x: {"input": x["input"], "history": trimmed_history}
+                ) | self._prompt | self._llm
+            else:
+                # Direct input for short conversations - no expensive preprocessing
+                chain = (
+                    lambda x: x
+                ) | self._prompt | self._llm
+
             # Create runnable with history
             # Use get_session_history method instead of dict access to ensure session exists
             runnable_with_history = RunnableWithMessageHistory(
-                self._chain,
+                chain,
                 self.get_session_history,
                 input_messages_key="input",
                 history_messages_key="history",
@@ -311,15 +359,15 @@ class LangChainOrchestrator(ChatOrchestrator):
             logger.error("Chat orchestrator health check failed: %s", str(e))
             return False
 
-    def _create_token_counter(self, chat_ollama_instance):
-        """Create a token counter function using ChatOllama instance directly."""
+    def _create_token_counter(self):
+        """Create a token counter function using stored LLM instance directly."""
         def count_tokens(messages: List[BaseMessage]) -> int:
-            # Use ChatOllama's native token counting for maximum accuracy
-            if hasattr(chat_ollama_instance, 'get_num_tokens_from_messages'):
-                return chat_ollama_instance.get_num_tokens_from_messages(messages)
-            elif hasattr(chat_ollama_instance, 'get_num_tokens'):
+            # Use self._llm directly for cleaner dependency access
+            if hasattr(self._llm, 'get_num_tokens_from_messages'):
+                return self._llm.get_num_tokens_from_messages(messages)
+            elif hasattr(self._llm, 'get_num_tokens'):
                 # Fallback for individual message token counting
-                return sum(chat_ollama_instance.get_num_tokens(msg) for msg in messages if hasattr(msg, 'content'))
+                return sum(self._llm.get_num_tokens(msg) for msg in messages if hasattr(msg, 'content'))
             else:
                 # Final fallback to simple character-based estimation
                 total_chars = sum(len(msg.content) for msg in messages if hasattr(msg, 'content'))

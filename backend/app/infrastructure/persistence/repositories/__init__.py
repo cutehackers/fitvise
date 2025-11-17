@@ -1,25 +1,23 @@
-"""
-DEPRECATED: This module is kept for backward compatibility only.
+"""Persistence layer repository implementations."""
 
-All repository implementations have been moved to:
-    app.infrastructure.persistence.repositories
-
-Please update your imports to use the new location.
-"""
-
-# Import from new location for backward compatibility
-from app.infrastructure.persistence.repositories import (
+from app.infrastructure.persistence.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
+)
+from app.infrastructure.persistence.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
-    PostgresDocumentRepository,
-    SQLiteDocumentRepository,
-    RepositoryContainer,
+)
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.dependencies import (
     get_repository_container,
     get_document_repository,
     get_data_source_repository,
     create_repository_container_for_pipeline,
-    create_repository_bundle_for_pipeline,
+    create_repository_bundle_for_pipeline,  # Deprecated but kept for backward compatibility
 )
+
+# Backward-compatible aliases
+PostgresDocumentRepository = SQLAlchemyDocumentRepository  # Works with both PostgreSQL and SQLite
+SQLiteDocumentRepository = SQLAlchemyDocumentRepository  # Same implementation, different name
 
 __all__ = [
     # Repository implementations

@@ -24,7 +24,7 @@ from app.domain.exceptions.retrieval_exceptions import (
 from app.domain.repositories.search_repository import SearchRepository
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 from app.domain.value_objects.similarity_score import SimilarityScore, SimilarityMethod
-from app.infrastructure.repositories.weaviate_embedding_repository import (
+from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
     WeaviateEmbeddingRepository,
 )
 from app.infrastructure.external_services.vector_stores.weaviate_client import (

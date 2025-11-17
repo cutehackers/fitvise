@@ -22,7 +22,7 @@ from app.domain.value_objects.quality_metrics import (
     ValidationResult,
     ValidationRule,
 )
-from app.infrastructure.database.models import DocumentModel
+from app.infrastructure.persistence.models import DocumentModel
 
 
 class SQLAlchemyDocumentRepository(DocumentRepository):

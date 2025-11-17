@@ -12,7 +12,7 @@ from app.core.settings import Settings, get_settings
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.document_repository import DocumentRepository
 from app.infrastructure.database.database import get_async_session
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
 
 
 async def get_repository_container(

@@ -18,7 +18,7 @@ from app.infrastructure.llm.dependencies import get_llm_service
 from app.infrastructure.external_services.ml_services.llm_services.llm_health_monitor import (
     LlmHealthMonitor,
 )
-from app.infrastructure.repositories.weaviate_search_repository import (
+from app.infrastructure.persistence.repositories.weaviate_search_repository import (
     WeaviateSearchRepository,
 )
 from app.infrastructure.external_services.vector_stores.weaviate_client import (

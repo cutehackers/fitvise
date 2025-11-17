@@ -85,7 +85,7 @@ from app.application.use_cases.storage_management import (
     SetupObjectStorageUseCase,
 )
 from app.infrastructure.external_services.data_sources.database_connectors import DatabaseConnectionConfig
-from app.infrastructure.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
+from app.infrastructure.persistence.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
 from app.infrastructure.external_services import ExternalServicesContainer

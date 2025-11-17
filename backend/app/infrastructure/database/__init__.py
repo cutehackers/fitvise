@@ -7,7 +7,7 @@ from app.infrastructure.database.database import (
     get_async_session,
     init_db,
 )
-from app.infrastructure.database.models import DocumentModel
+from app.infrastructure.persistence.models import DocumentModel
 
 __all__ = [
     "Base",

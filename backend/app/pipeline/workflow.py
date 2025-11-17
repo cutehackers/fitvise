@@ -30,7 +30,7 @@ from app.pipeline.contracts import RunSummary
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.infrastructure.external_services import ExternalServicesContainer
 from app.core.settings import Settings, get_settings
 from scripts.rag_summary import (

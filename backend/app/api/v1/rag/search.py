@@ -30,7 +30,7 @@ from app.application.use_cases.retrieval.semantic_search import (
     SemanticSearchUseCase,
 )
 from app.domain.services.retrieval_service import RetrievalService
-from app.infrastructure.repositories.weaviate_search_repository import (
+from app.infrastructure.persistence.repositories.weaviate_search_repository import (
     WeaviateSearchRepository,
 )
 from app.infrastructure.external_services.vector_stores.weaviate_client import (
@@ -66,7 +66,7 @@ def get_search_repository(
     client: WeaviateClient = Depends(get_weaviate_client),
 ) -> WeaviateSearchRepository:
     """Get search repository instance."""
-    from app.infrastructure.repositories.weaviate_embedding_repository import (
+    from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
         WeaviateEmbeddingRepository,
     )
     from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (

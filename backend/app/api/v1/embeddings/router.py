@@ -47,7 +47,7 @@ from app.infrastructure.external_services.ml_services.embedding_models.sentence_
 from app.infrastructure.external_services.vector_stores.weaviate_client import (
     WeaviateClient,
 )
-from app.infrastructure.repositories.weaviate_embedding_repository import (
+from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
     WeaviateEmbeddingRepository,
 )
 

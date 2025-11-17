@@ -12,7 +12,7 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from pydantic import ConfigDict
 
-from app.infrastructure.repositories.weaviate_search_repository import (
+from app.infrastructure.persistence.repositories.weaviate_search_repository import (
     WeaviateSearchRepository,
 )
 

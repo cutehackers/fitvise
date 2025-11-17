@@ -21,7 +21,7 @@ from app.application.use_cases.knowledge_sources.categorize_sources import (
     CategorizeSourcesResponse
 )
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.infrastructure.repositories.dependencies import get_data_source_repository
+from app.infrastructure.persistence.repositories.dependencies import get_data_source_repository
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import (
     SklearnDocumentCategorizer
 )

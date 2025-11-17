@@ -16,7 +16,7 @@ from app.api.v1.fitvise.dependencies import (
     get_rag_use_case,
     get_llm_health_monitor,
 )
-from app.infrastructure.llm.dependencies import get_chat_orchestrator, get_llm_provider
+from app.infrastructure.llm.dependencies import get_chat_orchestrator, get_llm_service
 from app.core.settings import settings
 from app.schemas.chat import (
     ApiErrorResponse,
@@ -115,14 +115,14 @@ def _on_llm_error(error_message: str) -> HTTPException:
     tags=["health"],
 )
 async def health(
-    llm_provider=Depends(get_llm_provider),
+    llm_service=Depends(get_llm_service),
     chat_orchestrator=Depends(get_chat_orchestrator),
 ) -> HealthResponse:
     """
     Perform comprehensive health check of the workout API service.
 
     Checks:
-        - LLM provider availability
+        - LLM service availability
         - Chat orchestrator health
         - Overall service status determination
 
@@ -130,11 +130,11 @@ async def health(
         HealthResponse: Service status and availability information
     """
     try:
-        # Check both LLM provider and chat orchestrator
-        provider_healthy = await llm_provider.health_check()
+        # Check both LLM service and chat orchestrator
+        service_healthy = await llm_service.health_check()
         orchestrator_healthy = await chat_orchestrator.health_check()
 
-        llm_available = provider_healthy and orchestrator_healthy
+        llm_available = service_healthy and orchestrator_healthy
         service_status = "healthy" if llm_available else "degraded"
 
         return _build_health_response(service_status, llm_available)

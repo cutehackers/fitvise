@@ -193,13 +193,13 @@ rag-system-phase3/                        # PHASE 3: Generation System and LLM I
 │   │   │   │   │
 │   │   │   │   └── llm_services/         # NEW: Epic 3.1 & 3.2: LLM Services
 │   │   │   │       ├── init.py
-│   │   │   │       ├── mistral_service.py        # Task 3.1.1: Mistral-7B
-│   │   │   │       ├── vllm_service.py           # Task 3.1.1: vLLM inference
-│   │   │   │       ├── huggingface_service.py    # Alternative LLM service
-│   │   │   │       ├── openai_service.py         # OpenAI API service
-│   │   │   │       ├── anthropic_service.py      # Claude API service
-│   │   │   │       ├── local_llm_service.py      # Local model service
-│   │   │   │       └── base_llm_service.py       # Base LLM interface
+│   │   │   │       ├── ollama_service.py         # Task 3.1.1: Ollama LLM (llama3.2:3b)
+│   │   │   │       ├── base_llm_service.py       # Base LLM service interface
+│   │   │   │       ├── vllm_service.py           # Future: vLLM inference optimization
+│   │   │   │       ├── huggingface_service.py    # Future: HuggingFace LLM service
+│   │   │   │       ├── openai_service.py         # Future: OpenAI API service
+│   │   │   │       ├── anthropic_service.py      # Future: Claude API service
+│   │   │   │       └── local_llm_service.py      # Future: Local model service
 │   │   │   │
 │   │   │   ├── fine_tuning/              # NEW: Epic 3.1: Fine-tuning Services
 │   │   │   │   ├── init.py

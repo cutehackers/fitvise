@@ -14,7 +14,7 @@ from app.infrastructure.external_services.context_management.context_window_mana
     ContextWindow,
     ContextWindowManager,
 )
-from app.infrastructure.llm.dependencies import get_llm_provider
+from app.infrastructure.llm.dependencies import get_llm_service
 from app.infrastructure.external_services.ml_services.llm_services.llm_health_monitor import (
     LlmHealthMonitor,
 )
@@ -93,12 +93,12 @@ def get_rag_use_case() -> SetupOllamaRagUseCase:
     Returns:
         SetupOllamaRagUseCase for RAG orchestration
     """
-    llm_provider = get_llm_provider()
+    llm_service = get_llm_service()
     retriever = get_weaviate_retriever()
     context_mgr = get_context_window_manager()
 
     rag_use_case = SetupOllamaRagUseCase(
-        llm_provider=llm_provider, retriever=retriever, context_manager=context_mgr
+        llm_service=llm_service, retriever=retriever, context_manager=context_mgr
     )
     logger.info("SetupOllamaRagUseCase initialized")
     return rag_use_case
@@ -112,11 +112,11 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
         LlmHealthMonitor for health tracking
     """
     # Create a temporary wrapper for health monitoring
-    from app.infrastructure.llm.providers.ollama_provider import OllamaProvider
+    from app.infrastructure.external_services.ml_services.llm_services.ollama_service import OllamaService
     from app.core.settings import Settings
 
     settings_instance = Settings()
-    ollama_provider = OllamaProvider(settings_instance)
-    monitor = LlmHealthMonitor(ollama_provider)
+    ollama_service = OllamaService(settings_instance)
+    monitor = LlmHealthMonitor(ollama_service)
     logger.info("LlmHealthMonitor initialized")
     return monitor

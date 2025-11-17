@@ -18,6 +18,14 @@ class LLMProviderError(LLMError):
         self.original_error = original_error
 
 
+class LLMServiceError(LLMError):
+    """Exception raised when LLM service operations fail."""
+
+    def __init__(self, message: str, provider: str = None, original_error: Exception = None):
+        super().__init__(message, provider)
+        self.original_error = original_error
+
+
 class ChatOrchestratorError(LLMError):
     """Exception raised when chat orchestration operations fail."""
 

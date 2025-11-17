@@ -13,7 +13,7 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
-from app.domain.llm.interfaces.llm_provider import LLMProvider
+from app.domain.llm.interfaces.llm_service import LLMService
 from app.infrastructure.adapters.weaviate_langchain_retriever import (
     WeaviateLangChainRetriever,
 )
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class SetupOllamaRagUseCase:
-    """Setup and execute RAG pipeline with LLM provider.
+    """Setup and execute RAG pipeline with LLM service.
 
     Orchestrates the complete RAG workflow:
     1. Retrieve relevant documents via semantic search
@@ -34,7 +34,7 @@ class SetupOllamaRagUseCase:
     4. Return response with source citations
 
     Args:
-        llm_provider: LLM provider for generation
+        llm_service: LLM service for generation
         retriever: Weaviate retriever for semantic search
         context_manager: Context window manager
     """
@@ -51,18 +51,18 @@ If the context doesn't contain relevant information, say so clearly."""
 
     def __init__(
         self,
-        llm_provider: LLMProvider,
+        llm_service: LLMService,
         retriever: WeaviateLangChainRetriever,
         context_manager: ContextWindowManager,
     ):
         """Initialize RAG use case.
 
         Args:
-            llm_provider: LLM provider for generation
+            llm_service: LLM service for generation
             retriever: Retriever for semantic search
             context_manager: Context window manager
         """
-        self.llm_provider = llm_provider
+        self.llm_service = llm_service
         self.retriever = retriever
         self.context_manager = context_manager
 
@@ -221,19 +221,19 @@ If the context doesn't contain relevant information, say so clearly."""
         return self.context_manager
 
     def _create_langchain_wrapper(self):
-        """Create a LangChain-compatible wrapper for our LLM provider."""
+        """Create a LangChain-compatible wrapper for our LLM service."""
         from langchain_core.language_models.llms import BaseLLM
         from langchain_core.messages import BaseMessage
         from pydantic import Field
         from typing import Optional, Dict, Any, List
 
         class LangChainLLMWrapper(BaseLLM):
-            """LangChain-compatible wrapper for our LLM provider."""
+            """LangChain-compatible wrapper for our LLM service."""
 
-            llm_provider: LLMProvider = Field(...)
+            llm_service: LLMService = Field(...)
 
-            def __init__(self, llm_provider: LLMProvider, **kwargs):
-                super().__init__(llm_provider=llm_provider, **kwargs)
+            def __init__(self, llm_service: LLMService, **kwargs):
+                super().__init__(llm_service=llm_service, **kwargs)
 
             def _call(
                 self,
@@ -242,8 +242,8 @@ If the context doesn't contain relevant information, say so clearly."""
                 run_manager: Optional[Any] = None,
                 **kwargs: Any,
             ) -> str:
-                """Synchronous call - not supported for async providers."""
-                raise NotImplementedError("Use async methods with this LLM provider")
+                """Synchronous call - not supported for async services."""
+                raise NotImplementedError("Use async methods with this LLM service")
 
             async def _acall(
                 self,
@@ -258,11 +258,11 @@ If the context doesn't contain relevant information, say so clearly."""
                 from app.domain.entities.message_role import MessageRole
 
                 message = Message(content=prompt, role=MessageRole.USER)
-                return await self.llm_provider.generate([message], **kwargs)
+                return await self.llm_service.generate([message], **kwargs)
 
             @property
             def _llm_type(self) -> str:
                 """Return the LLM type."""
-                return f"custom_{self.llm_provider.provider_name}"
+                return f"custom_{self.llm_service.provider_name}"
 
-        return LangChainLLMWrapper(llm_provider=self.llm_provider)
+        return LangChainLLMWrapper(llm_service=self.llm_service)

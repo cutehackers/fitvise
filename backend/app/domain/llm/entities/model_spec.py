@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 
 
 @dataclass
-class ModelInfo:
+class ModelSpec:
     """Information about an LLM model."""
 
     name: str

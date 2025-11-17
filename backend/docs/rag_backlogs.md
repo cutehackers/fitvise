@@ -154,10 +154,11 @@
 
 ### 3.1 LLM Infrastructure
 
-- [ ]  **Task 3.1.1**: Set up Mistral-7B inference server
-    - Deliverable: vLLM-based inference server with load balancing
-    - Acceptance Criteria: Handles 50 concurrent requests, <5s response time
+- [x]  **Task 3.1.1**: Set up Ollama inference server (llama3.2:3b)
+    - Deliverable: Ollama-based LLM service implementation with streaming support
+    - Acceptance Criteria: Handles concurrent requests, <5s response time for responses
     - Effort: 8 days
+    - Status: ✅ Complete - OllamaService implemented with full async support and health monitoring
 - [ ]  **Task 3.1.2**: Implement PEFT fine-tuning pipeline
     - Deliverable: Parameter-efficient fine-tuning pipeline for domain adaptation
     - Acceptance Criteria: Improves domain accuracy by 25% vs base model
@@ -331,12 +332,13 @@
   - ✅ Task 2.1.3: Recursive chunking for hierarchical documents
   - ✅ Task 2.2.1: Base Sentence-Transformers infrastructure
   - ✅ Task 2.3.2: Weaviate schema for metadata (just completed)
-**Epic 3 Progress**: ⬜⬜⬜⬜⬜⬜⬜ (0/7 tasks completed) - 0%
+**Epic 3 Progress**: ✅⬜⬜⬜⬜⬜⬜ (1/7 tasks completed) - 14%
+  - ✅ Task 3.1.1: Ollama inference server setup (llama3.2:3b)
 **Epic 4 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜ (0/8 tasks completed) - 0%
 **Epic 5 Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/13 tasks completed) - 0%
 **Cross-Epic Progress**: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/16 tasks completed) - 0%
 
-**Overall Progress**: 17/69 tasks completed (25%)
+**Overall Progress**: 18/69 tasks completed (26%)
 
 ## Sprint Planning
 

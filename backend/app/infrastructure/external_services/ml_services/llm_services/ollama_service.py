@@ -1,4 +1,4 @@
-"""Ollama LLM provider implementation."""
+"""Ollama LLM service implementation."""
 
 import logging
 import time
@@ -9,23 +9,23 @@ from langchain_ollama.chat_models import ChatOllama
 
 from app.core.settings import Settings
 from app.domain.llm.entities.message import Message
-from app.domain.llm.entities.model_info import ModelInfo
-from app.domain.llm.exceptions import LLMProviderError
-from app.domain.llm.interfaces.llm_provider import LLMProvider
+from backend.app.domain.llm.entities.model_spec import ModelSpec
+from app.domain.llm.exceptions import LLMServiceError
+from app.domain.llm.interfaces.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
 
 
-class OllamaProvider(LLMProvider):
-    """Ollama implementation of LLM provider.
+class OllamaService(LLMService):
+    """Ollama implementation of LLM service.
 
-    This provider uses LangChain's ChatOllama to interact with Ollama
+    This service uses LangChain's ChatOllama to interact with Ollama
     instances, providing a clean interface for both streaming and
     non-streaming generation.
     """
 
     def __init__(self, settings: Settings):
-        """Initialize Ollama provider with settings.
+        """Initialize Ollama service with settings.
 
         Args:
             settings: Application settings containing LLM configuration
@@ -41,7 +41,7 @@ class OllamaProvider(LLMProvider):
         )
 
         # Model information
-        self._model_info = ModelInfo(
+        self._model_spec = ModelSpec(
             name=settings.llm_model,
             provider="ollama",
             max_tokens=self._get_max_tokens_for_model(settings.llm_model),
@@ -73,7 +73,7 @@ class OllamaProvider(LLMProvider):
             Generated response text
 
         Raises:
-            LLMProviderError: If generation fails
+            LLMServiceError: If generation fails
         """
         try:
             # Convert messages to LangChain format
@@ -108,7 +108,7 @@ class OllamaProvider(LLMProvider):
         except Exception as e:
             error_msg = f"Ollama generation failed: {str(e)}"
             logger.error(error_msg)
-            raise LLMProviderError(
+            raise LLMServiceError(
                 error_msg,
                 provider="ollama",
                 original_error=e,
@@ -133,7 +133,7 @@ class OllamaProvider(LLMProvider):
             Generated text chunks as they are produced
 
         Raises:
-            LLMProviderError: If streaming fails
+            LLMServiceError: If streaming fails
         """
         try:
             # Convert messages to LangChain format
@@ -166,14 +166,14 @@ class OllamaProvider(LLMProvider):
         except Exception as e:
             error_msg = f"Ollama streaming failed: {str(e)}"
             logger.error(error_msg)
-            raise LLMProviderError(
+            raise LLMServiceError(
                 error_msg,
                 provider="ollama",
                 original_error=e,
             )
 
     async def health_check(self) -> bool:
-        """Check if the Ollama provider is healthy and accessible.
+        """Check if the Ollama service is healthy and accessible.
 
         Returns:
             True if healthy, False otherwise
@@ -202,17 +202,17 @@ class OllamaProvider(LLMProvider):
             )
             return False
 
-    def get_model_info(self) -> ModelInfo:
+    def get_model_spec(self) -> ModelSpec:
         """Get information about the current model.
 
         Returns:
             Model information
         """
-        return self._model_info
+        return self._model_spec
 
     @property
     def provider_name(self) -> str:
-        """Get the name of this provider."""
+        """Get the name of this service provider."""
         return "ollama"
 
     @property
@@ -252,7 +252,7 @@ class OllamaProvider(LLMProvider):
 
         return langchain_messages
 
-    
+
     def _get_max_tokens_for_model(self, model_name: str) -> Optional[int]:
         """Get maximum token limit for a model.
 

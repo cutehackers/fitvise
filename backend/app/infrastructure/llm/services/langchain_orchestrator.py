@@ -21,7 +21,7 @@ from operator import itemgetter
 from app.domain.llm.entities.message import Message
 from app.domain.llm.exceptions import ChatOrchestratorError, SessionNotFoundError, MessageValidationError
 from app.domain.llm.interfaces.chat_orchestrator import ChatOrchestrator
-from app.domain.llm.interfaces.llm_provider import LLMProvider
+from app.domain.llm.interfaces.llm_service import LLMService
 from app.domain.entities.message_role import MessageRole
 from app.schemas.chat import ChatRequest, ChatResponse
 
@@ -62,18 +62,18 @@ class LangChainOrchestrator(ChatOrchestrator):
 
     def __init__(
         self,
-        llm_provider: LLMProvider,
+        llm_service: LLMService,
         turns_window: int = 10,
         max_session_age_hours: int = 24,
     ):
         """Initialize the chat orchestrator.
 
         Args:
-            llm_provider: LLM provider for generating responses
+            llm_service: LLM service for generating responses
             turns_window: Number of conversation turns to keep in memory (default: 10)
             max_session_age_hours: Maximum age before sessions expire (default: 24)
         """
-        self._llm_provider = llm_provider
+        self._llm_service = llm_service
         self._turns_window = turns_window
         self._max_session_age_hours = max_session_age_hours
 
@@ -88,11 +88,11 @@ class LangChainOrchestrator(ChatOrchestrator):
         ])
 
         # Store LLM instance for direct access
-        self._llm = llm_provider.llm_instance
+        self._llm = llm_service.llm_instance
 
         self._trimmer = trim_messages(
             max_tokens=MAX_TOKENS_TABLE.get(
-                llm_provider.get_model_info().name.lower(),
+                llm_service.get_model_spec().name.lower(),
                 DEFAULT_MAX_TOKEN_LENGTH
             ),
             token_counter=self._create_token_counter(),
@@ -113,7 +113,7 @@ class LangChainOrchestrator(ChatOrchestrator):
         self._trim_messages_threshold = 20
 
         # Use ChatOllama instance directly (no adapter needed)
-        # The OllamaProvider's llm_instance returns a LangChain-compatible ChatOllama
+        # The OllamaService's llm_instance returns a LangChain-compatible ChatOllama
 
         # Create optimized prompt template with built-in history handling
         # This eliminates the need for complex RunnablePassthrough.assign
@@ -216,7 +216,7 @@ class LangChainOrchestrator(ChatOrchestrator):
 
                     # Stream response chunk
                     yield ChatResponse(
-                        model=self._llm_provider.get_model_info().name,
+                        model=self._llm_service.get_model_spec().name,
                         message=request.message.model_copy(
                             update={"role": MessageRole.ASSISTANT.value, "content": chunk.content}
                         ),
@@ -226,7 +226,7 @@ class LangChainOrchestrator(ChatOrchestrator):
 
             # Send final response
             yield ChatResponse(
-                model=self._llm_provider.get_model_info().name,
+                model=self._llm_service.get_model_spec().name,
                 done=True,
                 created_at=_get_current_timestamp(),
             )
@@ -345,8 +345,8 @@ class LangChainOrchestrator(ChatOrchestrator):
         """
         try:
             # Check LLM provider health
-            provider_healthy = await self._llm_provider.health_check()
-            if not provider_healthy:
+            llm_service_healthy = await self._llm_service.health_check()
+            if not llm_service_healthy:
                 return False
 
             # Check session storage (simple count check)

@@ -1,16 +1,16 @@
-"""Abstract LLM provider interface."""
+"""Abstract LLM service interface."""
 
 from abc import ABC, abstractmethod
 from typing import AsyncGenerator, Dict, Any, Optional
 
 from app.domain.llm.entities.message import Message
-from app.domain.llm.entities.model_info import ModelInfo
+from app.domain.llm.entities.model_spec import ModelSpec
 
 
-class LLMProvider(ABC):
-    """Abstract interface for LLM providers.
+class LLMService(ABC):
+    """Abstract interface for LLM services.
 
-    This interface defines the contract for LLM providers, supporting
+    This interface defines the contract for LLM services, supporting
     both streaming and non-streaming generation with a clean,
     provider-agnostic API.
     """
@@ -29,13 +29,13 @@ class LLMProvider(ABC):
             messages: List of messages in the conversation
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0.0-2.0)
-            **kwargs: Provider-specific parameters
+            **kwargs: Service-specific parameters
 
         Returns:
             Generated response text
 
         Raises:
-            LLMProviderError: If generation fails
+            LLMServiceError: If generation fails
         """
         pass
 
@@ -53,19 +53,19 @@ class LLMProvider(ABC):
             messages: List of messages in the conversation
             max_tokens: Maximum tokens to generate
             temperature: Sampling temperature (0.0-2.0)
-            **kwargs: Provider-specific parameters
+            **kwargs: Service-specific parameters
 
         Yields:
             Generated text chunks as they are produced
 
         Raises:
-            LLMProviderError: If streaming fails
+            LLMServiceError: If streaming fails
         """
         pass
 
     @abstractmethod
     async def health_check(self) -> bool:
-        """Check if the LLM provider is healthy and accessible.
+        """Check if the LLM service is healthy and accessible.
 
         Returns:
             True if healthy, False otherwise
@@ -73,7 +73,7 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    def get_model_info(self) -> ModelInfo:
+    def get_model_info(self) -> ModelSpec:
         """Get information about the current model.
 
         Returns:
@@ -84,7 +84,7 @@ class LLMProvider(ABC):
     @property
     @abstractmethod
     def provider_name(self) -> str:
-        """Get the name of this provider."""
+        """Get the name of this service provider."""
         pass
 
     @property

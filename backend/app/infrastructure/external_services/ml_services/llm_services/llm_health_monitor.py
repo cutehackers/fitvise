@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from collections import deque
 
-from app.infrastructure.llm.providers.ollama_provider import OllamaProvider
+from app.infrastructure.external_services.ml_services.llm_services.ollama_service import OllamaService
 
 logger = logging.getLogger(__name__)
 
@@ -88,24 +88,24 @@ class LlmHealthMonitor:
     Provides metrics for monitoring dashboards and alerting.
 
     Args:
-        ollama_provider: Ollama provider to monitor
+        ollama_service: Ollama service to monitor
         max_samples: Maximum response time samples to keep (default: 100)
     """
 
-    def __init__(self, ollama_provider: OllamaProvider, max_samples: int = 100):
+    def __init__(self, ollama_service: OllamaService, max_samples: int = 100):
         """Initialize health monitor.
 
         Args:
-            ollama_provider: Ollama provider instance
+            ollama_service: Ollama service instance
             max_samples: Maximum response time samples to retain
         """
-        self.ollama_provider = ollama_provider
+        self.ollama_service = ollama_service
         self.metrics = HealthMetrics()
         self.metrics.response_times = deque(maxlen=max_samples)
 
         logger.info(
             "LlmHealthMonitor initialized: model=%s, max_samples=%d",
-            ollama_provider._model_name,
+            ollama_service._model_name,
             max_samples,
         )
 
@@ -131,8 +131,8 @@ class LlmHealthMonitor:
         error_message = None
 
         try:
-            # Use OllamaProvider's health_check method
-            is_healthy = await self.ollama_provider.health_check()
+            # Use OllamaService's health_check method
+            is_healthy = await self.ollama_service.health_check()
             response_time_ms = (time.time() - start_time) * 1000
 
         except Exception as e:
@@ -156,7 +156,7 @@ class LlmHealthMonitor:
 
         return {
             "status": "healthy" if is_healthy else "unhealthy",
-            "model": self.ollama_provider._model_name,
+            "model": self.ollama_service._model_name,
             "response_time_ms": response_time_ms,
             "avg_response_time_ms": self.metrics.avg_response_time,
             "p95_response_time_ms": self.metrics.p95_response_time,
@@ -247,4 +247,4 @@ class LlmHealthMonitor:
         Returns:
             Model name
         """
-        return self.ollama_provider._model_name
+        return self.ollama_service._model_name

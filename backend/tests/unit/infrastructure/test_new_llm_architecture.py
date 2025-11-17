@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from typing import AsyncGenerator
 
 from app.domain.llm.entities.message import Message
-from app.domain.llm.entities.model_info import ModelInfo
+from backend.app.domain.llm.entities.model_spec import ModelSpec
 from app.domain.llm.entities.session import ChatSession
 from app.domain.llm.exceptions import LLMProviderError, ChatOrchestratorError
 from app.domain.entities.message_role import MessageRole
@@ -118,7 +118,7 @@ class TestLangChainOrchestrator:
     def mock_llm_provider(self) -> AsyncMock:
         """Create mock LLM provider."""
         provider = AsyncMock(spec=OllamaProvider)
-        provider.get_model_info.return_value = ModelInfo(
+        provider.get_model_info.return_value = ModelSpec(
             name="llama3.2:3b",
             provider="ollama",
             max_tokens=128000,

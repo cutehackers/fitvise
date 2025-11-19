@@ -10,7 +10,7 @@ The new architecture follows clean architecture principles with clear separation
 ┌─────────────────────────────────────────────────────────────┐
 │                    API Layer (FastAPI)                      │
 ├─────────────────────────────────────────────────────────────┤
-│                  Application Layer                           │
+│                  Application Layer                          │
 │  ┌─────────────────┐    ┌─────────────────────────────────┐ │
 │  │ Chat Orchestrator│    │      RAG Use Cases             │ │
 │  │                 │    │                                 │ │
@@ -18,13 +18,13 @@ The new architecture follows clean architecture principles with clear separation
 ├─────────────────────────────────────────────────────────────┤
 │                    Domain Layer                            │
 │  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │ LLM Provider     │    │     Chat Orchestrator          │ │
+│  │ LLM Service     │    │     Chat Orchestrator           │ │
 │  │ Interface       │    │     Interface                   │ │
 │  └─────────────────┘    └─────────────────────────────────┘ │
 ├─────────────────────────────────────────────────────────────┤
 │                Infrastructure Layer                        │
 │  ┌─────────────────┐    ┌─────────────────────────────────┐ │
-│  │  OllamaProvider │    │  LangChainOrchestrator         │ │
+│  │  OllamaService  │    │  LangChainOrchestrator          │ │
 │  │                 │    │                                 │ │
 │  └─────────────────┘    └─────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -36,11 +36,11 @@ The new architecture follows clean architecture principles with clear separation
 
 #### Interfaces (`app/domain/llm/interfaces/`)
 
-- **`LLMProvider`**: Abstract interface for LLM providers
+- **`LLMService`**: Abstract interface for LLM providers
   - `generate()` - Non-streaming generation
   - `generate_stream()` - Streaming generation
   - `health_check()` - Health monitoring
-  - `get_model_info()` - Model information
+  - `get_model_spec()` - Model information
 
 - **`ChatOrchestrator`**: Abstract interface for chat orchestration
   - `chat()` - Process chat messages with streaming

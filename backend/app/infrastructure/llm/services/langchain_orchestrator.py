@@ -95,7 +95,7 @@ class LangChainOrchestrator(ChatOrchestrator):
                 llm_service.get_model_spec().name.lower(),
                 DEFAULT_MAX_TOKEN_LENGTH
             ),
-            token_counter=self._create_token_counter(),
+            token_counter=self._llm,
             strategy="last",
             # Most chat models expect that chat history starts with either:
             # (1) a HumanMessage or

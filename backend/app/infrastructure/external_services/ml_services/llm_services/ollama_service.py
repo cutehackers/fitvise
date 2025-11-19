@@ -12,6 +12,7 @@ from app.domain.llm.entities.message import Message
 from app.domain.llm.entities.model_spec import ModelSpec
 from app.domain.llm.exceptions import LLMServiceError
 from app.domain.llm.interfaces.llm_service import LLMService
+from langchain_core.language_models.chat_models import BaseChatModel
 
 logger = logging.getLogger(__name__)
 
@@ -216,7 +217,7 @@ class OllamaService(LLMService):
         return "ollama"
 
     @property
-    def llm_instance(self) -> ChatOllama:
+    def llm_instance(self) -> BaseChatModel:
         """Get the underlying ChatOllama instance for direct operations.
 
         Returns:

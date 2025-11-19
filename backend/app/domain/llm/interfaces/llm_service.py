@@ -5,6 +5,7 @@ from typing import AsyncGenerator, Dict, Any, Optional
 
 from app.domain.llm.entities.message import Message
 from app.domain.llm.entities.model_spec import ModelSpec
+from langchain_core.language_models.chat_models import BaseChatModel   
 
 
 class LLMService(ABC):
@@ -73,7 +74,7 @@ class LLMService(ABC):
         pass
 
     @abstractmethod
-    def get_model_info(self) -> ModelSpec:
+    def get_model_spec(self) -> ModelSpec:
         """Get information about the current model.
 
         Returns:
@@ -89,7 +90,7 @@ class LLMService(ABC):
 
     @property
     @abstractmethod
-    def llm_instance(self) -> Any:
+    def llm_instance(self) -> BaseChatModel:
         """Get the underlying LLM instance for direct operations.
 
         Returns:

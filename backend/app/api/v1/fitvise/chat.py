@@ -9,11 +9,8 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.application.use_cases.llm_infrastructure.setup_ollama_rag import (
-    SetupOllamaRagUseCase,
-)
 from app.api.v1.fitvise.dependencies import (
-    get_rag_use_case,
+    get_rag_orchestrator,
     get_llm_health_monitor,
 )
 from app.infrastructure.llm.dependencies import get_chat_orchestrator, get_llm_service
@@ -310,7 +307,7 @@ async def chat(
 )
 async def chat_with_rag(
     request: ChatRequest,
-    rag_use_case: SetupOllamaRagUseCase = Depends(get_rag_use_case),
+    rag_orchestrator=Depends(get_rag_orchestrator),
 ) -> StreamingResponse:
     """
     Handle chat requests with RAG (Retrieval-Augmented Generation).
@@ -320,7 +317,7 @@ async def chat_with_rag(
 
     Args:
         request: Chat request with message
-        rag_use_case: RAG use case dependency
+        rag_orchestrator: RAG orchestrator dependency
 
     Returns:
         StreamingResponse: Streaming JSON objects with response chunks and sources
@@ -337,60 +334,12 @@ async def chat_with_rag(
                 ),
             )
 
-        query = request.message.content.strip()
-
         async def stream_rag_generator():
             """Generate streaming RAG response with sources."""
             try:
-                # Execute RAG query
-                response_stream, sources = await rag_use_case.execute_rag_stream(
-                    query=query,
-                    top_k=settings.rag_retrieval_top_k,
-                    session_id=request.session_id,
-                )
-
-                # Stream response chunks
-                full_response = ""
-                async for chunk in response_stream:
-                    if chunk:
-                        full_response += chunk
-                        # Yield chunk as streaming response
-                        chunk_response = RagChatResponse(
-                            model=settings.llm_model,
-                            created_at=_get_current_timestamp(),
-                            message=ChatMessage(
-                                role=MessageRole.ASSISTANT.value, content=chunk
-                            ),
-                            done=False,
-                            sources=None,  # Don't send sources until done
-                        )
-                        yield f"{chunk_response.model_dump_json()}\n"
-
-                # Final response with sources
-                source_citations = [
-                    SourceCitation(
-                        index=i + 1,
-                        content=doc.page_content[:500],  # Limit content size
-                        similarity_score=doc.metadata.get("similarity_score", 0.0),
-                        document_id=doc.metadata.get("document_id", ""),
-                        chunk_id=doc.metadata.get("chunk_id", ""),
-                        metadata=doc.metadata,
-                    )
-                    for i, doc in enumerate(sources)
-                ]
-
-                final_response = RagChatResponse(
-                    model=settings.llm_model,
-                    created_at=_get_current_timestamp(),
-                    done=True,
-                    sources=source_citations,
-                    rag_metadata={
-                        "chunks_retrieved": len(sources),
-                        "query_length": len(query),
-                        "response_length": len(full_response),
-                    },
-                )
-                yield f"{final_response.model_dump_json()}\n"
+                # Stream RAG-enhanced responses with context and sources
+                async for response in rag_orchestrator.chat(request):
+                    yield f"{response.model_dump_json()}\n"
 
             except Exception as e:
                 logger.error("RAG streaming error: %s", str(e))

@@ -32,7 +32,7 @@ dependencies = [
     "langchain-ollama>=1.0.0",
     "transformers>=4.55.3",
     "scikit-learn>=1.7.1",
-    "pandas>=2.3.2",
+    "pandas>=2.2.0,<2.3.0",
     "numpy>=2.3.2",
     "aiofiles>=24.1.0",
     "beautifulsoup4>=4.13.5",
@@ -40,7 +40,7 @@ dependencies = [
     "requests>=2.32.5",
     "aiohttp>=3.12.15",
     "openpyxl>=3.1.5",
-    "llama-index>=0.12.52",
+    "llama-index>=0.14.8",
     "llama-index-embeddings-huggingface>=0.5.5",
     "weaviate-client>=4.17.0",
     "xxhash>=3.6.0",
@@ -53,6 +53,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "alembic>=1.17.1",
     "aiosqlite>=0.21.0",
+    "llama-index-vector-stores-weaviate>=1.4.1",
 ]
 
 [tool.isort]

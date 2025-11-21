@@ -13,10 +13,9 @@ from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 
+from langchain_core.retrievers import BaseRetriever
+
 from app.domain.llm.interfaces.llm_service import LLMService
-from app.infrastructure.adapters.weaviate_langchain_retriever import (
-    WeaviateLangChainRetriever,
-)
 from app.infrastructure.external_services.context_management.context_window_manager import (
     ContextWindowManager,
 )
@@ -28,14 +27,14 @@ class SetupOllamaRagUseCase:
     """Setup and execute RAG pipeline with LLM service.
 
     Orchestrates the complete RAG workflow:
-    1. Retrieve relevant documents via semantic search
+    1. Retrieve relevant documents via LlamaIndex semantic search
     2. Fit documents into context window
     3. Generate response with LLM
     4. Return response with source citations
 
     Args:
         llm_service: LLM service for generation
-        retriever: Weaviate retriever for semantic search
+        retriever: LlamaIndex-backed retriever for semantic search
         context_manager: Context window manager
     """
 
@@ -52,14 +51,14 @@ If the context doesn't contain relevant information, say so clearly."""
     def __init__(
         self,
         llm_service: LLMService,
-        retriever: WeaviateLangChainRetriever,
+        retriever: BaseRetriever,
         context_manager: ContextWindowManager,
     ):
         """Initialize RAG use case.
 
         Args:
             llm_service: LLM service for generation
-            retriever: Retriever for semantic search
+            retriever: LlamaIndex-backed retriever for semantic search
             context_manager: Context window manager
         """
         self.llm_service = llm_service
@@ -204,11 +203,11 @@ If the context doesn't contain relevant information, say so clearly."""
             logger.error("RAG streaming query failed: %s", str(e))
             raise
 
-    def get_retriever(self) -> WeaviateLangChainRetriever:
+    def get_retriever(self) -> BaseRetriever:
         """Get the retriever instance.
 
         Returns:
-            Weaviate retriever
+            LlamaIndex-backed retriever
         """
         return self.retriever
 

@@ -2,42 +2,59 @@
 
 import logging
 from functools import lru_cache
+from typing import Annotated
+
+from fastapi import Depends
+from langchain_core.retrievers import BaseRetriever
 
 from app.application.use_cases.llm_infrastructure.setup_ollama_rag import (
     SetupOllamaRagUseCase,
 )
-from app.core.settings import settings
-from app.infrastructure.adapters.weaviate_langchain_retriever import (
-    WeaviateLangChainRetriever,
-)
+from app.core.settings import settings, Settings
 from app.infrastructure.external_services.context_management.context_window_manager import (
     ContextWindow,
     ContextWindowManager,
 )
-from app.infrastructure.llm.dependencies import get_llm_service
+from app.infrastructure.external_services.external_services_container import (
+    ExternalServicesContainer,
+)
 from app.infrastructure.external_services.ml_services.llm_services.llm_health_monitor import (
     LlmHealthMonitor,
 )
-from app.infrastructure.persistence.repositories.weaviate_search_repository import (
-    WeaviateSearchRepository,
+from app.infrastructure.external_services.ml_services.llm_services.ollama_service import (
+    OllamaService,
 )
-from app.infrastructure.external_services.vector_stores.weaviate_client import (
-    WeaviateClient,
-)
+from app.infrastructure.llm.dependencies import get_llm_service
+from app.infrastructure.llm.services.rag_orchestrator import RagOrchestrator
 
 logger = logging.getLogger(__name__)
 
 
 @lru_cache()
-def get_weaviate_client() -> WeaviateClient:
-    """Get Weaviate client singleton.
+def get_settings_instance() -> Settings:
+    """Get cached settings instance.
 
     Returns:
-        WeaviateClient instance
+        Application settings
     """
-    client = WeaviateClient()
-    logger.info("WeaviateClient initialized")
-    return client
+    return settings
+
+
+@lru_cache()
+def get_external_services_container(
+    settings_instance: Annotated[Settings, Depends(get_settings_instance)]
+) -> ExternalServicesContainer:
+    """Get external services container singleton.
+
+    Args:
+        settings_instance: Application settings
+
+    Returns:
+        ExternalServicesContainer with all external services initialized
+    """
+    container = ExternalServicesContainer(settings_instance)
+    logger.info("ExternalServicesContainer initialized")
+    return container
 
 
 
@@ -63,38 +80,51 @@ def get_context_window_manager() -> ContextWindowManager:
     return manager
 
 
-@lru_cache()
-def get_weaviate_retriever() -> WeaviateLangChainRetriever:
-    """Get Weaviate retriever singleton.
+async def get_llama_index_retriever(
+    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
+) -> BaseRetriever:
+    """Get LlamaIndex retriever with connected Weaviate.
+
+    Ensures Weaviate connection is established before creating retriever.
+
+    Args:
+        container: External services container
 
     Returns:
-        WeaviateLangChainRetriever for semantic search
-    """
-    weaviate_client = get_weaviate_client()
-    search_repo = WeaviateSearchRepository(weaviate_client)
+        LlamaIndex-backed retriever for semantic search
 
-    retriever = WeaviateLangChainRetriever(
-        search_repository=search_repo,
-        top_k=settings.rag_retrieval_top_k,
-        similarity_threshold=settings.rag_retrieval_similarity_threshold,
-    )
+    Raises:
+        ExternalServicesError: If Weaviate connection fails
+    """
+    # Ensure Weaviate is connected
+    await container.ensure_weaviate_connected()
+
+    # Get retriever from container
+    retriever = container.llama_index_retriever
     logger.info(
-        "WeaviateLangChainRetriever initialized: top_k=%d, threshold=%.2f",
+        "LlamaIndex retriever obtained: top_k=%d, threshold=%.2f",
         settings.rag_retrieval_top_k,
         settings.rag_retrieval_similarity_threshold,
     )
     return retriever
 
 
-@lru_cache()
-def get_rag_use_case() -> SetupOllamaRagUseCase:
-    """Get RAG use case singleton.
+async def get_rag_use_case(
+    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
+) -> SetupOllamaRagUseCase:
+    """Get RAG use case singleton with all dependencies.
+
+    Args:
+        container: External services container
 
     Returns:
         SetupOllamaRagUseCase for RAG orchestration
     """
-    llm_service = get_llm_service()
-    retriever = get_weaviate_retriever()
+    # Ensure Weaviate is connected
+    await container.ensure_weaviate_connected()
+
+    llm_service = get_llm_service(settings)
+    retriever = container.llama_index_retriever
     context_mgr = get_context_window_manager()
 
     rag_use_case = SetupOllamaRagUseCase(
@@ -112,11 +142,38 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
         LlmHealthMonitor for health tracking
     """
     # Create a temporary wrapper for health monitoring
-    from app.infrastructure.external_services.ml_services.llm_services.ollama_service import OllamaService
-    from app.core.settings import Settings
-
     settings_instance = Settings()
     ollama_service = OllamaService(settings_instance)
     monitor = LlmHealthMonitor(ollama_service)
     logger.info("LlmHealthMonitor initialized")
     return monitor
+
+
+async def get_rag_orchestrator(
+    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
+) -> RagOrchestrator:
+    """Get RAG orchestrator with all dependencies.
+
+    Args:
+        container: External services container with retriever and context manager
+
+    Returns:
+        RagOrchestrator for RAG-enabled chat with document retrieval
+
+    Raises:
+        ExternalServicesError: If Weaviate connection fails
+    """
+    # Ensure Weaviate is connected
+    await container.ensure_weaviate_connected()
+
+    llm_service = get_llm_service(settings)
+    retriever = container.llama_index_retriever
+    context_mgr = get_context_window_manager()
+
+    rag_orchestrator = RagOrchestrator(
+        llm_service=llm_service,
+        retriever=retriever,
+        context_manager=context_mgr,
+    )
+    logger.info("RagOrchestrator initialized")
+    return rag_orchestrator

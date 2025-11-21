@@ -9,6 +9,8 @@ to ensure services are created once per container instance.
 
 from typing import Optional
 
+from langchain_core.retrievers import BaseRetriever
+
 from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
 from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.core.settings import Settings
@@ -88,6 +90,7 @@ class ExternalServicesContainer:
         self._embedding_repository: Optional[EmbeddingRepository] = embedding_repository
         self._embedding_domain_service: Optional[EmbeddingService] = embedding_domain_service
         self._weaviate_client: Optional[WeaviateClient] = None
+        self._llama_index_retriever: Optional[BaseRetriever] = None
 
         # Validate dependencies
         if HuggingFaceEmbedding is None:
@@ -264,3 +267,64 @@ class ExternalServicesContainer:
                 ) from exc
 
         return self._embedding_domain_service
+
+    @property
+    def llama_index_retriever(self) -> BaseRetriever:
+        """Get LlamaIndex-backed retriever for RAG pipelines.
+
+        Returns a LangChain-compatible retriever using LlamaIndex's VectorStoreIndex
+        with Weaviate backend. Lazily initializes on first access and caches for
+        subsequent accesses.
+
+        Note: The retriever requires a connected WeaviateClient. Call
+        ensure_weaviate_connected() before accessing this property.
+
+        Returns:
+            LangChain BaseRetriever using LlamaIndex + Weaviate
+
+        Raises:
+            ExternalServicesError: If retriever initialization fails
+            ValueError: If WeaviateClient is not connected
+        """
+        if self._llama_index_retriever is None:
+            try:
+                from app.infrastructure.adapters.llama_index_weaviate_retriever import (
+                    create_llama_index_retriever,
+                )
+
+                client = self.weaviate_client
+                if not client.is_connected:
+                    raise ExternalServicesError(
+                        "WeaviateClient must be connected before creating retriever. "
+                        "Call await ensure_weaviate_connected() first."
+                    )
+
+                self._llama_index_retriever = create_llama_index_retriever(
+                    weaviate_client=client,
+                    top_k=5,
+                    embed_model_name="Alibaba-NLP/gte-multilingual-base",
+                )
+            except ValueError as exc:
+                # Re-raise ValueError from create_llama_index_retriever
+                raise
+            except Exception as exc:
+                raise ExternalServicesError(
+                    f"Failed to initialize LlamaIndex retriever: {str(exc)}"
+                ) from exc
+
+        return self._llama_index_retriever
+
+    async def connected_llama_index_retriever(self) -> BaseRetriever:
+        """Get LlamaIndex retriever with connected Weaviate client.
+
+        Ensures Weaviate client is connected before returning retriever.
+
+        Returns:
+            LlamaIndex-backed retriever ready for use
+
+        Raises:
+            ExternalServicesError: If connection or retriever initialization fails
+        """
+        # Ensure Weaviate client is connected
+        await self.ensure_weaviate_connected()
+        return self.llama_index_retriever

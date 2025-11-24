@@ -7,9 +7,6 @@ from typing import Annotated
 from fastapi import Depends
 from langchain_core.retrievers import BaseRetriever
 
-from app.application.use_cases.llm_infrastructure.setup_ollama_rag import (
-    SetupOllamaRagUseCase,
-)
 from app.core.settings import settings, Settings
 from app.infrastructure.external_services.context_management.context_window_manager import (
     ContextWindow,
@@ -107,31 +104,6 @@ async def get_llama_index_retriever(
         settings.rag_retrieval_similarity_threshold,
     )
     return retriever
-
-
-async def get_rag_use_case(
-    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
-) -> SetupOllamaRagUseCase:
-    """Get RAG use case singleton with all dependencies.
-
-    Args:
-        container: External services container
-
-    Returns:
-        SetupOllamaRagUseCase for RAG orchestration
-    """
-    # Ensure Weaviate is connected
-    await container.ensure_weaviate_connected()
-
-    llm_service = get_llm_service(settings)
-    retriever = container.llama_index_retriever
-    context_mgr = get_context_window_manager()
-
-    rag_use_case = SetupOllamaRagUseCase(
-        llm_service=llm_service, retriever=retriever, context_manager=context_mgr
-    )
-    logger.info("SetupOllamaRagUseCase initialized")
-    return rag_use_case
 
 
 @lru_cache()

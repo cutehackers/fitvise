@@ -19,10 +19,9 @@ These tests require the `torch` dependency to be installed to run successfully:
 |-----------|-----------|-------|----------|
 | ContextWindowManager | `tests/unit/infrastructure/test_context_window_manager.py` | 26 | torch |
 | WeaviateLangChainRetriever | `tests/unit/infrastructure/test_weaviate_langchain_retriever.py` | 16 | torch |
-| SetupOllamaRagUseCase | `tests/unit/use_cases/test_setup_ollama_rag.py` | 22 | torch |
 | RAG Chat Endpoints | `tests/integration/api/test_rag_chat_endpoints.py` | 18 | torch |
 
-**Total Test Coverage**: 163 tests across all RAG-LLM integration components
+**Total Test Coverage**: 141 tests across all RAG-LLM integration components
 
 ## Running the Tests
 
@@ -46,7 +45,6 @@ pytest tests/unit/infrastructure/test_ollama_service.py \
        tests/unit/infrastructure/test_llm_health_monitor.py \
        tests/unit/infrastructure/test_context_window_manager.py \
        tests/unit/infrastructure/test_weaviate_langchain_retriever.py \
-       tests/unit/use_cases/test_setup_ollama_rag.py \
        tests/integration/api/test_rag_chat_endpoints.py \
        -v
 ```
@@ -71,11 +69,6 @@ pytest tests/unit/infrastructure/test_context_window_manager.py -v
 **WeaviateLangChainRetriever (16 tests)**:
 ```bash
 pytest tests/unit/infrastructure/test_weaviate_langchain_retriever.py -v
-```
-
-**SetupOllamaRagUseCase (22 tests)**:
-```bash
-pytest tests/unit/use_cases/test_setup_ollama_rag.py -v
 ```
 
 **RAG Chat Endpoints (18 tests)**:
@@ -187,28 +180,6 @@ open htmlcov/index.html
 - `test_configurable_similarity_threshold` - Parameter customization
 - `test_sync_retrieval_not_implemented` - Ensures async-only usage
 
-### SetupOllamaRagUseCase Tests (22 tests)
-
-**Test Class**: `TestSetupOllamaRagUseCase`
-
-**Coverage**:
-- Complete RAG pipeline: retrieve → fit → generate
-- Both streaming and non-streaming modes
-- Empty query validation
-- No documents fallback handling
-- Context window integration
-- Custom top_k parameter
-- Session ID support (placeholder for future)
-- Query trimming and sanitization
-- Error propagation from components
-- Empty chunk filtering in streaming
-
-**Key Tests**:
-- `test_execute_rag_query_success` - Full RAG query flow
-- `test_execute_rag_stream_success` - Streaming RAG flow
-- `test_execute_rag_query_no_documents` - Fallback message when no retrieval
-- `test_context_fitting` - Verifies context manager integration
-
 ### RAG Chat Endpoints Tests (18 tests)
 
 **Test Classes**:
@@ -303,7 +274,6 @@ Add to CI pipeline:
            tests/unit/infrastructure/test_llm_health_monitor.py \
            tests/unit/infrastructure/test_context_window_manager.py \
            tests/unit/infrastructure/test_weaviate_langchain_retriever.py \
-           tests/unit/use_cases/test_setup_ollama_rag.py \
            tests/integration/api/test_rag_chat_endpoints.py \
            --cov=app.infrastructure.external_services.ml_services.llm_services \
            --cov=app.application.use_cases.llm_infrastructure \
@@ -319,7 +289,6 @@ Add to CI pipeline:
 | LlmHealthMonitor | 90% | ✅ 98% |
 | ContextWindowManager | 85% | ⏳ TBD |
 | WeaviateLangChainRetriever | 85% | ⏳ TBD |
-| SetupOllamaRagUseCase | 85% | ⏳ TBD |
 | RAG Endpoints | 80% | ⏳ TBD |
 
 **Overall Target**: 85%+ coverage for all RAG-LLM integration code
@@ -365,7 +334,7 @@ mock.async_method = AsyncMock(return_value=result)
 ## Next Steps
 
 1. **Install torch dependency** to enable remaining tests
-2. **Run full test suite** to validate all 163 tests
+2. **Run full test suite** to validate all 141 tests
 3. **Generate coverage report** to identify gaps
 4. **Add to CI/CD pipeline** for automated testing
 5. **Monitor test execution time** and optimize slow tests

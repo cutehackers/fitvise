@@ -24,6 +24,7 @@ from app.schemas.chat import (
     ChatMessage,
 )
 from app.domain.entities.message_role import MessageRole
+from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,13 @@ async def chat(
         StreamingResponse: A stream of JSON objects with response chunks
     """
     try:
+        # Log request details for debugging
+        logger.info(
+            f"Received chat request - session_id: {request.session_id}, "
+            f"message_length: {len(request.message.content) if request.message and request.message.content else 'None'}, "
+            f"message_role: {request.message.role if request.message else 'None'}"
+        )
+
         if not request.message:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -273,10 +281,37 @@ async def chat(
                 ),
             )
 
+        # Add validation for message content (consistent with /chat-rag endpoint)
+        if not request.message.content or not request.message.content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=_build_error_response(
+                    message="Message content cannot be empty or whitespace only",
+                    error_type="invalid_request_error",
+                    code="EMPTY_MESSAGE_CONTENT",
+                    param="message.content",
+                ),
+            )
+
         async def stream_generator():
             try:
                 async for chunk in chat_orchestrator.chat(request):
                     yield f"{chunk.model_dump_json()}\n"
+            except MessageValidationError as e:
+                error_response = _build_error_response(
+                    message=str(e),
+                    error_type="invalid_request_error",
+                    code="VALIDATION_ERROR",
+                    param=e.field if hasattr(e, 'field') else None
+                )
+                yield f"{error_response}\n"
+            except ChatOrchestratorError as e:
+                error_response = _build_error_response(
+                    message=f"Chat processing failed: {str(e)}",
+                    error_type="service_error",
+                    code="CHAT_PROCESSING_ERROR"
+                )
+                yield f"{error_response}\n"
             except Exception as e:
                 error_response = _build_error_response(message=str(e), error_type="stream_error", code="STREAM_ERROR")
                 yield f"{error_response}\n"
@@ -341,6 +376,23 @@ async def chat_with_rag(
                 async for response in rag_orchestrator.chat(request):
                     yield f"{response.model_dump_json()}\n"
 
+            except MessageValidationError as e:
+                logger.error("RAG validation error: %s", str(e))
+                error_response = _build_error_response(
+                    message=str(e),
+                    error_type="invalid_request_error",
+                    code="RAG_VALIDATION_ERROR",
+                    param=e.field if hasattr(e, 'field') else None
+                )
+                yield f"{error_response}\n"
+            except ChatOrchestratorError as e:
+                logger.error("RAG processing error: %s", str(e))
+                error_response = _build_error_response(
+                    message=f"RAG processing failed: {str(e)}",
+                    error_type="service_error",
+                    code="RAG_PROCESSING_ERROR"
+                )
+                yield f"{error_response}\n"
             except Exception as e:
                 logger.error("RAG streaming error: %s", str(e))
                 error_response = _build_error_response(

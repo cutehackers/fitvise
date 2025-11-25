@@ -22,7 +22,8 @@ from app.infrastructure.external_services.ml_services.llm_services.ollama_servic
     OllamaService,
 )
 from app.infrastructure.llm.dependencies import get_llm_service
-from app.infrastructure.llm.services.rag_orchestrator import RagOrchestrator
+from app.domain.services.session_service import SessionService
+from app.application.use_cases.chat.rag_chat_use_case import RagChatUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -123,14 +124,14 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
 
 async def get_rag_orchestrator(
     container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
-) -> RagOrchestrator:
-    """Get RAG orchestrator with all dependencies.
+) -> RagChatUseCase:
+    """Get RAG Chat use case with all dependencies.
 
     Args:
         container: External services container with retriever and context manager
 
     Returns:
-        RagOrchestrator for RAG-enabled chat with document retrieval
+        RagChatUseCase for RAG-enabled chat with document retrieval
 
     Raises:
         ExternalServicesError: If Weaviate connection fails
@@ -142,10 +143,14 @@ async def get_rag_orchestrator(
     retriever = container.llama_index_retriever
     context_mgr = get_context_window_manager()
 
-    rag_orchestrator = RagOrchestrator(
+    # Create session service with default configuration
+    session_service = SessionService()
+
+    rag_chat_use_case = RagChatUseCase(
         llm_service=llm_service,
         retriever=retriever,
         context_manager=context_mgr,
+        session_service=session_service,
     )
-    logger.info("RagOrchestrator initialized")
-    return rag_orchestrator
+    logger.info("RagChatUseCase initialized (replaces RagOrchestrator)")
+    return rag_chat_use_case

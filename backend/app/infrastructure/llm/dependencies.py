@@ -6,10 +6,10 @@ from typing import Annotated
 from fastapi import Depends
 
 from app.core.settings import Settings, settings
-from app.domain.llm.interfaces.chat_orchestrator import ChatOrchestrator
 from app.domain.llm.interfaces.llm_service import LLMService
+from app.domain.services.session_service import SessionService
 from app.infrastructure.external_services.ml_services.llm_services.ollama_service import OllamaService
-from app.infrastructure.llm.services.langchain_orchestrator import LangChainOrchestrator
+from app.application.use_cases.chat.chat_use_case import ChatUseCase
 
 
 @lru_cache()
@@ -35,18 +35,23 @@ def get_llm_service(settings: Annotated[Settings, Depends(get_settings)]) -> LLM
 def get_chat_orchestrator(
     llm_service: Annotated[LLMService, Depends(get_llm_service)],
     settings: Annotated[Settings, Depends(get_settings)],
-) -> ChatOrchestrator:
-    """Get chat orchestrator instance.
+) -> ChatUseCase:
+    """Get Chat use case instance (replaces LangChainOrchestrator).
 
     Args:
         llm_service: LLM service
         settings: Application settings
 
     Returns:
-        Chat orchestrator implementation
+        ChatUseCase implementation for basic chat functionality
     """
-    return LangChainOrchestrator(
+    # Create session service with default configuration
+    session_service = SessionService()
+
+    chat_use_case = ChatUseCase(
         llm_service=llm_service,
+        session_service=session_service,
         turns_window=getattr(settings, 'chat_turns_window', 10),
         max_session_age_hours=getattr(settings, 'chat_max_session_age_hours', 24),
     )
+    return chat_use_case

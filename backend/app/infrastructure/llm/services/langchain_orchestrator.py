@@ -190,9 +190,7 @@ class LangChainOrchestrator(ChatOrchestrator):
                 ) | self._prompt | self._llm
             else:
                 # Direct input for short conversations - no expensive preprocessing
-                chain = (
-                    lambda x: x
-                ) | self._prompt | self._llm
+                chain = (lambda x: x) | self._prompt | self._llm
 
             # Create runnable with history
             # Use get_session_history method instead of dict access to ensure session exists

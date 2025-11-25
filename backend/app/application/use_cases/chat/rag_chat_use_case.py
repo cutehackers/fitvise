@@ -15,6 +15,7 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -268,12 +269,6 @@ If the context doesn't contain relevant information, say so clearly."""
             # Validate request
             self._ensure_chat_request(request)
 
-            # Add user message to our session service
-            self._session_service.add_user_message(
-                request.session_id,
-                request.message.content
-            )
-
             # Retrieve context documents
             context, documents = await self._retrieve(request.message.content)
 
@@ -283,23 +278,25 @@ If the context doesn't contain relevant information, say so clearly."""
             # Apply conditional trimming
             smart_trimmer = self._get_smart_trimmer(session_history.messages)
 
-            # Create chain with context
+            # Create chain with context using idiomatic LangChain constructs
             if smart_trimmer is self._trimmer:
+                # For long conversations: trim history before passing to prompt
                 trimmed_history = smart_trimmer(session_history.messages)
                 chain = (
-                    lambda x: {
-                        "input": x["input"],
-                        "context": context,
-                        "history": trimmed_history,
-                    }
-                ) | self._prompt | self._llm
+                    RunnablePassthrough.assign(
+                        context=lambda x: context,
+                        history=lambda x: trimmed_history
+                    )
+                    | self._prompt 
+                    | self._llm
+                )
             else:
+                # For short conversations: add context to input
                 chain = (
-                    lambda x: {
-                        "input": x["input"],
-                        "context": context,
-                    }
-                ) | self._prompt | self._llm
+                    RunnablePassthrough.assign(context=lambda x: context)
+                    | self._prompt 
+                    | self._llm
+                )
 
             # Create runnable with history using SessionService's persistent history
             runnable_with_history = RunnableWithMessageHistory(

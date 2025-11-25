@@ -15,6 +15,7 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.runnables.history import RunnableWithMessageHistory
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
@@ -179,14 +180,18 @@ class ChatUseCase:
             # Apply conditional trimming
             smart_trimmer = self._get_smart_trimmer(session_history.messages)
 
-            # When trimmer is required.
             if smart_trimmer is self._trimmer:
+                # For long conversations: trim history before passing to prompt
                 trimmed_history = smart_trimmer.invoke(session_history.messages)
                 chain = (
-                    lambda x: {"input": x["input"], "history": trimmed_history}
-                ) | self._prompt | self._llm
+                    RunnablePassthrough.assign(history=lambda x: trimmed_history)
+                    | self._prompt 
+                    | self._llm
+                )
             else:
-                chain = (lambda x: x) | self._prompt | self._llm
+                # For short conversations: pass input directly to prompt
+                # The prompt template handles history through MessagesPlaceholder
+                chain = self._prompt | self._llm
 
             # Create runnable with history using SessionService's persistent history
             runnable_with_history = RunnableWithMessageHistory(

@@ -1,19 +1,21 @@
 """LlamaIndex Weaviate retriever with LangChain compatibility.
 
 Uses LlamaIndex's native VectorStoreIndex with Weaviate backend,
-wrapped in a custom adapter for LangChain BaseRetriever compatibility.
+wrapped in a flexible wrapper for LangChain BaseRetriever compatibility.
 """
 
 import asyncio
 import logging
-from typing import List, Any
+from typing import Any, Dict, List, Optional
 
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from llama_index.core import VectorStoreIndex
+from llama_index.core.retrievers import BaseRetriever as LlamaIndexBaseRetriever
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
+from pydantic import Field
 
 from app.infrastructure.external_services.vector_stores.weaviate_client import (
     WeaviateClient,
@@ -22,18 +24,36 @@ from app.infrastructure.external_services.vector_stores.weaviate_client import (
 logger = logging.getLogger(__name__)
 
 
-class LlamaIndexRetrieverAdapter(BaseRetriever):
-    """Adapts LlamaIndex retriever to LangChain BaseRetriever interface.
+class LlamaIndexRetriever(BaseRetriever):
+    """Flexible wrapper for any LlamaIndex BaseRetriever.
 
-    This adapter wraps a LlamaIndex retriever and converts its NodeWithScore
-    results to LangChain Document objects, enabling seamless integration with
-    LangChain RAG pipelines.
+    This wrapper provides LangChain BaseRetriever compatibility for any
+    LlamaIndex retriever, converting NodeWithScore results to LangChain
+    Document objects with proper async support and configurable behavior.
 
     Attributes:
-        llama_retriever: The underlying LlamaIndex retriever instance
+        llama_retriever: The underlying LlamaIndex BaseRetriever instance
+        config: Optional configuration dictionary for custom behavior
     """
 
-    llama_retriever: Any  # LlamaIndex BaseRetriever
+    llama_retriever: Any  # LlamaIndex BaseRetriever - using Any for flexibility
+    config: Dict[str, Any] = Field(default_factory=dict)
+
+    def __init__(
+        self,
+        llama_retriever: Any,  # Any LlamaIndex retriever instance
+        config: Optional[Dict[str, Any]] = None
+    ):
+        """Initialize the LlamaIndex retriever wrapper.
+
+        Args:
+            llama_retriever: A LlamaIndex BaseRetriever instance
+            config: Optional configuration for custom behavior
+        """
+        super().__init__(
+            llama_retriever=llama_retriever,
+            config=config or {}
+        )
 
     class Config:
         arbitrary_types_allowed = True
@@ -80,6 +100,7 @@ class LlamaIndexRetrieverAdapter(BaseRetriever):
         )
         return self._nodes_to_documents(nodes)
 
+    
     def _nodes_to_documents(self, nodes: List[Any]) -> List[Document]:
         """Convert LlamaIndex NodeWithScore objects to LangChain Documents.
 
@@ -108,7 +129,7 @@ class LlamaIndexRetrieverAdapter(BaseRetriever):
         return documents
 
 
-def create_llama_index_retriever(
+def create_llama_index_weaviate_retriever(
     weaviate_client: WeaviateClient,
     top_k: int = 5,
     similarity_threshold: float = 0.7,
@@ -143,8 +164,8 @@ def create_llama_index_retriever(
         >>> client = WeaviateClient(config)
         >>> await client.connect()
         >>>
-        >>> retriever = create_llama_index_retriever(client, top_k=5)
-        >>> documents = await retriever.aget_relevant_documents("fitness query")
+        >>> retriever = create_llama_index_weaviate_retriever(client, top_k=5)
+        >>> documents = await retriever.ainvoke("fitness query")
     """
     # Validate connection
     if not weaviate_client.is_connected:
@@ -181,10 +202,18 @@ def create_llama_index_retriever(
         )
 
         # Use LlamaIndex's native as_retriever() method
-        llama_retriever = index.as_retriever(similarity_top_k=top_k)
+        llama_retriever: LlamaIndexBaseRetriever = index.as_retriever(similarity_top_k=top_k)
 
-        # Wrap in LangChain-compatible adapter
-        retriever = LlamaIndexRetrieverAdapter(llama_retriever=llama_retriever)
+        # Create configuration for the wrapper
+        config = {
+            "similarity_threshold": similarity_threshold,
+            "top_k": top_k,
+            "index_name": index_name,
+            "text_key": text_key,
+        }
+
+        # Wrap in LangChain-compatible retriever
+        retriever = LlamaIndexRetriever(llama_retriever=llama_retriever, config=config)
 
         logger.info("LlamaIndex retriever created successfully")
 

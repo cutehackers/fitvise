@@ -27,10 +27,10 @@ from app.infrastructure.persistence.repositories.weaviate_embedding_repository i
 )
 from llama_index.core.embeddings import BaseEmbedding
 
-try:
-    from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # type: ignore
-except ImportError:
-    HuggingFaceEmbedding = None  # type: ignore
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding  # type: ignore
+from app.infrastructure.llm.services.llama_index_retriever import (
+    create_llama_index_weaviate_retriever,
+)
 
 
 class ExternalServicesError(Exception):
@@ -91,13 +91,6 @@ class ExternalServicesContainer:
         self._embedding_domain_service: Optional[EmbeddingService] = embedding_domain_service
         self._weaviate_client: Optional[WeaviateClient] = None
         self._llama_index_retriever: Optional[BaseRetriever] = None
-
-        # Validate dependencies
-        if HuggingFaceEmbedding is None:
-            raise ExternalServicesError(
-                "llama-index[huggingface] is required for embedding services. "
-                "Install with: pip install llama-index llama-index-embeddings-huggingface"
-            )
 
     @property
     def embedding_model(self) -> BaseEmbedding:
@@ -288,10 +281,6 @@ class ExternalServicesContainer:
         """
         if self._llama_index_retriever is None:
             try:
-                from app.infrastructure.adapters.llama_index_weaviate_retriever import (
-                    create_llama_index_retriever,
-                )
-
                 client = self.weaviate_client
                 if not client.is_connected:
                     raise ExternalServicesError(
@@ -299,13 +288,13 @@ class ExternalServicesContainer:
                         "Call await ensure_weaviate_connected() first."
                     )
 
-                self._llama_index_retriever = create_llama_index_retriever(
+                self._llama_index_retriever = create_llama_index_weaviate_retriever(
                     weaviate_client=client,
                     top_k=5,
                     embed_model_name="Alibaba-NLP/gte-multilingual-base",
                 )
             except ValueError as exc:
-                # Re-raise ValueError from create_llama_index_retriever
+                # Re-raise ValueError from create_llama_index_weaviate_retriever
                 raise
             except Exception as exc:
                 raise ExternalServicesError(

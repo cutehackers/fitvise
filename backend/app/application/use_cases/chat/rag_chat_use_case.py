@@ -430,7 +430,7 @@ If the context doesn't contain relevant information, say so clearly."""
 
             # Check retriever availability (try a simple query)
             try:
-                result = await self._retriever.ainvoke({"input": "test"})
+                result = await self._retriever.ainvoke("test")
                 if result is None:
                     logger.warning(
                         "RagChatUseCase health check: Retriever returned None"

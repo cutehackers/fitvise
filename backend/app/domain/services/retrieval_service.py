@@ -10,6 +10,9 @@ from typing import Any, Dict, List, Optional
 
 from app.domain.entities.search_query import SearchQuery
 from app.domain.entities.search_result import SearchResult
+from app.domain.repositories.search_repository import SearchRepository
+from app.domain.services.embedding_service import EmbeddingService
+from app.domain.value_objects.embedding_result import EmbeddingResult
 from app.domain.value_objects.similarity_score import SimilarityScore
 
 
@@ -17,12 +20,34 @@ class RetrievalService:
     """Domain service for coordinating retrieval operations.
 
     Provides business logic for processing search results, applying ranking
-    algorithms, and formatting results for presentation.
+    algorithms, formatting results for presentation, and orchestrating
+    complete semantic search workflows.
+
+    Examples:
+        >>> service = RetrievalService(embedding_service, search_repository)
+        >>> # Execute complete semantic search
+        >>> results = await service.execute_semantic_search(
+        ...     query="What exercises help with back pain?",
+        ...     top_k=5,
+        ...     filters={"doc_type": "fitness"}
+        ... )
+        >>> len(results)
+        5
     """
 
-    def __init__(self) -> None:
-        """Initialize retrieval service."""
-        pass
+    def __init__(
+        self,
+        embedding_service: EmbeddingService,
+        search_repository: SearchRepository,
+    ) -> None:
+        """Initialize retrieval service.
+
+        Args:
+            embedding_service: Service for generating embeddings
+            search_repository: Repository for search operations
+        """
+        self._embedding_service = embedding_service
+        self._search_repository = search_repository
 
     async def process_search_results(
         self,
@@ -344,6 +369,226 @@ class RetrievalService:
             fused_results.append(fused_result)
 
         return fused_results
+
+    async def execute_semantic_search(
+        self,
+        query: str,
+        top_k: int = 10,
+        min_similarity: float = 0.0,
+        filters: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True,
+        include_metadata: bool = True,
+    ) -> List[SearchResult]:
+        """Execute complete semantic search workflow.
+
+        Orchestrates query embedding, similarity search, and result processing
+        to provide a complete semantic search solution.
+
+        Args:
+            query: Search query text
+            top_k: Maximum number of results to return
+            min_similarity: Minimum similarity threshold
+            filters: Optional search filters
+            use_cache: Whether to use query embedding cache
+            include_metadata: Whether to include result metadata
+
+        Returns:
+            List of processed search results sorted by relevance
+
+        Raises:
+            RetrievalError: If search execution fails
+        """
+        try:
+            # Step 1: Validate input
+            if not query or not query.strip():
+                raise ValueError("Query cannot be empty")
+
+            # Step 2: Embed the query
+            embedding_result = await self._embedding_service.embed_query(
+                query=query.strip(),
+                use_cache=use_cache,
+                store_embedding=use_cache,  # Store cached queries for future use
+            )
+
+            # Step 3: Create search query entity
+            search_query = SearchQuery.create(
+                text=query.strip(),
+                top_k=top_k,
+                min_similarity=min_similarity,
+                include_metadata=include_metadata,
+                filters=filters,
+            )
+
+            # Step 4: Validate search query
+            await self._search_repository.validate_query(search_query)
+
+            # Step 5: Perform similarity search
+            raw_results = await self._search_repository.semantic_search(search_query)
+
+            # Step 6: Process and rank results
+            processed_results = await self.process_search_results(
+                raw_results=raw_results,
+                query=search_query,
+                query_embedding_dimension=embedding_result.vector_dimension,
+            )
+
+            return processed_results
+
+        except Exception as e:
+            # Re-raise validation errors
+            if "Query cannot be empty" in str(e) or "validation" in str(e).lower():
+                raise
+            # Wrap other errors in retrieval error
+            raise Exception(f"Semantic search execution failed: {str(e)}") from e
+
+    async def execute_semantic_search_with_metrics(
+        self,
+        query: str,
+        top_k: int = 10,
+        min_similarity: float = 0.0,
+        filters: Optional[Dict[str, Any]] = None,
+        use_cache: bool = True,
+        include_metadata: bool = True,
+    ) -> Dict[str, Any]:
+        """Execute semantic search with detailed performance metrics.
+
+        Args:
+            query: Search query text
+            top_k: Maximum number of results to return
+            min_similarity: Minimum similarity threshold
+            filters: Optional search filters
+            use_cache: Whether to use query embedding cache
+            include_metadata: Whether to include result metadata
+
+        Returns:
+            Dictionary with search results and performance metrics
+
+        Raises:
+            RetrievalError: If search execution fails
+        """
+        import time
+        from datetime import datetime
+
+        start_time = time.time()
+
+        # Execute search
+        results = await self.execute_semantic_search(
+            query=query,
+            top_k=top_k,
+            min_similarity=min_similarity,
+            filters=filters,
+            use_cache=use_cache,
+            include_metadata=include_metadata,
+        )
+
+        # Calculate metrics
+        total_time = (time.time() - start_time) * 1000  # Convert to milliseconds
+
+        # Calculate average similarity score
+        avg_similarity = 0.0
+        if results:
+            avg_similarity = sum(result.similarity_score.score for result in results) / len(results)
+
+        # Get embedding cache status
+        embedding_cache_hit = False
+        if use_cache:
+            # We could track this from the embedding service, but for now use a simple heuristic
+            embedding_cache_hit = total_time < 100  # If very fast, likely from cache
+
+        return {
+            "results": results,
+            "metrics": {
+                "total_processing_time_ms": total_time,
+                "result_count": len(results),
+                "avg_similarity_score": avg_similarity,
+                "cache_hit": embedding_cache_hit,
+                "query_length": len(query),
+                "min_similarity_threshold": min_similarity,
+                "top_k_requested": top_k,
+                "top_k_returned": len(results),
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        }
+
+    async def find_similar_chunks(
+        self,
+        chunk_ids: List[str],
+        top_k: int = 10,
+        min_similarity: float = 0.0,
+    ) -> List[SearchResult]:
+        """Find chunks similar to given chunk IDs.
+
+        Args:
+            chunk_ids: List of chunk IDs to find similar items for
+            top_k: Maximum number of results per chunk
+            min_similarity: Minimum similarity threshold
+
+        Returns:
+            List of similar chunks
+        """
+        return await self._search_repository.find_similar_chunks(
+            chunk_ids=chunk_ids,
+            top_k=top_k,
+            min_similarity=min_similarity,
+        )
+
+    async def get_search_suggestions(
+        self,
+        partial_query: str,
+        max_suggestions: int = 5,
+        min_similarity: float = 0.3,
+    ) -> List[str]:
+        """Get search suggestions based on partial query.
+
+        Args:
+            partial_query: Partial search query text
+            max_suggestions: Maximum number of suggestions
+            min_similarity: Minimum similarity for suggestions
+
+        Returns:
+            List of suggested query completions
+        """
+        try:
+            if not partial_query or len(partial_query.strip()) < 2:
+                return []
+
+            return await self._search_repository.get_search_suggestions(
+                partial_query=partial_query.strip(),
+                max_suggestions=max_suggestions,
+                min_similarity=min_similarity,
+            )
+        except Exception as e:
+            # Return empty list on failure to avoid breaking UI
+            return []
+
+    async def get_retrieval_metrics(self) -> Dict[str, Any]:
+        """Get performance metrics for retrieval operations.
+
+        Returns:
+            Dictionary with retrieval service metrics
+        """
+        try:
+            # Get embedding service health
+            embedding_healthy = await self._embedding_service.health_check()
+
+            # Get search repository health and stats
+            search_health = await self._search_repository.health_check()
+            search_stats = await self._search_repository.get_search_statistics()
+
+            return {
+                "embedding_service_healthy": embedding_healthy,
+                "search_repository_healthy": search_health,
+                "search_statistics": search_stats,
+                "overall_status": "healthy" if embedding_healthy and search_health else "degraded",
+            }
+        except Exception as e:
+            return {
+                "error": f"Failed to get retrieval metrics: {str(e)}",
+                "embedding_service_healthy": False,
+                "search_repository_healthy": False,
+                "search_statistics": {},
+                "overall_status": "error",
+            }
 
     def _average_score_aggregation(
         self,

@@ -11,19 +11,13 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from app.application.use_cases.retrieval.semantic_search import (
-    SemanticSearchRequest,
-    SemanticSearchResponse,
-    SemanticSearchUseCase,
-)
 from app.domain.entities.document_reference import DocumentReference
 from app.domain.entities.retrieval_context import RetrievalContext
-from app.domain.entities.search_result import SearchResult
 from app.domain.exceptions.retrieval_exceptions import (
     RetrievalError,
     ContextBuildingError,
 )
-from app.domain.services.context_service import ContextService
+from app.domain.services.document_retrieval_service import DocumentRetrievalService
 
 
 @dataclass
@@ -137,17 +131,14 @@ class RetrieveDocumentUseCase:
 
     def __init__(
         self,
-        semantic_search_uc: SemanticSearchUseCase,
-        context_service: ContextService,
+        document_retrieval_service: DocumentRetrievalService,
     ) -> None:
         """Initialize retrieve document use case.
 
         Args:
-            semantic_search_uc: Use case for semantic search
-            context_service: Domain service for context building
+            document_retrieval_service: Domain service for document retrieval with context building
         """
-        self._semantic_search_uc = semantic_search_uc
-        self._context_service = context_service
+        self._document_retrieval_service = document_retrieval_service
 
     async def execute(self, request: RetrieveDocumentRequest) -> RetrieveDocumentResponse:
         """Execute document retrieval with context building.
@@ -170,61 +161,53 @@ class RetrieveDocumentUseCase:
             )
 
         try:
-            # Step 1: Execute semantic search
-            search_start = datetime.now()
-            search_request = request.to_semantic_search_request()
-            search_response = await self._semantic_search_uc.execute(search_request)
-            search_time = (datetime.now() - search_start).total_seconds() * 1000
+            # Delegate to DocumentRetrievalService for complete workflow
+            retrieval_result = await self._document_retrieval_service.retrieve_documents_with_metrics(
+                query=request.query.strip(),
+                max_context_tokens=request.max_context_tokens,
+                max_documents=request.max_documents,
+                filters=request.filters,
+                min_similarity=request.min_similarity,
+                context_id=context_id,
+                metadata=request.retrieval_metadata,
+            )
 
-            if not search_response.success:
+            context = retrieval_result["context"]
+            metrics = retrieval_result["metrics"]
+            search_metrics = retrieval_result["search_metrics"]
+
+            if context is None:
+                # Error case - service returned metrics with error
+                total_time = (datetime.now() - start_time).total_seconds() * 1000
                 return RetrieveDocumentResponse(
                     success=False,
                     context_id=context_id,
-                    search_time_ms=search_time,
-                    error=f"Search failed: {search_response.error}",
+                    processing_time_ms=total_time,
+                    error=metrics.get("error", "Document retrieval failed"),
                 )
 
-            # Step 2: Convert search results to document references
-            document_references = self._convert_to_document_references(
-                search_response.results
-            )
-
-            # Step 3: Build retrieval context
-            context_start = datetime.now()
-            retrieval_context = await self._context_service.build_context(
-                query=request.query,
-                document_references=document_references,
-                max_tokens=request.max_context_tokens,
-                context_id=context_id,
-            )
-            context_time = (datetime.now() - context_start).total_seconds() * 1000
-
-            # Step 4: Calculate metrics and build response
+            # Build response from service results
             total_time = (datetime.now() - start_time).total_seconds() * 1000
-            avg_score = (
-                sum(ref.get_similarity_score() for ref in document_references)
-                / len(document_references)
-                if document_references
-                else 0.0
-            )
 
             return RetrieveDocumentResponse(
                 success=True,
                 context_id=context_id,
-                context=retrieval_context,
-                total_documents_found=len(search_response.results),
-                documents_in_context=len(retrieval_context.document_references),
-                documents_truncated=retrieval_context.truncated_count,
+                context=context,
+                total_documents_found=metrics.get("total_documents_found", 0),
+                documents_in_context=metrics.get("documents_in_context", 0),
+                documents_truncated=metrics.get("documents_truncated", 0),
                 processing_time_ms=total_time,
-                search_time_ms=search_time,
-                context_time_ms=context_time,
-                avg_similarity_score=avg_score,
-                context_utilization=retrieval_context.get_token_usage_ratio(),
+                search_time_ms=search_metrics.get("embedding_processing_time_ms", 0.0),
+                context_time_ms=metrics.get("context_processing_time_ms", 0.0),
+                avg_similarity_score=metrics.get("avg_similarity_score", 0.0),
+                context_utilization=metrics.get("context_utilization", 0.0),
                 metadata={
                     "query_length": len(request.query),
                     "max_context_tokens": request.max_context_tokens,
-                    "search_response_time_ms": search_response.processing_time_ms,
-                    "embedding_cache_hit": search_response.metadata.get("cache_hit", False),
+                    "context_quality_score": metrics.get("context_quality_score", 0.0),
+                    "search_service_status": metrics.get("search_service_status", "unknown"),
+                    "retrieval_metrics": metrics,
+                    "search_metrics": search_metrics,
                 },
             )
 
@@ -246,42 +229,6 @@ class RetrieveDocumentUseCase:
                 error=f"Unexpected error: {str(e)}",
             )
 
-    def _convert_to_document_references(
-        self,
-        search_results: List[SearchResult],
-    ) -> List[DocumentReference]:
-        """Convert search results to document references.
-
-        Args:
-            search_results: List of search results
-
-        Returns:
-            List of document references
-        """
-        document_references = []
-        for result in search_results:
-            # Create relevance reason based on similarity score
-            relevance_reason = f"Similarity score: {result.similarity_score.score:.3f}"
-            if result.similarity_score.score >= 0.9:
-                relevance_reason = "Highly relevant match"
-            elif result.similarity_score.score >= 0.7:
-                relevance_reason = "Relevant match"
-            else:
-                relevance_reason = "Potentially relevant match"
-
-            reference = DocumentReference.from_search_result(
-                search_result=result,
-                relevance_reason=relevance_reason,
-                metadata={
-                    "rank": result.rank,
-                    "similarity_score": result.similarity_score.score,
-                    "converted_at": datetime.utcnow().isoformat(),
-                },
-            )
-            document_references.append(reference)
-
-        return document_references
-
     async def retrieve_additional_documents(
         self,
         context_id: UUID,
@@ -301,51 +248,31 @@ class RetrieveDocumentUseCase:
         start_time = datetime.now()
 
         try:
-            # Get existing context (this would require context repository)
-            # For now, create a new context - in real implementation this would load existing
-            existing_context = RetrievalContext(
+            # Delegate to DocumentRetrievalService for additional documents
+            context = await self._document_retrieval_service.retrieve_additional_documents(
                 context_id=context_id,
-                query=additional_query,
-                max_tokens=4000,
+                additional_query=additional_query,
+                max_additional_documents=max_additional_documents,
+                max_context_tokens=max_context_tokens,
+                min_similarity=min_similarity,
             )
 
-            # Search for additional documents
-            search_request = SemanticSearchRequest(
-                query_text=additional_query,
-                top_k=max_additional_documents,
-                min_similarity=0.0,
-            )
-            search_response = await self._semantic_search_uc.execute(search_request)
-
-            if not search_response.success:
-                return RetrieveDocumentResponse(
-                    success=False,
-                    context_id=context_id,
-                    error=f"Additional search failed: {search_response.error}",
-                )
-
-            # Convert and add to context
-            additional_references = self._convert_to_document_references(
-                search_response.results
-            )
-
-            added_count = existing_context.add_references(additional_references)
             total_time = (datetime.now() - start_time).total_seconds() * 1000
 
             return RetrieveDocumentResponse(
                 success=True,
                 context_id=context_id,
-                context=existing_context,
-                total_documents_found=len(search_response.results),
-                documents_in_context=len(existing_context.document_references),
-                documents_truncated=existing_context.truncated_count,
+                context=context,
+                total_documents_found=len(context.document_references) + context.truncated_count,
+                documents_in_context=len(context.document_references),
+                documents_truncated=context.truncated_count,
                 processing_time_ms=total_time,
-                search_time_ms=search_response.processing_time_ms,
-                context_time_ms=0.0,  # Context building time is minimal here
-                avg_similarity_score=search_response.avg_similarity_score,
-                context_utilization=existing_context.get_token_usage_ratio(),
+                search_time_ms=0.0,  # Embedded in DocumentRetrievalService timing
+                context_time_ms=0.0,  # Embedded in DocumentRetrievalService timing
+                avg_similarity_score=0.0,  # Would need to be calculated from service if needed
+                context_utilization=context.get_token_usage_ratio(),
                 metadata={
-                    "additional_documents_added": added_count,
+                    "additional_documents_added": len(context.document_references),
                     "augmented_context": True,
                 },
             )
@@ -366,18 +293,18 @@ class RetrieveDocumentUseCase:
             Dictionary with performance statistics
         """
         try:
-            # Get semantic search metrics
-            search_metrics = await self._semantic_search_uc.get_performance_metrics()
+            # Get document retrieval metrics from the service
+            retrieval_metrics = await self._document_retrieval_service.get_retrieval_performance_metrics()
 
             return {
-                "semantic_search_metrics": search_metrics,
+                "document_retrieval_metrics": retrieval_metrics,
                 "retrieve_document_status": "operational",
-                "context_service_status": "operational",
+                "overall_status": retrieval_metrics.get("overall_status", "unknown"),
             }
         except Exception as e:
             return {
                 "error": f"Failed to get performance metrics: {str(e)}",
-                "semantic_search_metrics": {},
+                "document_retrieval_metrics": {},
                 "retrieve_document_status": "error",
-                "context_service_status": "unknown",
+                "overall_status": "error",
             }

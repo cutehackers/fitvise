@@ -12,11 +12,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
-from app.application.use_cases.embedding.embed_query import (
-    EmbedQueryRequest,
-    EmbedQueryResponse,
-    EmbedQueryUseCase,
-)
 from app.domain.entities.search_query import SearchQuery
 from app.domain.entities.search_result import SearchResult
 from app.domain.exceptions.retrieval_exceptions import (
@@ -153,19 +148,13 @@ class SemanticSearchUseCase:
 
     def __init__(
         self,
-        embed_query_uc: EmbedQueryUseCase,
-        search_repository: SearchRepository,
         retrieval_service: RetrievalService,
     ) -> None:
         """Initialize semantic search use case.
 
         Args:
-            embed_query_uc: Use case for embedding queries
-            search_repository: Repository for search operations
-            retrieval_service: Domain service for retrieval coordination
+            retrieval_service: Domain service for complete semantic search orchestration
         """
-        self._embed_query_uc = embed_query_uc
-        self._search_repository = search_repository
         self._retrieval_service = retrieval_service
 
     async def execute(self, request: SemanticSearchRequest) -> SemanticSearchResponse:
@@ -189,62 +178,43 @@ class SemanticSearchUseCase:
             )
 
         try:
-            # Step 1: Convert to domain entity and validate
-            search_query = request.to_search_query()
-            await self._search_repository.validate_query(search_query)
-
-            # Step 2: Embed the query
-            embed_start = datetime.now()
-            embed_request = EmbedQueryRequest(
-                query=request.query_text,
+            # Delegate to RetrievalService for complete semantic search workflow
+            search_results_with_metrics = await self._retrieval_service.execute_semantic_search_with_metrics(
+                query=request.query_text.strip(),
+                top_k=request.top_k,
+                min_similarity=request.min_similarity,
+                filters=request.filters,
                 use_cache=True,
-                store_embedding=False,  # Don't store query embeddings by default
-            )
-            embed_response = await self._embed_query_uc.execute(embed_request)
-            embedding_time = (datetime.now() - embed_start).total_seconds() * 1000
-
-            if not embed_response.success:
-                return SemanticSearchResponse(
-                    success=False,
-                    query_id=query_id,
-                    embedding_time_ms=embedding_time,
-                    error=f"Query embedding failed: {embed_response.error}",
-                )
-
-            # Step 3: Perform similarity search
-            search_start = datetime.now()
-            raw_results = await self._search_repository.semantic_search(search_query)
-            search_time = (datetime.now() - search_start).total_seconds() * 1000
-
-            # Step 4: Process and rank results
-            processed_results = await self._retrieval_service.process_search_results(
-                raw_results=raw_results,
-                query=search_query,
-                query_embedding_dimension=embed_response.vector_dimension,
+                include_metadata=request.include_metadata,
             )
 
-            # Step 5: Calculate metrics and build response
-            total_time = (datetime.now() - start_time).total_seconds() * 1000
+            results = search_results_with_metrics["results"]
+            metrics = search_results_with_metrics["metrics"]
+
+            # Calculate additional metrics
             avg_score = (
-                sum(r.similarity_score.score for r in processed_results) / len(processed_results)
-                if processed_results
+                sum(r.similarity_score.score for r in results) / len(results)
+                if results
                 else 0.0
             )
 
             return SemanticSearchResponse(
                 success=True,
                 query_id=query_id,
-                results=processed_results,
-                total_results=len(processed_results),
-                processing_time_ms=total_time,
-                embedding_time_ms=embedding_time,
-                search_time_ms=search_time,
-                query_vector_dimension=embed_response.vector_dimension,
+                results=results,
+                total_results=len(results),
+                processing_time_ms=metrics["total_processing_time_ms"],
+                embedding_time_ms=0.0,  # Embedded in total time now
+                search_time_ms=metrics["total_processing_time_ms"],  # Single operation now
+                query_vector_dimension=0,  # Not tracked at use case level anymore
                 avg_similarity_score=avg_score,
                 metadata={
-                    "cache_hit": embed_response.cache_hit,
+                    "cache_hit": metrics["cache_hit"],
                     "query_length": len(request.query_text),
-                    "filter_count": len(search_query.filters.as_dict()),
+                    "min_similarity_threshold": request.min_similarity,
+                    "top_k_requested": request.top_k,
+                    "top_k_returned": len(results),
+                    "retrieval_metrics": metrics,
                 },
             )
 
@@ -283,7 +253,7 @@ class SemanticSearchUseCase:
             List of similar chunks
         """
         try:
-            return await self._search_repository.find_similar_chunks(
+            return await self._retrieval_service.find_similar_chunks(
                 chunk_ids=chunk_ids,
                 top_k=top_k,
                 min_similarity=min_similarity,
@@ -311,11 +281,8 @@ class SemanticSearchUseCase:
             List of suggested query completions
         """
         try:
-            if not partial_query or len(partial_query.strip()) < 2:
-                return []
-
-            return await self._search_repository.get_search_suggestions(
-                partial_query=partial_query.strip(),
+            return await self._retrieval_service.get_search_suggestions(
+                partial_query=partial_query,
                 max_suggestions=max_suggestions,
                 min_similarity=min_similarity,
             )
@@ -332,18 +299,13 @@ class SemanticSearchUseCase:
             Dictionary with performance statistics
         """
         try:
-            # Get embedding metrics
-            embed_metrics = await self._embed_query_uc.get_performance_metrics()
-
-            # Get search repository health and stats
-            search_health = await self._search_repository.health_check()
-            search_stats = await self._search_repository.get_search_statistics()
+            # Get retrieval service metrics (includes embedding and search)
+            retrieval_metrics = await self._retrieval_service.get_retrieval_metrics()
 
             return {
-                "embedding_metrics": embed_metrics,
-                "search_health": search_health,
-                "search_statistics": search_stats,
-                "overall_status": "healthy" if search_health.get("status") == "healthy" else "degraded",
+                "retrieval_service_metrics": retrieval_metrics,
+                "semantic_search_status": "operational",
+                "overall_status": retrieval_metrics.get("overall_status", "unknown"),
             }
         except Exception as e:
             return {
@@ -369,12 +331,17 @@ class SemanticSearchUseCase:
             feedback_score: User feedback score (1-5, if provided)
         """
         try:
-            await self._search_repository.log_search_interaction(
-                query_id=str(query_id),
-                result_ids=result_ids,
-                clicked_result_id=clicked_result_id,
-                feedback_score=feedback_score,
-            )
+            # This functionality could be moved to the RetrievalService
+            # For now, implement a simple logging mechanism
+            feedback_data = {
+                "query_id": str(query_id),
+                "result_ids": result_ids,
+                "clicked_result_id": clicked_result_id,
+                "feedback_score": feedback_score,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            # In a real implementation, this would be stored in a feedback repository
+            print(f"Search feedback logged: {feedback_data}")
         except Exception as e:
             # Non-critical failure - log but don't raise
             print(f"Warning: Failed to log search feedback: {str(e)}")

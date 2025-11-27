@@ -281,6 +281,52 @@ class WeaviateEmbeddingRepository(EmbeddingRepository):
                 details=str(e),
             ) from e
 
+    async def find_by_query_text(self, query_text: str) -> Optional[Embedding]:
+        """Find embedding by query text for caching.
+
+        Args:
+            query_text: Query text to search for
+
+        Returns:
+            Embedding if found, None otherwise
+
+        Raises:
+            EmbeddingStorageError: If retrieval operation fails
+        """
+        try:
+            # Build filter for exact query text match
+            filters = {
+                "path": ["text"],
+                "operator": "Equal",
+                "valueString": query_text,
+            }
+
+            # Query with filter for exact text match
+            results = await self._client.similarity_search(
+                class_name=self.CLASS_NAME,
+                vector=[0.0] * 768,  # Dummy vector for filter-only query
+                limit=1,  # Only need one result
+                filters=filters,
+                min_certainty=0.0,
+                include_vector=True,
+            )
+
+            if not results:
+                return None
+
+            # Return the first matching embedding
+            obj = results[0]
+            return self._object_to_embedding(
+                obj, UUID(obj["properties"]["chunk_id"])
+            )
+
+        except Exception as e:
+            raise EmbeddingStorageError(
+                message=f"Failed to find embedding for query text",
+                operation="find_by_query_text",
+                details=str(e),
+            ) from e
+
     async def similarity_search(
         self,
         query_vector: EmbeddingVector,

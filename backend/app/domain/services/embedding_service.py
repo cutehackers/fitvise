@@ -18,6 +18,7 @@ from app.domain.exceptions.embedding_exceptions import (
 )
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 from app.domain.value_objects.embedding_vector import EmbeddingVector
+from app.domain.value_objects.embedding_result import EmbeddingResult
 
 
 class EmbeddingService:
@@ -27,7 +28,7 @@ class EmbeddingService:
     implementing business logic for batch vs real-time processing.
 
     Examples:
-        >>> service = EmbeddingService(repository)
+        >>> service = EmbeddingService(repository, sentence_transformer_service)
         >>> # Store embedding
         >>> await service.store_chunk_embedding(
         ...     chunk=chunk,
@@ -42,20 +43,32 @@ class EmbeddingService:
         ...     model_name="Alibaba-NLP/gte-multilingual-base"
         ... )
 
+        >>> # Embed query with caching
+        >>> result = await service.embed_query(
+        ...     query="What exercises help with back pain?",
+        ...     use_cache=True
+        ... )
+        >>>
         >>> # Search similar
         >>> results = await service.find_similar(
-        ...     query_vector=query_vector,
+        ...     query_vector=result.vector,
         ...     k=10
         ... )
     """
 
-    def __init__(self, repository: EmbeddingRepository) -> None:
+    def __init__(
+        self,
+        repository: EmbeddingRepository,
+        sentence_transformer_service=None,
+    ) -> None:
         """Initialize embedding service.
 
         Args:
             repository: Embedding repository for persistence
+            sentence_transformer_service: Service for generating embeddings
         """
         self._repository = repository
+        self._sentence_transformer_service = sentence_transformer_service
 
     async def store_chunk_embedding(
         self,
@@ -240,10 +253,204 @@ class EmbeddingService:
         """
         return await self._repository.delete_by_document_id(document_id)
 
+    async def embed_query(
+        self,
+        query: str,
+        use_cache: bool = True,
+        store_embedding: bool = False,
+        model_name: str = "Alibaba-NLP/gte-multilingual-base",
+        model_version: str = "1.0",
+    ) -> EmbeddingResult:
+        """Embed a query text with caching support.
+
+        Args:
+            query: Query text to embed
+            use_cache: Whether to use query cache
+            store_embedding: Whether to store the embedding
+            model_name: Name of embedding model to use
+            model_version: Version of embedding model
+
+        Returns:
+            EmbeddingResult with generated vector and metadata
+
+        Raises:
+            EmbeddingGenerationError: If embedding generation fails
+            EmbeddingStorageError: If storage fails
+        """
+        try:
+            # Validate input
+            if not query or not query.strip():
+                raise EmbeddingGenerationError(
+                    message="Query cannot be empty",
+                    operation="embed_query",
+                    details="Query validation failed"
+                )
+
+            # Check cache first if enabled
+            if use_cache:
+                cached_embedding = await self._repository.find_by_query_text(query.strip())
+                if cached_embedding:
+                    return EmbeddingResult.from_cache_hit(
+                        query=query.strip(),
+                        vector=cached_embedding.vector,
+                        model_name=model_name,
+                        embedding_id=cached_embedding.id,
+                        model_version=model_version,
+                        metadata={"cache_hit": True, "model_name": model_name},
+                    )
+
+            # Generate embedding using sentence transformer service
+            if not self._sentence_transformer_service:
+                raise EmbeddingGenerationError(
+                    message="Sentence transformer service not available",
+                    operation="embed_query",
+                    details="EmbeddingService initialized without sentence_transformer_service"
+                )
+
+            vector = await self._sentence_transformer_service.encode(query.strip())
+
+            embedding_id = None
+            if store_embedding:
+                # Store the embedding for future use
+                embedding = Embedding.for_query_text(
+                    vector=vector,
+                    query_text=query.strip(),
+                    model_name=model_name,
+                    model_version=model_version,
+                    metadata={"query_type": "user_query"},
+                )
+                await self._repository.save(embedding)
+                embedding_id = embedding.id
+
+            return EmbeddingResult.create(
+                query=query.strip(),
+                vector=vector,
+                model_name=model_name,
+                model_version=model_version,
+                cache_hit=False,
+                stored=store_embedding,
+                embedding_id=embedding_id,
+                metadata={"cache_hit": False, "model_name": model_name},
+            )
+
+        except EmbeddingGenerationError:
+            raise  # Re-raise embedding generation errors
+        except EmbeddingStorageError:
+            raise  # Re-raise storage errors
+        except Exception as e:
+            raise EmbeddingGenerationError(
+                message="Failed to embed query",
+                operation="embed_query",
+                details=str(e),
+            ) from e
+
+    async def embed_batch(
+        self,
+        texts: List[str],
+        batch_size: int = 32,
+        model_name: str = "Alibaba-NLP/gte-multilingual-base",
+        model_version: str = "1.0",
+        store_embeddings: bool = False,
+    ) -> List[EmbeddingResult]:
+        """Embed multiple texts efficiently in batches.
+
+        Args:
+            texts: List of texts to embed
+            batch_size: Number of texts to process in each batch
+            model_name: Name of embedding model to use
+            model_version: Version of embedding model
+            store_embeddings: Whether to store the embeddings
+
+        Returns:
+            List of EmbeddingResult objects
+
+        Raises:
+            EmbeddingGenerationError: If embedding generation fails
+            EmbeddingStorageError: If storage fails
+        """
+        if not texts:
+            return []
+
+        try:
+            # Validate input
+            if not self._sentence_transformer_service:
+                raise EmbeddingGenerationError(
+                    message="Sentence transformer service not available",
+                    operation="embed_batch",
+                    details="EmbeddingService initialized without sentence_transformer_service"
+                )
+
+            # Filter out empty texts
+            valid_texts = [text.strip() for text in texts if text and text.strip()]
+            if not valid_texts:
+                return []
+
+            # Generate embeddings in batches
+            all_vectors = []
+            for i in range(0, len(valid_texts), batch_size):
+                batch_texts = valid_texts[i:i + batch_size]
+                batch_vectors = await self._sentence_transformer_service.encode_batch(batch_texts)
+                all_vectors.extend(batch_vectors)
+
+            # Store embeddings if requested
+            embedding_ids = [None] * len(valid_texts)
+            if store_embeddings:
+                embeddings = [
+                    Embedding.for_query_text(
+                        vector=vector,
+                        query_text=text,
+                        model_name=model_name,
+                        model_version=model_version,
+                        metadata={"batch_index": i, "query_type": "batch_query"},
+                    )
+                    for i, (text, vector) in enumerate(zip(valid_texts, all_vectors))
+                ]
+                stored_embeddings = await self._repository.batch_save(embeddings, batch_size=batch_size)
+                embedding_ids = [emb.id for emb in stored_embeddings]
+
+            # Create results
+            results = [
+                EmbeddingResult.create(
+                    query=text,
+                    vector=vector,
+                    model_name=model_name,
+                    model_version=model_version,
+                    cache_hit=False,
+                    stored=store_embeddings,
+                    embedding_id=embedding_id,
+                    metadata={"batch_index": i, "cache_hit": False},
+                )
+                for i, (text, vector, embedding_id) in enumerate(zip(valid_texts, all_vectors, embedding_ids))
+            ]
+
+            return results
+
+        except EmbeddingGenerationError:
+            raise  # Re-raise embedding generation errors
+        except EmbeddingStorageError:
+            raise  # Re-raise storage errors
+        except Exception as e:
+            raise EmbeddingGenerationError(
+                message="Failed to embed batch",
+                operation="embed_batch",
+                details=str(e),
+            ) from e
+
     async def health_check(self) -> bool:
         """Check embedding service health.
 
         Returns:
             True if service is healthy
         """
-        return await self._repository.health_check()
+        repository_healthy = await self._repository.health_check()
+
+        # Check sentence transformer service if available
+        transformer_healthy = True
+        if self._sentence_transformer_service:
+            try:
+                # Simple health check - try to encode a short text
+                await self._sentence_transformer_service.encode("health check")
+            except Exception:
+                transformer_healthy = False
+
+        return repository_healthy and transformer_healthy

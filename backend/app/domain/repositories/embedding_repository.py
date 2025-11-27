@@ -133,6 +133,21 @@ class EmbeddingRepository(ABC):
         pass
 
     @abstractmethod
+    async def find_by_query_text(self, query_text: str) -> Optional[Embedding]:
+        """Find embedding by query text for caching.
+
+        Args:
+            query_text: Query text to search for
+
+        Returns:
+            Embedding if found, None otherwise
+
+        Raises:
+            EmbeddingStorageError: If retrieval operation fails
+        """
+        pass
+
+    @abstractmethod
     async def similarity_search(
         self,
         query_vector: EmbeddingVector,

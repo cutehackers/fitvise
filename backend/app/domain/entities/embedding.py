@@ -118,8 +118,8 @@ class Embedding:
     def for_query(
         cls,
         vector: EmbeddingVector,
-        query_id: UUID,
-        model_name: str,
+        query_id: Optional[UUID] = None,
+        model_name: str = "",
         model_version: str = "1.0",
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Embedding:
@@ -127,7 +127,7 @@ class Embedding:
 
         Args:
             vector: Embedding vector
-            query_id: Query identifier
+            query_id: Optional query identifier
             model_name: Name of embedding model
             model_version: Model version string
             metadata: Additional metadata
@@ -143,6 +143,38 @@ class Embedding:
             model_name=model_name,
             model_version=model_version,
             query_id=query_id,
+            metadata=meta,
+        )
+
+    @classmethod
+    def for_query_text(
+        cls,
+        vector: EmbeddingVector,
+        query_text: str,
+        model_name: str,
+        model_version: str = "1.0",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Embedding:
+        """Create embedding for a user query with stored text for caching.
+
+        Args:
+            vector: Embedding vector
+            query_text: Query text to store for caching
+            model_name: Name of embedding model
+            model_version: Model version string
+            metadata: Additional metadata
+
+        Returns:
+            Embedding instance for query with cached text
+        """
+        meta = metadata or {}
+        meta["source_type"] = "query_text"
+        meta["query_text"] = query_text
+
+        return cls(
+            vector=vector,
+            model_name=model_name,
+            model_version=model_version,
             metadata=meta,
         )
 

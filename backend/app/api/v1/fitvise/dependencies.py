@@ -8,7 +8,7 @@ from fastapi import Depends
 from langchain_core.retrievers import BaseRetriever
 
 from app.core.settings import settings, Settings
-from app.infrastructure.external_services.context_management.context_window_manager import (
+from app.domain.services.context_window_manager import (
     ContextWindow,
     ContextWindowManager,
 )

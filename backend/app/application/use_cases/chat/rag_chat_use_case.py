@@ -26,7 +26,7 @@ from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationEr
 from app.domain.llm.interfaces.llm_service import LLMService
 from app.domain.entities.message_role import MessageRole
 from app.domain.services.session_service import SessionService
-from app.infrastructure.external_services.context_management.context_window_manager import (
+from app.domain.services.context_window_manager import (
     ContextWindowManager,
 )
 from app.schemas.chat import ChatRequest, RagChatResponse, SourceCitation

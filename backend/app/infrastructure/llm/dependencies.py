@@ -32,7 +32,7 @@ def get_llm_service(settings: Annotated[Settings, Depends(get_settings)]) -> LLM
 
 
 @lru_cache()
-def get_chat_orchestrator(
+def get_chat_use_case(
     llm_service: Annotated[LLMService, Depends(get_llm_service)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> ChatUseCase:

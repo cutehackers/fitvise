@@ -122,7 +122,7 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
     return monitor
 
 
-async def get_rag_orchestrator(
+async def get_rag_chat_use_case(
     container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
 ) -> RagChatUseCase:
     """Get RAG Chat use case with all dependencies.

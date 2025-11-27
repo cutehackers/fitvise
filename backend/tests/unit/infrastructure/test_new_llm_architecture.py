@@ -11,7 +11,7 @@ from app.domain.llm.exceptions import LLMProviderError, ChatOrchestratorError
 from app.domain.entities.message_role import MessageRole
 from app.infrastructure.llm.providers.ollama_provider import OllamaProvider
 from app.infrastructure.llm.services.langchain_orchestrator import LangChainOrchestrator
-from app.infrastructure.llm.dependencies import get_llm_provider, get_chat_orchestrator
+from app.infrastructure.llm.dependencies import get_llm_provider, get_chat_use_case
 from app.core.settings import Settings
 
 
@@ -248,7 +248,7 @@ class TestDependencyInjection:
         """Test chat orchestrator dependency injection."""
         with patch('app.infrastructure.llm.dependencies.settings', mock_settings):
             with patch('app.infrastructure.llm.providers.ollama_provider.ChatOllama'):
-                orchestrator = get_chat_orchestrator()
+                orchestrator = get_chat_use_case()
                 assert isinstance(orchestrator, LangChainOrchestrator)
 
 

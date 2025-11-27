@@ -10,10 +10,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.api.v1.fitvise.dependencies import (
-    get_rag_orchestrator,
+    get_rag_chat_use_case,
     get_llm_health_monitor,
 )
-from app.infrastructure.llm.dependencies import get_chat_orchestrator, get_llm_service
+from app.infrastructure.llm.dependencies import get_chat_use_case, get_llm_service
 from app.core.settings import settings
 from app.schemas.chat import (
     ApiErrorResponse,
@@ -114,7 +114,7 @@ def _on_llm_error(error_message: str) -> HTTPException:
 )
 async def health(
     llm_service=Depends(get_llm_service),
-    chat_orchestrator=Depends(get_chat_orchestrator),
+    chat_orchestrator=Depends(get_chat_use_case),
 ) -> HealthResponse:
     """
     Perform comprehensive health check of the workout API service.
@@ -250,14 +250,14 @@ async def get_available_models() -> Dict[str, Any]:
 )
 async def chat(
     request: ChatRequest,
-    chat_orchestrator=Depends(get_chat_orchestrator),
+    chat_use_case=Depends(get_chat_use_case),
 ) -> StreamingResponse:
     """
     Handle chat requests with streaming responses.
 
     Args:
         request: Chat request with message history
-        chat_orchestrator: Chat orchestrator dependency
+        chat_use_case: Chat orchestrator dependency
 
     Returns:
         StreamingResponse: A stream of JSON objects with response chunks
@@ -295,7 +295,7 @@ async def chat(
 
         async def stream_generator():
             try:
-                async for chunk in chat_orchestrator.chat(request):
+                async for chunk in chat_use_case.chat(request):
                     yield f"{chunk.model_dump_json()}\n"
             except MessageValidationError as e:
                 error_response = _build_error_response(
@@ -342,7 +342,7 @@ async def chat(
 )
 async def chat_with_rag(
     request: ChatRequest,
-    rag_orchestrator=Depends(get_rag_orchestrator),
+    rag_chat_use_case=Depends(get_rag_chat_use_case),
 ) -> StreamingResponse:
     """
     Handle chat requests with RAG (Retrieval-Augmented Generation).
@@ -373,7 +373,7 @@ async def chat_with_rag(
             """Generate streaming RAG response with sources."""
             try:
                 # Stream RAG-enhanced responses with context and sources
-                async for response in rag_orchestrator.chat(request):
+                async for response in rag_chat_use_case.chat(request):
                     yield f"{response.model_dump_json()}\n"
 
             except MessageValidationError as e:

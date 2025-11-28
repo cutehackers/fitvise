@@ -179,7 +179,7 @@ class SemanticSearchUseCase:
 
         try:
             # Delegate to RetrievalService for complete semantic search workflow
-            search_results_with_metrics = await self._retrieval_service.execute_semantic_search_with_metrics(
+            search_results_with_metrics = await self._retrieval_service.semantic_search_with_metrics(
                 query=request.query_text.strip(),
                 top_k=request.top_k,
                 min_similarity=request.min_similarity,

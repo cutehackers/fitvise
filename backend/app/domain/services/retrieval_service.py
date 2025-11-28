@@ -26,7 +26,7 @@ class RetrievalService:
     Examples:
         >>> service = RetrievalService(embedding_service, search_repository)
         >>> # Execute complete semantic search
-        >>> results = await service.execute_semantic_search(
+        >>> results = await service.semantic_search(
         ...     query="What exercises help with back pain?",
         ...     top_k=5,
         ...     filters={"doc_type": "fitness"}
@@ -370,7 +370,7 @@ class RetrievalService:
 
         return fused_results
 
-    async def execute_semantic_search(
+    async def semantic_search(
         self,
         query: str,
         top_k: int = 10,
@@ -441,7 +441,7 @@ class RetrievalService:
             # Wrap other errors in retrieval error
             raise Exception(f"Semantic search execution failed: {str(e)}") from e
 
-    async def execute_semantic_search_with_metrics(
+    async def semantic_search_with_metrics(
         self,
         query: str,
         top_k: int = 10,
@@ -472,7 +472,7 @@ class RetrievalService:
         start_time = time.time()
 
         # Execute search
-        results = await self.execute_semantic_search(
+        results = await self.semantic_search(
             query=query,
             top_k=top_k,
             min_similarity=min_similarity,

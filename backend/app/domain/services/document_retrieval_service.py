@@ -84,7 +84,7 @@ class DocumentRetrievalService:
         """
         try:
             # Step 1: Execute semantic search
-            search_results = await self._retrieval_service.execute_semantic_search(
+            search_results = await self._retrieval_service.semantic_search(
                 query=query.strip(),
                 top_k=max_documents,
                 min_similarity=min_similarity,

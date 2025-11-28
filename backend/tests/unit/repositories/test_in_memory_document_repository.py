@@ -18,8 +18,8 @@ from app.domain.value_objects.document_metadata import (
     DocumentStatus,
 )
 from app.domain.value_objects.quality_metrics import DataQualityMetrics, ContentQualityMetrics
-from app.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.in_memory_document_repository import InMemoryDocumentRepository
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.core.settings import Settings
 
 

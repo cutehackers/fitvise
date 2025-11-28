@@ -8,14 +8,14 @@ from unittest.mock import Mock, AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import Settings
-from app.infrastructure.repositories.container import RepositoryContainer
-from app.infrastructure.repositories.in_memory_document_repository import (
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
-from app.infrastructure.repositories.sqlalchemy_document_repository import (
+from app.infrastructure.persistence.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.repositories.in_memory_data_source_repository import (
+from app.infrastructure.persistence.repositories.in_memory_data_source_repository import (
     InMemoryDataSourceRepository,
 )
 

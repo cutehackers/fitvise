@@ -9,7 +9,8 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
-from app.domain.value_objects.vector_embedding import VectorEmbedding
+from app.domain.exceptions.embedding_exceptions import EmbeddingGenerationError
+from app.domain.value_objects.embedding_vector import EmbeddingVector
 
 
 class EmbeddingService(ABC):
@@ -25,7 +26,7 @@ class EmbeddingService(ABC):
         text: str,
         model_name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> VectorEmbedding:
+    ) -> EmbeddingVector:
         """Generate embedding for a single text.
 
         Args:
@@ -34,10 +35,10 @@ class EmbeddingService(ABC):
             metadata: Optional metadata for the embedding
 
         Returns:
-            Generated vector embedding
+            Generated embedding vector
 
         Raises:
-            RetrievalError: If embedding generation fails
+            EmbeddingGenerationError: If embedding generation fails
         """
         pass
 
@@ -47,7 +48,7 @@ class EmbeddingService(ABC):
         texts: List[str],
         model_name: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[VectorEmbedding]:
+    ) -> List[EmbeddingVector]:
         """Generate embeddings for multiple texts.
 
         Args:
@@ -56,10 +57,10 @@ class EmbeddingService(ABC):
             metadata: Optional metadata for the embeddings
 
         Returns:
-            List of generated vector embeddings
+            List of generated embedding vectors
 
         Raises:
-            RetrievalError: If batch embedding generation fails
+            EmbeddingGenerationError: If batch embedding generation fails
         """
         pass
 
@@ -77,7 +78,7 @@ class EmbeddingService(ABC):
             Dictionary with model information
 
         Raises:
-            RetrievalError: If model info lookup fails
+            EmbeddingGenerationError: If model info lookup fails
         """
         pass
 
@@ -89,7 +90,7 @@ class EmbeddingService(ABC):
             List of model names
 
         Raises:
-            RetrievalError: If model listing fails
+            EmbeddingGenerationError: If model listing fails
         """
         pass
 
@@ -107,7 +108,7 @@ class EmbeddingService(ABC):
             True if model is valid, False otherwise
 
         Raises:
-            RetrievalError: If validation check fails
+            EmbeddingGenerationError: If validation check fails
         """
         pass
 
@@ -119,7 +120,7 @@ class EmbeddingService(ABC):
             Dictionary with health status information
 
         Raises:
-            RetrievalError: If health check fails
+            EmbeddingGenerationError: If health check fails
         """
         pass
 

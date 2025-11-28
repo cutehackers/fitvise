@@ -20,10 +20,10 @@ from app.domain.value_objects.document_metadata import (
     DocumentStatus,
 )
 from app.domain.value_objects.quality_metrics import DataQualityMetrics, ContentQualityMetrics
-from app.infrastructure.repositories.sqlalchemy_document_repository import (
+from app.infrastructure.persistence.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.infrastructure.database import async_session_maker
 
 

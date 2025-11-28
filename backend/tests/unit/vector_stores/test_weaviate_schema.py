@@ -5,7 +5,6 @@ from datetime import datetime
 from uuid import uuid4, UUID
 
 from app.infrastructure.external_services.vector_stores.weaviate_schema import (
-    create_chunk_class_schema,
     validate_chunk_metadata,
     create_chunk_metadata_template,
     get_filterable_fields,

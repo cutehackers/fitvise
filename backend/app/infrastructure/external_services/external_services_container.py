@@ -16,6 +16,7 @@ from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.core.settings import Settings
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 from app.domain.services.embedding_service import EmbeddingService
+from app.domain.services.analytics_service import AnalyticsService
 from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
     SentenceTransformerService,
 )
@@ -24,6 +25,9 @@ from app.infrastructure.external_services.vector_stores.weaviate_client import (
 )
 from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
     WeaviateEmbeddingRepository,
+)
+from app.infrastructure.external_services.analytics.langfuse_service import (
+    LangFuseService,
 )
 from llama_index.core.embeddings import BaseEmbedding
 
@@ -69,6 +73,7 @@ class ExternalServicesContainer:
         sentence_transformer_service: Optional[SentenceTransformerService] = None,
         embedding_repository: Optional[EmbeddingRepository] = None,
         embedding_domain_service: Optional[EmbeddingService] = None,
+        analytics_service: Optional[AnalyticsService] = None,
     ):
         """Initialize container with configuration.
 
@@ -78,6 +83,7 @@ class ExternalServicesContainer:
             sentence_transformer_service: Optional pre-initialized sentence transformer service for testing.
             embedding_repository: Optional pre-initialized embedding repository for testing.
             embedding_domain_service: Optional pre-initialized embedding domain service for testing.
+            analytics_service: Optional pre-initialized analytics service for testing.
 
         Raises:
             ExternalServicesError: If required dependencies are missing
@@ -89,6 +95,7 @@ class ExternalServicesContainer:
         self._sentence_transformer_service: Optional[SentenceTransformerService] = sentence_transformer_service
         self._embedding_repository: Optional[EmbeddingRepository] = embedding_repository
         self._embedding_domain_service: Optional[EmbeddingService] = embedding_domain_service
+        self._analytics_service: Optional[AnalyticsService] = analytics_service
         self._weaviate_client: Optional[WeaviateClient] = None
         self._llama_index_retriever: Optional[BaseRetriever] = None
 
@@ -260,6 +267,29 @@ class ExternalServicesContainer:
                 ) from exc
 
         return self._embedding_domain_service
+
+    @property
+    def analytics_service(self) -> AnalyticsService:
+        """Get analytics service instance.
+
+        Returns a configured analytics service for distributed tracing and insights.
+        Lazily initializes on first access and caches for subsequent accesses.
+
+        Returns:
+            Configured AnalyticsService instance ready for use
+
+        Raises:
+            ExternalServicesError: If service initialization fails
+        """
+        if self._analytics_service is None:
+            try:
+                self._analytics_service = LangFuseService(self.settings)
+            except Exception as exc:
+                raise ExternalServicesError(
+                    f"Failed to initialize analytics service: {str(exc)}"
+                ) from exc
+
+        return self._analytics_service
 
     @property
     def llama_index_retriever(self) -> BaseRetriever:

@@ -95,6 +95,7 @@ from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.core.settings import get_settings
 from app.pipeline.performance_tracker import PerformanceTracker
+from app.domain.services.analytics_service import AnalyticsService, TraceHandle, SpanHandle
 
 logger = logging.getLogger(__name__)
 
@@ -255,6 +256,7 @@ class RagIngestionTask:
         document_repository: DocumentRepository,
         data_source_repository: Optional[DataSourceRepository] = None,
         verbose: bool = False,
+        analytics_service: Optional[AnalyticsService] = None,
     ):
         """Initialize the ingestion phase.
 
@@ -266,11 +268,13 @@ class RagIngestionTask:
                         Ensures single service initialization.
             data_source_repository: Optional shared data source repository
             verbose: Enable verbose logging
+            analytics_service: Optional analytics service for distributed tracing
         """
         self.document_repository = document_repository
         self.external_services = external_services
         self.data_source_repository = data_source_repository
         self.verbose = verbose
+        self.analytics_service = analytics_service
         self.tracker = PerformanceTracker()
 
         if verbose:
@@ -977,6 +981,7 @@ class RagIngestionTask:
         self,
         spec: PipelineSpec,
         use_cases: UseCaseBundle,
+        pipeline_id: Optional[str] = None,
     ) -> tuple[List[DocumentSource], List[Dict[str, object]]]:
         """Aggregate documents from configured sources while recording discovery issues."""
         documents: List[DocumentSource] = []
@@ -1052,6 +1057,7 @@ class RagIngestionTask:
         client: ObjectStorageClient,
         run_id: str,
         errors: List[Dict[str, object]],
+        pipeline_id: Optional[str] = None,
     ) -> tuple[List[StorageObject], Dict[str, int], int, List[UUID]]:
         """Execute extraction, normalization, enrichment, validation, and persistence.
 
@@ -1076,11 +1082,51 @@ class RagIngestionTask:
                     logger.debug(f"🔧 INGESTION VERBOSE: Processing document {i+1}/{len(documents)}: {doc.uri or doc.path or 'inline'}")
                     logger.debug(f"🔧 INGESTION VERBOSE: Document origin: {doc.origin}, content_type: {doc.content_type}")
 
+                # Create document-level trace for processing
+                doc_span = None
+                if self.analytics_service and pipeline_id:
+                    doc_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"process_document_{i+1}",
+                        metadata={
+                            "document_index": i + 1,
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "document_origin": doc.origin,
+                            "content_type": doc.content_type,
+                            "processing_stages": ["extract_content", "normalize_content", "enrich_metadata", "validate_quality", "store_document"]
+                        }
+                    )
+
                 # Stage 1: Extract Content
+                extract_span = None
+                if self.analytics_service and doc_span:
+                    extract_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"extract_content_{i+1}",
+                        metadata={
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "content_type": doc.content_type,
+                            "processor": "docling" if doc.content_type == "application/pdf" else "tika"
+                        }
+                    )
+
                 async with self.tracker.with_tracker("extract_content"):
                     content = await self._extract_content(doc, spec, use_cases)
 
                 base_text = content.markdown or content.text or ""
+
+                # Update extract span with results
+                if extract_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=extract_span.span_id,
+                        metadata={
+                            "content_length": len(base_text),
+                            "has_content": bool(base_text),
+                            "processor": content.metadata.get("processor") if hasattr(content, "metadata") else None,
+                            "warnings": len(content.warnings) if hasattr(content, "warnings") else 0
+                        },
+                        status="success" if base_text else "error"
+                    )
 
                 if self.verbose:
                     extract_stats = self.tracker.get_stats("extract_content")
@@ -1091,11 +1137,42 @@ class RagIngestionTask:
                     if self.verbose:
                         logger.debug(f"🔧 INGESTION VERBOSE: Skipping document {i+1} - no content extracted")
                     skipped += 1
+
+                    # Update document span with skip reason
+                    if doc_span and self.analytics_service:
+                        await self.analytics_service.update_span(
+                            span_id=doc_span.span_id,
+                            metadata={"skip_reason": "no_content_extracted"},
+                            status="skipped"
+                        )
                     continue
 
                 # Stage 2: Normalize Content
+                normalize_span = None
+                if self.analytics_service and doc_span:
+                    normalize_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"normalize_content_{i+1}",
+                        metadata={
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "input_length": len(base_text)
+                        }
+                    )
+
                 async with self.tracker.with_tracker("normalize_content"):
                     normalized = await self._normalize_content(base_text, use_cases)
+
+                # Update normalize span with results
+                if normalize_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=normalize_span.span_id,
+                        metadata={
+                            "tokens_count": len(normalized.tokens) if normalized.tokens else 0,
+                            "lemmas_count": len(normalized.lemmas) if normalized.lemmas else 0,
+                            "entities_count": len(normalized.entities) if normalized.entities else 0
+                        },
+                        status="success"
+                    )
 
                 if self.verbose:
                     normalize_stats = self.tracker.get_stats("normalize_content")
@@ -1103,8 +1180,33 @@ class RagIngestionTask:
                         logger.debug(f"🔧 INGESTION VERBOSE: Normalization complete - tokens: {len(normalized.tokens) if normalized.tokens else 0} (took {normalize_stats.get('average', 0):.3f}s)")
 
                 # Stage 3: Enrich Metadata
+                enrich_span = None
+                if self.analytics_service and doc_span:
+                    enrich_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"enrich_metadata_{i+1}",
+                        metadata={
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "input_length": len(normalized.normalized)
+                        }
+                    )
+
                 async with self.tracker.with_tracker("enrich_metadata"):
                     enriched = await self._enrich_content(normalized.normalized, use_cases)
+
+                # Update enrich span with results
+                if enrich_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=enrich_span.span_id,
+                        metadata={
+                            "keywords_count": len(enriched.keywords) if enriched.keywords else 0,
+                            "entities_count": len(enriched.entities) if enriched.entities else 0,
+                            "language": enriched.language,
+                            "dates_count": len(enriched.dates) if enriched.dates else 0,
+                            "authors_count": len(enriched.authors) if enriched.authors else 0
+                        },
+                        status="success"
+                    )
 
                 if self.verbose:
                     enrich_stats = self.tracker.get_stats("enrich_metadata")
@@ -1112,8 +1214,33 @@ class RagIngestionTask:
                         logger.debug(f"🔧 INGESTION VERBOSE: Metadata enrichment complete - keywords: {len(enriched.keywords) if enriched.keywords else 0}, entities: {len(enriched.entities) if enriched.entities else 0} (took {enrich_stats.get('average', 0):.3f}s)")
 
                 # Stage 4: Validate Quality
+                validate_span = None
+                if self.analytics_service and doc_span:
+                    validate_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"validate_quality_{i+1}",
+                        metadata={
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "input_length": len(normalized.normalized)
+                        }
+                    )
+
                 async with self.tracker.with_tracker("validate_quality"):
                     quality = await self._validate_content(normalized.normalized, use_cases)
+
+                # Update validate span with results
+                if validate_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=validate_span.span_id,
+                        metadata={
+                            "overall_score": quality.overall_score,
+                            "quality_level": quality.quality_level,
+                            "metrics_count": len(quality.metrics) if quality.metrics else 0,
+                            "validations_count": len(quality.validations) if quality.validations else 0,
+                            "ge_report": quality.ge_report is not None
+                        },
+                        status="success"
+                    )
 
                 if self.verbose:
                     validate_stats = self.tracker.get_stats("validate_quality")
@@ -1138,6 +1265,19 @@ class RagIngestionTask:
                 }
 
                 # Stage 5: Store Document (MinIO + Repository)
+                store_span = None
+                if self.analytics_service and doc_span:
+                    store_span = await self.analytics_service.create_span(
+                        parent_trace=pipeline_id,
+                        operation=f"store_document_{i+1}",
+                        metadata={
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "storage_provider": spec.storage.provider,
+                            "storage_bucket": spec.storage.bucket,
+                            "object_key": object_key
+                        }
+                    )
+
                 async with self.tracker.with_tracker("store_document"):
                     try:
                         result = client.put_object(
@@ -1149,6 +1289,26 @@ class RagIngestionTask:
                             tags=tags,
                         )
                     except Exception as exc:
+                        # Update store span with error
+                        if store_span and self.analytics_service:
+                            await self.analytics_service.update_span(
+                                span_id=store_span.span_id,
+                                metadata={"storage_error": str(exc)},
+                                status="error"
+                            )
+
+                            await self.analytics_service.track_error(
+                                exc,
+                                "document_ingestion",
+                                {
+                                    "component": "document_storage",
+                                    "pipeline_id": pipeline_id,
+                                    "document_uri": doc.uri or doc.path or "inline",
+                                    "stage": "store_document"
+                                },
+                                trace_id=pipeline_id
+                            )
+
                         raise StorageWriteError(
                             "Failed to write processed document to storage",
                             stage="storage",
@@ -1180,10 +1340,39 @@ class RagIngestionTask:
                     processed_document_ids.append(document_entity.id)
                     origin_counts[doc.origin] = origin_counts.get(doc.origin, 0) + 1
 
+                # Update store span with success
+                if store_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=store_span.span_id,
+                        metadata={
+                            "stored_size": result.size,
+                            "object_key": object_key,
+                            "document_id": str(document_entity.id),
+                            "repository_saved": True
+                        },
+                        status="success"
+                    )
+
                 if self.verbose:
                     store_stats = self.tracker.get_stats("store_document")
                     if store_stats:
                         logger.debug(f"🔧 INGESTION VERBOSE: Document stored - key: {object_key}, size: {result.size} bytes (took {store_stats.get('average', 0):.3f}s)")
+
+                # Complete document processing trace
+                if doc_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=doc_span.span_id,
+                        metadata={
+                            "processing_successful": True,
+                            "final_quality_score": quality.overall_score,
+                            "final_quality_level": quality.quality_level,
+                            "document_id": str(document_entity.id),
+                            "object_key": object_key,
+                            "stored_size": result.size
+                        },
+                        status="success"
+                    )
+
             except ProcessingError as exc:
                 logger.error(
                     "Processing error at stage '%s' for %s: %s",
@@ -1191,10 +1380,55 @@ class RagIngestionTask:
                     doc.uri or doc.path or "inline",
                     exc,
                 )
+
+                # Track processing error
+                if self.analytics_service:
+                    await self.analytics_service.track_error(
+                        exc,
+                        "document_ingestion",
+                        {
+                            "component": "document_processing",
+                            "pipeline_id": pipeline_id,
+                            "document_uri": doc.uri or doc.path or "inline",
+                            "stage": exc.stage or "unknown",
+                            "error_type": type(exc).__name__
+                        },
+                        trace_id=pipeline_id
+                    )
+
                 errors.append(exc.to_record())
+
+                # Update document span with error
+                if doc_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=doc_span.span_id,
+                        metadata={
+                            "processing_successful": False,
+                            "error_stage": exc.stage or "unknown",
+                            "error_type": type(exc).__name__,
+                            "error_message": str(exc)
+                        },
+                        status="error"
+                    )
+
             except Exception as exc:  # pragma: no cover
                 source_label = doc.uri or doc.path or "inline"
                 logger.exception("Unexpected failure while processing: %s", source_label)
+
+                # Track unexpected error
+                if self.analytics_service:
+                    await self.analytics_service.track_error(
+                        exc,
+                        "document_ingestion",
+                        {
+                            "component": "document_processing",
+                            "pipeline_id": pipeline_id,
+                            "document_uri": source_label,
+                            "error_type": "UnexpectedProcessingError"
+                        },
+                        trace_id=pipeline_id
+                    )
+
                 errors.append(
                     {
                         "error_type": "UnexpectedProcessingError",
@@ -1203,6 +1437,18 @@ class RagIngestionTask:
                         "detail": repr(exc),
                     }
                 )
+
+                # Update document span with unexpected error
+                if doc_span and self.analytics_service:
+                    await self.analytics_service.update_span(
+                        span_id=doc_span.span_id,
+                        metadata={
+                            "processing_successful": False,
+                            "error_type": "UnexpectedProcessingError",
+                            "error_message": str(exc)
+                        },
+                        status="error"
+                    )
 
         # Log stage timing summary using PerformanceTracker
         all_stats = self.tracker.get_all_stats()
@@ -1219,6 +1465,7 @@ class RagIngestionTask:
         run_id: str,
         dry_run: bool,
         errors: List[Dict[str, object]],
+        pipeline_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Apply semantic chunking to processed documents when chunking is enabled."""
         chunk_options = getattr(spec, "chunking", None)
@@ -1336,7 +1583,30 @@ class RagIngestionTask:
         Returns:
             RagIngestionTaskReport with processing results, stored documents, and timing breakdown
         """
+        from uuid import uuid4
+
         phase_start_time = datetime.now(timezone.utc)
+        pipeline_id = str(uuid4())
+
+        # Start main trace for ingestion phase
+        trace_handle = None
+        if self.analytics_service:
+            trace_handle = await self.analytics_service.trace_rag_pipeline(
+                pipeline_id=pipeline_id,
+                phase="document_ingestion",
+                metadata={
+                    "task": "RagIngestionTask",
+                    "start_time": phase_start_time.isoformat(),
+                    "dry_run": dry_run,
+                    "document_path": str(spec.documents.path),
+                    "storage_provider": spec.storage.provider,
+                    "storage_bucket": spec.storage.bucket,
+                    "patterns": spec.documents.include,
+                    "recurse": spec.documents.recurse,
+                    "chunking_enabled": getattr(spec.chunking, "enabled", True) if hasattr(spec, "chunking") else True,
+                }
+            )
+
         logger.info("Running ingestion with shared document repository...")
 
         # Track timing for each pipeline step
@@ -1345,6 +1615,7 @@ class RagIngestionTask:
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting ingestion phase with verbose logging")
             logger.debug(f"🔧 INGESTION VERBOSE: dry_run={dry_run}")
+            logger.debug(f"🔧 INGESTION VERBOSE: pipeline_id={pipeline_id}")
             logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.path={spec.documents.path}")
             logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.include={spec.documents.include}")
             logger.debug(f"🔧 INGESTION VERBOSE: spec.documents.recurse={spec.documents.recurse}")
@@ -1362,15 +1633,50 @@ class RagIngestionTask:
 
         # Phase 1: Infrastructure setup
         logger.info("pipeline initialization started | phase=setup")
+        setup_span = None
+        if self.analytics_service and pipeline_id:
+            setup_span = await self.analytics_service.create_span(
+                parent_trace=pipeline_id,
+                operation="infrastructure_setup",
+                metadata={
+                    "phase": "setup",
+                    "operations": ["storage_setup", "audit_sources", "categorize_sources"]
+                }
+            )
+
         async with self.tracker.with_tracker("setup"):
             await self._init_pipeline(spec, use_cases)
+
+        # Update setup span with completion
+        if setup_span and self.analytics_service:
+            await self.analytics_service.update_span(
+                span_id=setup_span.span_id,
+                metadata={"status": "completed"},
+                status="success"
+            )
 
         # Phase 2: Discovery
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting document discovery phase")
 
+        discovery_span = None
+        if self.analytics_service and pipeline_id:
+            discovery_span = await self.analytics_service.create_span(
+                parent_trace=pipeline_id,
+                operation="document_discovery",
+                metadata={
+                    "phase": "discovery",
+                    "sources_enabled": {
+                        "files": True,
+                        "databases": len(spec.sources.databases) if spec.sources.databases else 0,
+                        "web": len(spec.sources.web) if spec.sources.web else 0,
+                        "apis": spec.sources.document_apis.enabled if spec.sources.document_apis else False
+                    }
+                }
+            )
+
         async with self.tracker.with_tracker("discovery"):
-            documents, errors = await self._discover_documents(spec, use_cases)
+            documents, errors = await self._discover_documents(spec, use_cases, pipeline_id)
 
         discovery_error_count = len(errors)
         if self.verbose:
@@ -1378,12 +1684,37 @@ class RagIngestionTask:
             if discovery_stats:
                 logger.debug(f"🔧 INGESTION VERBOSE: Discovery completed - found {len(documents)} documents, {discovery_error_count} errors (took {discovery_stats.get('total', 0):.2f}s)")
 
+        # Update discovery span with results
+        if discovery_span and self.analytics_service:
+            await self.analytics_service.update_span(
+                span_id=discovery_span.span_id,
+                metadata={
+                    "documents_found": len(documents),
+                    "discovery_errors": discovery_error_count,
+                    "total_errors": len(errors)
+                },
+                status="success" if discovery_error_count == 0 else "error"
+            )
+
         # Phase 3: Processing
         client = self._storage_client(spec)
 
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting document processing phase")
             logger.debug(f"🔧 INGESTION VERBOSE: Storage client created for provider: {spec.storage.provider}")
+
+        processing_span = None
+        if self.analytics_service and pipeline_id:
+            processing_span = await self.analytics_service.create_span(
+                parent_trace=pipeline_id,
+                operation="document_processing",
+                metadata={
+                    "phase": "processing",
+                    "documents_to_process": len(documents),
+                    "storage_provider": spec.storage.provider,
+                    "processing_stages": ["extract_content", "normalize_content", "enrich_metadata", "validate_quality", "store_document"]
+                }
+            )
 
         async with self.tracker.with_tracker("processing"):
             stored_objects, origin_counts, skipped, processed_document_ids = (
@@ -1394,6 +1725,7 @@ class RagIngestionTask:
                     client=client,
                     run_id=run_id,
                     errors=errors,
+                    pipeline_id=pipeline_id,
                 )
             )
 
@@ -1402,9 +1734,36 @@ class RagIngestionTask:
             if processing_stats:
                 logger.debug(f"🔧 INGESTION VERBOSE: Processing completed - stored: {len(stored_objects)}, skipped: {skipped}, processed_ids: {len(processed_document_ids)} (took {processing_stats.get('total', 0):.2f}s)")
 
+        # Update processing span with results
+        if processing_span and self.analytics_service:
+            await self.analytics_service.update_span(
+                span_id=processing_span.span_id,
+                metadata={
+                    "documents_stored": len(stored_objects),
+                    "documents_skipped": skipped,
+                    "documents_processed": len(processed_document_ids),
+                    "processing_failures": max(len(errors) - discovery_error_count, 0),
+                    "origin_counts": origin_counts
+                },
+                status="success" if len(stored_objects) > 0 else "error"
+            )
+
         # Phase 4: Post-processing (chunking)
         if self.verbose:
             logger.debug("🔧 INGESTION VERBOSE: Starting chunking phase")
+
+        chunking_span = None
+        if self.analytics_service and pipeline_id:
+            chunking_span = await self.analytics_service.create_span(
+                parent_trace=pipeline_id,
+                operation="document_chunking",
+                metadata={
+                    "phase": "chunking",
+                    "documents_to_chunk": len(processed_document_ids),
+                    "dry_run": dry_run,
+                    "chunking_enabled": getattr(spec.chunking, "enabled", True) if hasattr(spec, "chunking") else True
+                }
+            )
 
         async with self.tracker.with_tracker("chunking"):
             chunk_summary = await self._maybe_chunk_documents(
@@ -1414,12 +1773,26 @@ class RagIngestionTask:
                 run_id=run_id,
                 dry_run=dry_run,
                 errors=errors,
+                pipeline_id=pipeline_id,
             )
 
         if self.verbose:
             chunking_stats = self.tracker.get_stats("chunking")
             if chunking_stats:
                 logger.debug(f"🔧 INGESTION VERBOSE: Chunking completed - documents: {chunk_summary.get('documents', 0)}, chunks: {chunk_summary.get('total_chunks', 0)}, enabled: {chunk_summary.get('enabled', False)} (took {chunking_stats.get('total', 0):.2f}s)")
+
+        # Update chunking span with results
+        if chunking_span and self.analytics_service:
+            await self.analytics_service.update_span(
+                span_id=chunking_span.span_id,
+                metadata={
+                    "documents_chunked": chunk_summary.get('documents', 0),
+                    "total_chunks": chunk_summary.get('total_chunks', 0),
+                    "chunking_enabled": chunk_summary.get('enabled', False),
+                    "dry_run": chunk_summary.get('dry_run', False)
+                },
+                status="success"
+            )
 
         # Build summary
         processing_failures = max(len(errors) - discovery_error_count, 0)
@@ -1454,6 +1827,25 @@ class RagIngestionTask:
         # Get pipeline timing breakdown from PerformanceTracker
         pipeline_stats = self.tracker.get_all_stats()
         timing_breakdown = {op: stats['total'] for op, stats in pipeline_stats.items()}
+
+        # Update main trace with final results
+        if trace_handle and self.analytics_service:
+            await self.analytics_service.update_trace(
+                trace_id=pipeline_id,
+                metadata={
+                    "execution_time_seconds": execution_time,
+                    "timing_breakdown": timing_breakdown,
+                    "documents_discovered": len(documents),
+                    "documents_processed": len(stored_objects),
+                    "documents_skipped": skipped,
+                    "processing_failures": processing_failures,
+                    "discovery_errors": discovery_error_count,
+                    "total_errors": len(errors),
+                    "chunk_summary": chunk_summary,
+                    "origin_counts": origin_counts,
+                },
+                status="success" if summary.processed > 0 else "error"
+            )
 
         # Log timing summary
         logger.info(f"Pipeline timing breakdown: setup={timing_breakdown.get('setup', 0):.2f}s, discovery={timing_breakdown.get('discovery', 0):.2f}s, processing={timing_breakdown.get('processing', 0):.2f}s, chunking={timing_breakdown.get('chunking', 0):.2f}s, total={execution_time:.2f}s")

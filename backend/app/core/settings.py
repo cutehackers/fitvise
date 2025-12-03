@@ -244,6 +244,12 @@ class Settings(BaseSettings):
     health_min_success_rate: float = 95.0  # Minimum success rate percentage
     health_max_response_time_ms: float = 5000.0  # Maximum response time threshold
 
+    # Langfuse Configuration
+    langfuse_secret_key: Optional[str] = None
+    langfuse_public_key: Optional[str] = None
+    langfuse_base_url: str = "https://cloud.langfuse.com"
+    langfuse_enabled: bool = True
+
     @property
     def rag_data_scan_paths_list(self) -> List[str]:
         """Convert comma-separated scan paths to list"""
@@ -322,9 +328,72 @@ class Settings(BaseSettings):
             raise ValueError('Sentence transformer cache size must be positive')
         return v
 
+    @field_validator('langfuse_base_url')
+    @classmethod
+    def validate_langfuse_base_url(cls, v):
+        """Validate LangFuse base URL format."""
+        if not v or not v.strip():
+            raise ValueError('LangFuse base URL cannot be empty')
+        v = v.strip()
+        # Basic URL validation
+        if not (v.startswith('http://') or v.startswith('https://')):
+            raise ValueError('LangFuse base URL must start with http:// or https://')
+        return v
+
+    @field_validator('langfuse_secret_key', 'langfuse_public_key')
+    @classmethod
+    def validate_langfuse_keys(cls, v, info):
+        """Validate LangFuse API keys format and consistency."""
+        # Get the field name
+        field_name = info.field_name
+
+        # If the field is None, that's okay (optional)
+        if v is None:
+            return v
+
+        # Check if key is a valid format (should be at least 10 characters)
+        if len(v) < 10:
+            raise ValueError(f'{field_name} must be at least 10 characters long')
+
+        # Check if key contains only valid characters
+        allowed_chars = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_')
+        if not all(c in allowed_chars for c in v):
+            raise ValueError(f'{field_name} contains invalid characters')
+
+        return v
+
+    def validate_langfuse_configuration(self) -> None:
+        """Validate complete LangFuse configuration for consistency."""
+        if not self.langfuse_enabled:
+            return
+
+        # If analytics is enabled, both keys should be provided
+        if self.langfuse_enabled and not self.langfuse_secret_key:
+            raise ValueError('LangFuse secret key is required when analytics is enabled')
+
+        if self.langfuse_enabled and not self.langfuse_public_key:
+            raise ValueError('LangFuse public key is required when analytics is enabled')
+
+    @property
+    def analytics_configured(self) -> bool:
+        """Check if LangFuse analytics is properly configured and enabled."""
+        return (
+            self.langfuse_enabled and
+            bool(self.langfuse_secret_key) and
+            bool(self.langfuse_public_key) and
+            bool(self.langfuse_base_url)
+        )
+
+    def model_post_init(self, __context) -> None:
+        """Validate LangFuse configuration after model initialization."""
+        try:
+            self.validate_langfuse_configuration()
+        except ValueError as e:
+            raise ValueError(f"LangFuse configuration error: {e}")
+
     def __hash__(self) -> int:
         """Make Settings hashable by hashing its JSON representation.
-        
+
         This is needed because FastAPI's dependency injection system may need to use
         the Settings instance as a dictionary key internally.
         """

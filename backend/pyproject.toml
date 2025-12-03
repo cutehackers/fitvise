@@ -54,6 +54,7 @@ dependencies = [
     "alembic>=1.17.1",
     "aiosqlite>=0.21.0",
     "llama-index-vector-stores-weaviate>=1.4.1",
+    "langfuse>=3.10.3",
 ]
 
 [tool.isort]

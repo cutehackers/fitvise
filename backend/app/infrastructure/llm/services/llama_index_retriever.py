@@ -42,7 +42,7 @@ class LlamaIndexRetriever(BaseRetriever):
     def __init__(
         self,
         llama_retriever: Any,  # Any LlamaIndex retriever instance
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the LlamaIndex retriever wrapper.
 
@@ -52,7 +52,7 @@ class LlamaIndexRetriever(BaseRetriever):
         """
         super().__init__(
             llama_retriever=llama_retriever,
-            config=config or {}
+            config=config or {},
         )
 
     class Config:
@@ -213,7 +213,10 @@ def create_llama_index_weaviate_retriever(
         }
 
         # Wrap in LangChain-compatible retriever
-        retriever = LlamaIndexRetriever(llama_retriever=llama_retriever, config=config)
+        retriever = LlamaIndexRetriever(
+            llama_retriever=llama_retriever,
+            config=config,
+        )
 
         logger.info("LlamaIndex retriever created successfully")
 

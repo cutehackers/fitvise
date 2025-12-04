@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 from typing import List, Literal, Optional
 
@@ -244,11 +245,46 @@ class Settings(BaseSettings):
     health_min_success_rate: float = 95.0  # Minimum success rate percentage
     health_max_response_time_ms: float = 5000.0  # Maximum response time threshold
 
-    # Langfuse Configuration
+    # LangFuse Configuration
+    # - LANGFUSE_SECRET_KEY
+    # - LANGFUSE_PUBLIC_KEY
+    # - LANGFUSE_HOST
     langfuse_secret_key: Optional[str] = None
     langfuse_public_key: Optional[str] = None
-    langfuse_base_url: str = "https://cloud.langfuse.com"
-    langfuse_enabled: bool = True
+    langfuse_host: Optional[str] = None
+
+    @property
+    def langfuse_configured(self) -> bool:
+        """Check if LangFuse environment variables are properly configured."""
+        return bool(self.langfuse_secret_key and self.langfuse_public_key)
+
+    # Framework Observability Configuration
+    # Core framework tracing settings
+    llamaindex_tracing_enabled: bool = True
+    langchain_tracing_enabled: bool = True
+    framework_tracing_sample_rate: float = 1.0
+    framework_tracing_privacy_masking: bool = True
+    framework_tracing_max_payload_size: int = 1024  # KB
+
+    # LlamaIndex specific tracing settings
+    llamaindex_trace_document_loading: bool = True
+    llamaindex_trace_vector_operations: bool = True
+    llamaindex_trace_embedding_generation: bool = True
+    llamaindex_trace_retrieval_operations: bool = True
+    llamaindex_max_chunk_size_for_tracing: int = 1000
+
+    # LangChain specific tracing settings
+    langchain_trace_message_processing: bool = True
+    langchain_trace_chain_execution: bool = True
+    langchain_trace_tool_usage: bool = True
+    langchain_trace_prompt_optimization: bool = True
+    langchain_max_message_length_for_tracing: int = 500
+
+    # Performance optimization settings
+    framework_tracing_async_batching: bool = True
+    framework_tracing_batch_size: int = 10
+    framework_tracing_flush_interval_seconds: int = 5
+    framework_tracing_timeout_seconds: int = 30
 
     @property
     def rag_data_scan_paths_list(self) -> List[str]:
@@ -328,18 +364,7 @@ class Settings(BaseSettings):
             raise ValueError('Sentence transformer cache size must be positive')
         return v
 
-    @field_validator('langfuse_base_url')
-    @classmethod
-    def validate_langfuse_base_url(cls, v):
-        """Validate LangFuse base URL format."""
-        if not v or not v.strip():
-            raise ValueError('LangFuse base URL cannot be empty')
-        v = v.strip()
-        # Basic URL validation
-        if not (v.startswith('http://') or v.startswith('https://')):
-            raise ValueError('LangFuse base URL must start with http:// or https://')
-        return v
-
+    
     @field_validator('langfuse_secret_key', 'langfuse_public_key')
     @classmethod
     def validate_langfuse_keys(cls, v, info):
@@ -362,34 +387,115 @@ class Settings(BaseSettings):
 
         return v
 
-    def validate_langfuse_configuration(self) -> None:
-        """Validate complete LangFuse configuration for consistency."""
-        if not self.langfuse_enabled:
-            return
+    
+    
+    # Framework Observability Validators
 
-        # If analytics is enabled, both keys should be provided
-        if self.langfuse_enabled and not self.langfuse_secret_key:
-            raise ValueError('LangFuse secret key is required when analytics is enabled')
+    @field_validator('framework_tracing_sample_rate')
+    @classmethod
+    def validate_framework_tracing_sample_rate(cls, v):
+        """Validate framework tracing sample rate is between 0.0 and 1.0."""
+        if not 0.0 <= v <= 1.0:
+            raise ValueError('Framework tracing sample rate must be between 0.0 and 1.0')
+        return v
 
-        if self.langfuse_enabled and not self.langfuse_public_key:
-            raise ValueError('LangFuse public key is required when analytics is enabled')
+    @field_validator('framework_tracing_max_payload_size')
+    @classmethod
+    def validate_framework_tracing_max_payload_size(cls, v):
+        """Validate framework tracing max payload size is positive."""
+        if v <= 0:
+            raise ValueError('Framework tracing max payload size must be positive')
+        if v > 10240:  # 10MB limit
+            raise ValueError('Framework tracing max payload size cannot exceed 10240 KB (10MB)')
+        return v
+
+    @field_validator('framework_tracing_batch_size')
+    @classmethod
+    def validate_framework_tracing_batch_size(cls, v):
+        """Validate framework tracing batch size is positive."""
+        if v <= 0:
+            raise ValueError('Framework tracing batch size must be positive')
+        if v > 1000:
+            raise ValueError('Framework tracing batch size cannot exceed 1000')
+        return v
+
+    @field_validator('framework_tracing_flush_interval_seconds')
+    @classmethod
+    def validate_framework_tracing_flush_interval(cls, v):
+        """Validate framework tracing flush interval is positive."""
+        if v <= 0:
+            raise ValueError('Framework tracing flush interval must be positive')
+        if v > 300:  # 5 minutes max
+            raise ValueError('Framework tracing flush interval cannot exceed 300 seconds')
+        return v
+
+    @field_validator('framework_tracing_timeout_seconds')
+    @classmethod
+    def validate_framework_tracing_timeout(cls, v):
+        """Validate framework tracing timeout is positive."""
+        if v <= 0:
+            raise ValueError('Framework tracing timeout must be positive')
+        if v > 600:  # 10 minutes max
+            raise ValueError('Framework tracing timeout cannot exceed 600 seconds')
+        return v
+
+    @field_validator('llamaindex_max_chunk_size_for_tracing')
+    @classmethod
+    def validate_llamaindex_max_chunk_size(cls, v):
+        """Validate LlamaIndex max chunk size for tracing is positive."""
+        if v <= 0:
+            raise ValueError('LlamaIndex max chunk size for tracing must be positive')
+        if v > 10000:
+            raise ValueError('LlamaIndex max chunk size for tracing cannot exceed 10000')
+        return v
+
+    @field_validator('langchain_max_message_length_for_tracing')
+    @classmethod
+    def validate_langchain_max_message_length(cls, v):
+        """Validate LangChain max message length for tracing is positive."""
+        if v <= 0:
+            raise ValueError('LangChain max message length for tracing must be positive')
+        if v > 10000:
+            raise ValueError('LangChain max message length for tracing cannot exceed 10000')
+        return v
+
+    def validate_framework_observability_configuration(self) -> None:
+        """Validate complete framework observability configuration for consistency."""
+        # If any framework tracing is enabled, basic analytics should be enabled
+        framework_tracing_enabled = (
+            self.llamaindex_tracing_enabled or
+            self.langchain_tracing_enabled
+        )
+
+        if framework_tracing_enabled and not self.langfuse_configured:
+            logger.warning(
+                "Framework tracing is enabled but LangFuse analytics is not properly configured. "
+                "Framework tracing will be disabled until analytics is configured."
+            )
+
+        # Validate sampling rate consistency
+        if framework_tracing_enabled and self.framework_tracing_sample_rate <= 0:
+            logger.warning(
+                "Framework tracing is enabled but sample rate is 0. No traces will be collected."
+            )
 
     @property
-    def analytics_configured(self) -> bool:
-        """Check if LangFuse analytics is properly configured and enabled."""
+    def framework_observability_configured(self) -> bool:
+        """Check if framework observability is properly configured."""
         return (
-            self.langfuse_enabled and
-            bool(self.langfuse_secret_key) and
-            bool(self.langfuse_public_key) and
-            bool(self.langfuse_base_url)
+            self.langfuse_configured and
+            (self.llamaindex_tracing_enabled or self.langchain_tracing_enabled) and
+            self.framework_tracing_sample_rate > 0
         )
 
     def model_post_init(self, __context) -> None:
-        """Validate LangFuse configuration after model initialization."""
+        """Validate configuration after model initialization."""
         try:
-            self.validate_langfuse_configuration()
+            # Note: LangFuse configuration now uses standard environment variables
+            # No additional validation needed for LangFuse settings
+            self.validate_framework_observability_configuration()
         except ValueError as e:
-            raise ValueError(f"LangFuse configuration error: {e}")
+            raise ValueError(f"Configuration error: {e}")
 
     def __hash__(self) -> int:
         """Make Settings hashable by hashing its JSON representation.

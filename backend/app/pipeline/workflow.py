@@ -240,8 +240,7 @@ class RAGWorkflow:
 
         # Initialize tasks with shared repositories and ML services
         self.infrastructure_task = RagInfrastructureTask(
-            verbose=verbose,
-            analytics_service=analytics_service
+            verbose=verbose
         )
         self.ingestion_task = RagIngestionTask(
             external_services=self.external_services,

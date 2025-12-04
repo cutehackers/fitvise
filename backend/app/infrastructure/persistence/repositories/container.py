@@ -10,6 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import Settings
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.document_repository import DocumentRepository
+from app.domain.repositories.embedding_repository import EmbeddingRepository
+from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
+    WeaviateEmbeddingRepository,
+)
 from app.infrastructure.persistence.repositories.in_memory_data_source_repository import (
     InMemoryDataSourceRepository,
 )
@@ -29,6 +33,7 @@ class RepositoryContainer:
     - Configuration-driven implementation selection
     - Lazy initialization of repositories
     - Session lifecycle management
+    - External services integration for embedding repositories
 
     Usage in FastAPI:
         container = RepositoryContainer(settings, session)
@@ -44,20 +49,24 @@ class RepositoryContainer:
         self,
         settings: Settings,
         session: Optional[AsyncSession] = None,
+        external_services: Optional["ExternalServicesContainer"] = None,
     ):
         """Initialize container with configuration.
 
         Args:
             settings: Application settings
             session: Optional database session for database repositories
+            external_services: Optional external services container for embedding repositories
         """
         self.settings = settings
         self.session = session
+        self.external_services = external_services
         self._use_database = self._should_use_database()
 
         # Lazy-initialized repositories
         self._document_repository: Optional[DocumentRepository] = None
         self._data_source_repository: Optional[DataSourceRepository] = None
+        self._embedding_repository: Optional[EmbeddingRepository] = None
 
     def _should_use_database(self) -> bool:
         """Check if database repositories should be used based on settings.
@@ -115,3 +124,39 @@ class RepositoryContainer:
             self._data_source_repository = InMemoryDataSourceRepository()
 
         return self._data_source_repository
+
+    @property
+    def embedding_repository(self) -> EmbeddingRepository:
+        """Get embedding repository instance using external services.
+
+        Returns a WeaviateEmbeddingRepository using the external services container.
+        Requires external_services to be provided during initialization.
+
+        Returns:
+            WeaviateEmbeddingRepository instance
+
+        Raises:
+            ValueError: If external_services is not provided
+            ExternalServicesError: If repository initialization fails
+        """
+        if self._embedding_repository is None:
+            if self.external_services is None:
+                raise ValueError(
+                    "ExternalServicesContainer required for embedding repository. "
+                    "Pass external_services to RepositoryContainer constructor."
+                )
+
+            try:
+                # Create WeaviateEmbeddingRepository using external services
+                weaviate_client = self.external_services.weaviate_client
+                self._embedding_repository = WeaviateEmbeddingRepository(weaviate_client)
+            except Exception as exc:
+                # Import here to avoid circular dependency
+                from app.infrastructure.external_services.external_services_container import (
+                    ExternalServicesError,
+                )
+                raise ExternalServicesError(
+                    f"Failed to initialize embedding repository: {str(exc)}"
+                ) from exc
+
+        return self._embedding_repository

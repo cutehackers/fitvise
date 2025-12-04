@@ -12,17 +12,17 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.application.dto.search import (
-    BatchSearchRequest,
-    DocumentSearchRequest,
-    SearchFeedback,
-    SearchHealthResponse,
-    SearchMetrics,
-    SearchRequest,
-    SearchResponse,
-    SearchSuggestionRequest,
-    SearchSuggestionsResponse,
-    SimilarChunksRequest,
+from app.schemas.search import (
+    BatchSearchRequestSchema,
+    DocumentSearchRequestSchema,
+    SearchFeedbackSchema,
+    SearchHealthResponseSchema,
+    SearchMetricsSchema,
+    SearchRequestSchema,
+    SearchResponseSchema,
+    SearchSuggestionRequestSchema,
+    SearchSuggestionsResponseSchema,
+    SimilarChunksRequestSchema,
 )
 from app.application.use_cases.retrieval.semantic_search import (
     SemanticSearchRequest,
@@ -113,11 +113,11 @@ def get_semantic_search_use_case(
 # API Endpoints
 # ---------------------------------------------------------------------------
 
-@router.post("/semantic", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+@router.post("/semantic", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
 async def semantic_search(
-    request: SearchRequest,
+    request: SearchRequestSchema,
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
-) -> SearchResponse:
+) -> SearchResponseSchema:
     """Perform semantic search on document chunks.
 
     This endpoint provides the core RAG retrieval functionality by:
@@ -167,7 +167,7 @@ async def semantic_search(
         response = await use_case.execute(semantic_request)
 
         # Convert use case response to DTO
-        return SearchResponse(
+        return SearchResponseSchema(
             success=response.success,
             query_id=str(response.query_id),
             results=[
@@ -205,9 +205,9 @@ async def semantic_search(
         ) from e
 
 
-@router.post("/similar-chunks", response_model=List[SearchResponse], status_code=status.HTTP_200_OK)
+@router.post("/similar-chunks", response_model=List[SearchResponseSchema], status_code=status.HTTP_200_OK)
 async def find_similar_chunks(
-    request: SimilarChunksRequest,
+    request: SimilarChunksRequestSchema,
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
 ):
     """Find chunks similar to given chunk IDs.
@@ -274,7 +274,7 @@ async def find_similar_chunks(
         ) from e
 
 
-@router.get("/suggestions", response_model=SearchSuggestionsResponse, status_code=status.HTTP_200_OK)
+@router.get("/suggestions", response_model=SearchSuggestionsResponseSchema, status_code=status.HTTP_200_OK)
 async def get_search_suggestions(
     partial_query: str = Query(..., min_length=2, max_length=100, description="Partial search query"),
     max_suggestions: int = Query(5, ge=1, le=20, description="Maximum number of suggestions"),
@@ -315,7 +315,7 @@ async def get_search_suggestions(
             for suggestion in suggestions
         ]
 
-        return SearchSuggestionsResponse(
+        return SearchSuggestionsResponseSchema(
             success=True,
             suggestions=suggestion_dtos,
             total_suggestions=len(suggestion_dtos),
@@ -331,7 +331,7 @@ async def get_search_suggestions(
 
 @router.post("/feedback", status_code=status.HTTP_200_OK)
 async def submit_search_feedback(
-    feedback: SearchFeedback,
+    feedback: SearchFeedbackSchema,
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
 ):
     """Submit user feedback for search results.
@@ -366,7 +366,7 @@ async def submit_search_feedback(
         ) from e
 
 
-@router.get("/health", response_model=SearchHealthResponse, status_code=status.HTTP_200_OK)
+@router.get("/health", response_model=SearchHealthResponseSchema, status_code=status.HTTP_200_OK)
 async def health_check(
     search_repo: WeaviateSearchRepository = Depends(get_search_repository),
 ):
@@ -385,7 +385,7 @@ async def health_check(
         # Perform health check
         health_info = await search_repo.health_check()
 
-        return SearchHealthResponse(
+        return SearchHealthResponseSchema(
             status=health_info.get("status", "unknown"),
             message=f"Search system is {health_info.get('status', 'unknown')}",
             components={
@@ -409,7 +409,7 @@ async def health_check(
         ) from e
 
 
-@router.get("/metrics", response_model=SearchMetrics, status_code=status.HTTP_200_OK)
+@router.get("/metrics", response_model=SearchMetricsSchema, status_code=status.HTTP_200_OK)
 async def get_search_metrics(
     time_range_days: int = Query(7, ge=1, le=365, description="Time range in days"),
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
@@ -439,7 +439,7 @@ async def get_search_metrics(
         # Get popular queries
         popular_queries = await search_repo.get_popular_queries(limit=10, time_range_days=time_range_days)
 
-        return SearchMetrics(
+        return SearchMetricsSchema(
             total_queries=search_stats.get("total_queries", 0),
             avg_processing_time_ms=search_stats.get("avg_processing_time_ms", 0.0),
             cache_hit_rate=search_stats.get("cache_hit_rate", 0.0),
@@ -460,9 +460,9 @@ async def get_search_metrics(
         ) from e
 
 
-@router.post("/batch", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+@router.post("/batch", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
 async def batch_search(
-    request: BatchSearchRequest,
+    request: BatchSearchRequestSchema,
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
 ):
     """Perform multiple searches and aggregate results.
@@ -535,7 +535,7 @@ async def batch_search(
             if result_dtos else 0.0
         )
 
-        return SearchResponse(
+        return SearchResponseSchema(
             success=True,
             query_id=str(UUID()),  # Generate temporary query ID for batch
             results=result_dtos,
@@ -558,9 +558,9 @@ async def batch_search(
         ) from e
 
 
-@router.post("/documents", response_model=SearchResponse, status_code=status.HTTP_200_OK)
+@router.post("/documents", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
 async def search_within_documents(
-    request: DocumentSearchRequest,
+    request: DocumentSearchRequestSchema,
     use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
 ):
     """Search within specific documents.
@@ -608,7 +608,7 @@ async def search_within_documents(
             if result_dtos else 0.0
         )
 
-        return SearchResponse(
+        return SearchResponseSchema(
             success=True,
             query_id=str(UUID()),  # Generate temporary query ID
             results=result_dtos,

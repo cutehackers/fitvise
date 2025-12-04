@@ -6,6 +6,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from langchain_core.retrievers import BaseRetriever
+from langchain_core.callbacks import BaseCallbackHandler
 
 from app.core.settings import settings, Settings
 from app.domain.services.context_window_manager import (
@@ -21,7 +22,7 @@ from app.infrastructure.external_services.ml_services.llm_services.llm_health_mo
 from app.infrastructure.external_services.ml_services.llm_services.ollama_service import (
     OllamaService,
 )
-from app.infrastructure.llm.dependencies import get_llm_service
+from app.infrastructure.llm.dependencies import get_llm_service, get_callback_handler
 from app.domain.services.session_service import SessionService
 from app.application.use_cases.chat.rag_chat_use_case import RagChatUseCase
 
@@ -123,12 +124,14 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
 
 
 async def get_rag_chat_use_case(
-    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
+    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)],
+    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)]
 ) -> RagChatUseCase:
     """Get RAG Chat use case with all dependencies.
 
     Args:
         container: External services container with retriever and context manager
+        callback_handler: Optional LangChain callback handler for analytics
 
     Returns:
         RagChatUseCase for RAG-enabled chat with document retrieval
@@ -139,7 +142,7 @@ async def get_rag_chat_use_case(
     # Ensure Weaviate is connected
     await container.ensure_weaviate_connected()
 
-    llm_service = get_llm_service(settings)
+    llm_service = get_llm_service(settings, callback_handler)
     retriever = container.llama_index_retriever
     context_mgr = get_context_window_manager()
 
@@ -151,6 +154,7 @@ async def get_rag_chat_use_case(
         retriever=retriever,
         context_manager=context_mgr,
         session_service=session_service,
+        callback_handler=callback_handler,
     )
     logger.info("RagChatUseCase initialized (replaces RagOrchestrator)")
     return rag_chat_use_case

@@ -22,7 +22,7 @@ from app.domain.exceptions.retrieval_exceptions import (
 from app.domain.repositories.search_repository import SearchRepository
 from app.domain.services.retrieval_service import RetrievalService
 from app.domain.value_objects.embedding_vector import EmbeddingVector
-from app.domain.value_objects.similarity_score import SimilarityScore, SimilarityMethod
+from app.domain.value_objects.similarity_score import SimilarityScore
 
 
 @dataclass

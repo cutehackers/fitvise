@@ -11,10 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.settings import Settings, get_settings
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.document_repository import DocumentRepository
-from app.domain.services.analytics_service import AnalyticsService
 from app.infrastructure.database.database import get_async_session
 from app.infrastructure.persistence.repositories.container import RepositoryContainer
-from app.infrastructure.external_services.external_services_container import ExternalServicesContainer
 
 
 async def get_repository_container(
@@ -148,6 +146,58 @@ async def create_repository_container_for_pipeline(
     return RepositoryContainer(settings)
 
 
+async def get_repository_container_with_external_services(
+    settings: Settings = Depends(get_settings),
+) -> tuple[RepositoryContainer, "ExternalServicesContainer"]:
+    """Get both RepositoryContainer and ExternalServicesContainer with proper relationship.
+
+    Creates RepositoryContainer first, then ExternalServicesContainer, and links them
+    together to eliminate circular dependencies.
+
+    Args:
+        settings: Application settings (auto-injected)
+
+    Yields:
+        Tuple of (RepositoryContainer, ExternalServicesContainer) with proper relationship
+
+    Example:
+        ```python
+        @app.get("/documents")
+        async def list_documents(
+            containers: tuple[RepositoryContainer, ExternalServicesContainer] = Depends(get_repository_container_with_external_services)
+        ):
+            repo_container, external_container = containers
+            documents = await repo_container.document_repository.find_all()
+            embeddings = await repo_container.embedding_repository.find_all()
+            return {"documents": documents, "embeddings": embeddings}
+        ```
+    """
+    # Import here to avoid circular dependency
+    from app.infrastructure.external_services.external_services_container import (
+        ExternalServicesContainer,
+    )
+
+    # Get session for database repositories
+    async for db_session in get_async_session():
+        # Create repository container first
+        repo_container = RepositoryContainer(settings, db_session)
+
+        # Create external services container
+        external_container = ExternalServicesContainer(settings)
+
+        # Link them: RepositoryContainer needs ExternalServicesContainer for embedding repository
+        repo_container.external_services = external_container
+
+        yield repo_container, external_container
+        return
+
+    # Fallback for in-memory mode (no session needed)
+    repo_container = RepositoryContainer(settings)
+    external_container = ExternalServicesContainer(settings)
+    repo_container.external_services = external_container
+    yield repo_container, external_container
+
+
 # Backward compatibility function - deprecated
 async def create_repository_bundle_for_pipeline(
     settings: Settings | None = None,
@@ -180,114 +230,5 @@ async def create_repository_bundle_for_pipeline(
     return container.document_repository, container.data_source_repository
 
 
-async def get_external_services_container(
-    settings: Settings = Depends(get_settings),
-) -> ExternalServicesContainer:
-    """FastAPI dependency for external services container.
-
-    Provides access to all external services including analytics, embedding,
-    and vector store services.
-
-    Args:
-        settings: Application settings (auto-injected)
-
-    Returns:
-        ExternalServicesContainer instance with all services ready to use
-
-    Example:
-        ```python
-        @app.get("/analytics/health")
-        async def analytics_health(
-            container: ExternalServicesContainer = Depends(get_external_services_container)
-        ):
-            analytics = container.analytics_service
-            health = await analytics.health_check()
-            return health
-        ```
-    """
-    return ExternalServicesContainer(settings)
-
-
-def get_analytics_service(
-    container: ExternalServicesContainer = Depends(get_external_services_container),
-) -> AnalyticsService:
-    """FastAPI dependency for analytics service.
-
-    Provides direct access to the analytics service for distributed tracing
-    and insights functionality.
-
-    Args:
-        container: External services container (auto-injected)
-
-    Returns:
-        AnalyticsService instance ready for use
-
-    Example:
-        ```python
-        @app.post("/documents")
-        async def create_document(
-            document_data: DocumentCreate,
-            analytics: AnalyticsService = Depends(get_analytics_service)
-        ):
-            # Track operation with analytics
-            trace_id = await analytics.trace_rag_pipeline(
-                pipeline_id=str(uuid4()),
-                phase="document_creation",
-                metadata={"document_type": document_data.type}
-            )
-
-            # Process document...
-
-            await analytics.update_trace(trace_id, {"status": "completed"}, "success")
-            return result
-        ```
-    """
-    return container.analytics_service
-
-
-def get_external_services_container_for_pipeline(
-    settings: Settings | None = None,
-) -> ExternalServicesContainer:
-    """Create external services container for RAG pipeline execution.
-
-    This function creates a properly configured external services container
-    for use in the RAG pipeline workflow, providing access to analytics,
-    embedding services, and vector stores.
-
-    Args:
-        settings: Optional settings instance (uses default if not provided)
-
-    Returns:
-        ExternalServicesContainer with all services ready to use
-
-    Example:
-        ```python
-        container = get_external_services_container_for_pipeline()
-
-        # Access analytics for pipeline tracing
-        analytics = container.analytics_service
-        await analytics.trace_rag_pipeline(
-            pipeline_id=str(uuid4()),
-            phase="ingestion",
-            metadata={"total_documents": 100}
-        )
-
-        # Use in pipeline tasks
-        task = RagIngestionTask(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
-            analytics_service=container.analytics_service,
-        )
-        await task.execute(spec)
-        ```
-
-    Note:
-        Services are lazily initialized and cached within the container.
-        Analytics service will gracefully degrade if not properly configured.
-    """
-    if settings is None:
-        settings = get_settings()
-
-    return ExternalServicesContainer(settings)
 
 

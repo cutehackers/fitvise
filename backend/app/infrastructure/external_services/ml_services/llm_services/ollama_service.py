@@ -2,9 +2,12 @@
 
 import logging
 import time
+from datetime import datetime
 from typing import AsyncGenerator, Any, Optional
 
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages.base import BaseMessage
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_ollama.chat_models import ChatOllama
 
 from app.core.settings import Settings
@@ -25,20 +28,24 @@ class OllamaService(LLMService):
     non-streaming generation.
     """
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, callback_handler: Optional[BaseCallbackHandler] = None):
         """Initialize Ollama service with settings.
 
         Args:
             settings: Application settings containing LLM configuration
+            callback_handler: Optional LangChain callback handler for analytics
         """
         self._settings = settings
         self._model_name = settings.llm_model
+        self._callback_handler = callback_handler
 
-        # Initialize ChatOllama client
+        # Initialize ChatOllama client with optional callbacks
+        callbacks = [callback_handler] if callback_handler else None
         self._llm = ChatOllama(
             base_url=settings.llm_base_url,
             model=settings.llm_model,
             temperature=settings.llm_temperature,
+            callbacks=callbacks,
         )
 
         # Model information
@@ -62,7 +69,7 @@ class OllamaService(LLMService):
         temperature: float = 0.7,
         **kwargs: Any,
     ) -> str:
-        """Generate a complete response.
+        """Generate a complete response with automatic callback tracking.
 
         Args:
             messages: List of messages in the conversation
@@ -77,12 +84,11 @@ class OllamaService(LLMService):
             LLMServiceError: If generation fails
         """
         try:
-            # Convert messages to LangChain format
+            # Convert messages to LangChain format and invoke
+            # Callbacks handle all token tracking and timing automatically
             langchain_messages = self._convert_messages_to_langchain(messages)
 
-            # Build generation parameters
-            # Note: In newer versions of langchain-ollama, temperature should be passed
-            # through the 'options' parameter to the Ollama client, not directly
+            # Build generation parameters for runtime configuration
             options = {"temperature": temperature}
             if max_tokens is not None:
                 options["num_predict"] = max_tokens
@@ -92,10 +98,10 @@ class OllamaService(LLMService):
                 if key not in ["temperature", "num_predict"]:
                     options[key] = value
 
-            # Create configured LLM with runtime parameters
+            # Create configured LLM with runtime parameters and callbacks
             configured_llm = self._llm.bind(options=options)
 
-            # Generate response using configured instance
+            # Generate response - callbacks handle tracking automatically
             response = await configured_llm.ainvoke(langchain_messages)
 
             logger.debug(
@@ -115,6 +121,7 @@ class OllamaService(LLMService):
                 original_error=e,
             )
 
+    
     async def generate_stream(
         self,
         messages: list[Message],
@@ -225,7 +232,7 @@ class OllamaService(LLMService):
         """
         return self._llm
 
-    def _convert_messages_to_langchain(self, messages: list[Message]) -> list[Any]:
+    def _convert_messages_to_langchain(self, messages: list[Message]) -> list[BaseMessage]:
         """Convert domain messages to LangChain message format.
 
         Args:
@@ -234,7 +241,7 @@ class OllamaService(LLMService):
         Returns:
             List of LangChain messages
         """
-        langchain_messages = []
+        langchain_messages: list[BaseMessage] = []
 
         for message in messages:
             if message.role.value == "system":
@@ -276,3 +283,5 @@ class OllamaService(LLMService):
         }
 
         return token_limits.get(model_name.lower())
+
+    

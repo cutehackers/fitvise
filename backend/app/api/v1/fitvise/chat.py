@@ -15,8 +15,13 @@ from app.api.v1.fitvise.dependencies import (
 )
 from app.infrastructure.llm.dependencies import get_chat_use_case, get_llm_service
 from app.core.settings import settings
+from app.core.error_handler import (
+    ErrorResponseBuilder,
+    LLMErrorHandler,
+    ValidationErrorHandler,
+)
+from app.core.constants import ServiceNames
 from app.schemas.chat import (
-    ApiErrorResponse,
     ChatRequest,
     HealthResponse,
     RagChatResponse,
@@ -34,17 +39,6 @@ router = APIRouter()
 
 
 
-# Constants
-HEALTH_CHECK_SERVICE_NAME = "workout-api"
-ERROR_MESSAGES = {
-    "empty_query": "Query cannot be empty",
-    "timeout": "LLM service is currently unavailable due to timeout",
-    "service_error": "LLM service is currently experiencing issues",
-    "generation_failed": "Failed to generate workout plan",
-    "unexpected_error": "An unexpected error occurred while generating workout plan",
-}
-
-
 # Helper functions
 def _get_current_timestamp() -> str:
     """Get current UTC timestamp in ISO format."""
@@ -55,54 +49,11 @@ def _build_health_response(status: str, llm_available: bool, timestamp: str = No
     """Create standardized health response."""
     return HealthResponse(
         status=status,
-        service=HEALTH_CHECK_SERVICE_NAME,
+        service=ServiceNames.WORKOUT_API,
         version=settings.app_version,
         llm_service_available=llm_available,
         timestamp=timestamp or _get_current_timestamp(),
     )
-
-
-def _build_error_response(
-    message: str,
-    error_type: str,
-    code: Optional[str] = None,
-    param: Optional[str] = None,
-) -> dict:
-    """Create standardized error response dictionary."""
-    return ApiErrorResponse(code=code, type=error_type, param=param, message=message).model_dump()
-
-
-def _on_llm_error(error_message: str) -> HTTPException:
-    """Handle LLM service errors with appropriate HTTP status codes."""
-    error_lower = error_message.lower()
-
-    if "timeout" in error_lower:
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_build_error_response(
-                message=ERROR_MESSAGES["timeout"],
-                error_type="service_timeout_error",
-                code="LLM_TIMEOUT",
-            ),
-        )
-    elif "service error" in error_lower:
-        return HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_build_error_response(
-                message=ERROR_MESSAGES["service_error"],
-                error_type="service_unavailable_error",
-                code="LLM_SERVICE_ERROR",
-            ),
-        )
-    else:
-        return HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=_build_error_response(
-                message=ERROR_MESSAGES["generation_failed"],
-                error_type="internal_server_error",
-                code="GENERATION_FAILED",
-            ),
-        )
 
 
 @router.get(
@@ -271,34 +222,18 @@ async def chat(
         )
 
         if not request.message:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=_build_error_response(
-                    message="Messages cannot be empty",
-                    error_type="invalid_request_error",
-                    code="EMPTY_MESSAGES",
-                    param="messages",
-                ),
-            )
+            raise ValidationErrorHandler.messages_required()
 
         # Add validation for message content (consistent with /chat-rag endpoint)
         if not request.message.content or not request.message.content.strip():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=_build_error_response(
-                    message="Message content cannot be empty or whitespace only",
-                    error_type="invalid_request_error",
-                    code="EMPTY_MESSAGE_CONTENT",
-                    param="message.content",
-                ),
-            )
+            raise ValidationErrorHandler.empty_message_content()
 
         async def stream_generator():
             try:
                 async for chunk in chat_use_case.chat(request):
                     yield f"{chunk.model_dump_json()}\n"
             except MessageValidationError as e:
-                error_response = _build_error_response(
+                error_response = ErrorResponseBuilder.build_error_response(
                     message=str(e),
                     error_type="invalid_request_error",
                     code="VALIDATION_ERROR",
@@ -306,14 +241,18 @@ async def chat(
                 )
                 yield f"{error_response}\n"
             except ChatOrchestratorError as e:
-                error_response = _build_error_response(
+                error_response = ErrorResponseBuilder.build_error_response(
                     message=f"Chat processing failed: {str(e)}",
                     error_type="service_error",
                     code="CHAT_PROCESSING_ERROR"
                 )
                 yield f"{error_response}\n"
             except Exception as e:
-                error_response = _build_error_response(message=str(e), error_type="stream_error", code="STREAM_ERROR")
+                error_response = ErrorResponseBuilder.build_error_response(
+                    message=str(e),
+                    error_type="stream_error",
+                    code="STREAM_ERROR"
+                )
                 yield f"{error_response}\n"
 
         return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
@@ -323,14 +262,7 @@ async def chat(
 
     except Exception as e:
         logger.error("Unexpected error in chat endpoint: %s", e)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=_build_error_response(
-                message="An unexpected error occurred",
-                error_type="internal_server_error",
-                code="UNEXPECTED_ERROR",
-            ),
-        )
+        raise ValidationErrorHandler.unexpected_error(e)
 
 
 @router.post(

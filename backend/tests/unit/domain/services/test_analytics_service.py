@@ -132,6 +132,14 @@ class MockAnalyticsService(AnalyticsService):
     def get_service_name(self) -> str:
         return "mock_analytics"
 
+    def get_default_metadata(self) -> Dict[str, Any]:
+        """Get default metadata for analytics events."""
+        return {
+            "service": "mock_analytics",
+            "version": "1.0.0",
+            "environment": "test"
+        }
+
 
 class TestAnalyticsService:
     """Test cases for the AnalyticsService domain interface."""
@@ -369,36 +377,9 @@ class TestAnalyticsService:
         # Should return None due to error
         assert trace_handle is None
 
-    @pytest.mark.asyncio
-    async def test_graceful_degradation(self):
-        """Test analytics service behavior when not properly configured."""
-        # This will test the actual LangFuseService graceful degradation
-        from app.infrastructure.external_services.analytics.langfuse_service import LangFuseService
-        from app.core.settings import Settings
-
-        # Create settings with missing LangFuse configuration
-        settings = Settings()
-        settings.langfuse_enabled = False
-        settings.langfuse_secret_key = None
-        settings.langfuse_public_key = None
-
-        # Create service with disabled configuration
-        langfuse_service = LangFuseService(settings)
-
-        # Service should be disabled but not crash
-        assert not langfuse_service.is_enabled()
-
-        # All operations should gracefully return None
-        trace = await langfuse_service.trace_rag_pipeline(
-            "test-pipeline", "test-phase", {}
-        )
-        assert trace is None
-
-        error_tracked = await langfuse_service.track_error(
-            Exception("Test"), "test-phase", {}
-        )
-        # Should not raise exception
-
-        health = await langfuse_service.health_check()
-        assert "enabled" in health
-        assert health["enabled"] is False
+    def test_get_default_metadata(self, analytics_service):
+        """Test default metadata generation."""
+        default_metadata = analytics_service.get_default_metadata()
+        assert "service" in default_metadata
+        assert "version" in default_metadata
+        assert default_metadata["service"] == "mock_analytics"

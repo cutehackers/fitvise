@@ -14,20 +14,11 @@ from langchain_core.retrievers import BaseRetriever
 from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
 from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.core.settings import Settings
-from app.domain.repositories.embedding_repository import EmbeddingRepository
-from app.domain.services.embedding_service import EmbeddingService
-from app.domain.services.analytics_service import AnalyticsService
 from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
     SentenceTransformerService,
 )
 from app.infrastructure.external_services.vector_stores.weaviate_client import (
     WeaviateClient,
-)
-from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
-    WeaviateEmbeddingRepository,
-)
-from app.infrastructure.external_services.analytics.langfuse_service import (
-    LangFuseService,
 )
 from llama_index.core.embeddings import BaseEmbedding
 
@@ -43,21 +34,19 @@ class ExternalServicesError(Exception):
 
 
 class ExternalServicesContainer:
-    """Container for all external service instances.
+    """Container for external services ONLY - no repositories.
 
     This container provides:
-    - Unified access to all external services (ML models, Weaviate, embedding services) for FastAPI and scripts
+    - Unified access to external services (ML models, Weaviate, LLM services) for FastAPI and scripts
     - Lazy initialization of services with caching
     - Single instance per container (no redundant initialization)
     - Easy mocking for testing
-    - Integrated ML services and external services management
+    - Clear separation from repository layer
 
     Usage in FastAPI/scripts:
         container = ExternalServicesContainer(settings)
         embedding_model = container.embedding_model
-        embedding_service = container.sentence_transformer_service
-        embedding_repository = container.embedding_repository
-        domain_service = container.embedding_domain_service
+        weaviate_client = container.weaviate_client
         # Services are initialized on first access, cached for subsequent accesses
 
     Usage in tests:
@@ -71,9 +60,6 @@ class ExternalServicesContainer:
         settings: Settings,
         embedding_model: Optional[BaseEmbedding] = None,
         sentence_transformer_service: Optional[SentenceTransformerService] = None,
-        embedding_repository: Optional[EmbeddingRepository] = None,
-        embedding_domain_service: Optional[EmbeddingService] = None,
-        analytics_service: Optional[AnalyticsService] = None,
     ):
         """Initialize container with configuration.
 
@@ -81,9 +67,6 @@ class ExternalServicesContainer:
             settings: Application settings
             embedding_model: Optional pre-initialized embedding model for testing.
             sentence_transformer_service: Optional pre-initialized sentence transformer service for testing.
-            embedding_repository: Optional pre-initialized embedding repository for testing.
-            embedding_domain_service: Optional pre-initialized embedding domain service for testing.
-            analytics_service: Optional pre-initialized analytics service for testing.
 
         Raises:
             ExternalServicesError: If required dependencies are missing
@@ -93,9 +76,6 @@ class ExternalServicesContainer:
         # Allow injection of services for testing
         self._embedding_model: Optional[BaseEmbedding] = embedding_model
         self._sentence_transformer_service: Optional[SentenceTransformerService] = sentence_transformer_service
-        self._embedding_repository: Optional[EmbeddingRepository] = embedding_repository
-        self._embedding_domain_service: Optional[EmbeddingService] = embedding_domain_service
-        self._analytics_service: Optional[AnalyticsService] = analytics_service
         self._weaviate_client: Optional[WeaviateClient] = None
         self._llama_index_retriever: Optional[BaseRetriever] = None
 
@@ -204,93 +184,8 @@ class ExternalServicesContainer:
                 ) from exc
         return client
 
-    @property
-    def embedding_repository(self) -> EmbeddingRepository:
-        """Get embedding repository instance.
-
-        Returns a configured embedding repository. Lazily initializes
-        on first access and caches for subsequent accesses.
-
-        Note: The repository uses a WeaviateClient that requires manual
-        connection before use. Call ensure_weaviate_connected() first.
-
-        Returns:
-            Configured EmbeddingRepository instance (WeaviateClient not connected)
-
-        Raises:
-            ExternalServicesError: If repository initialization fails
-        """
-        if self._embedding_repository is None:
-            try:
-                client = self.weaviate_client
-                self._embedding_repository = WeaviateEmbeddingRepository(client)
-            except Exception as exc:
-                raise ExternalServicesError(
-                    f"Failed to initialize embedding repository: {str(exc)}"
-                ) from exc
-
-        return self._embedding_repository
-
-    async def connected_embedding_repository(self) -> EmbeddingRepository:
-        """Get embedding repository with connected Weaviate client.
-
-        Returns:
-            EmbeddingRepository with connected WeaviateClient ready for use
-
-        Raises:
-            ExternalServicesError: If connection or repository initialization fails
-        """
-        # Ensure Weaviate client is connected
-        await self.ensure_weaviate_connected()
-        return self.embedding_repository
-
-    @property
-    def embedding_domain_service(self) -> EmbeddingService:
-        """Get embedding domain service instance.
-
-        Returns a configured embedding domain service. Lazily initializes
-        on first access and caches for subsequent accesses.
-
-        Returns:
-            Configured EmbeddingService instance ready for use
-
-        Raises:
-            ExternalServicesError: If service initialization fails
-        """
-        if self._embedding_domain_service is None:
-            try:
-                repository = self.embedding_repository
-                self._embedding_domain_service = EmbeddingService(repository)
-            except Exception as exc:
-                raise ExternalServicesError(
-                    f"Failed to initialize embedding domain service: {str(exc)}"
-                ) from exc
-
-        return self._embedding_domain_service
-
-    @property
-    def analytics_service(self) -> AnalyticsService:
-        """Get analytics service instance.
-
-        Returns a configured analytics service for distributed tracing and insights.
-        Lazily initializes on first access and caches for subsequent accesses.
-
-        Returns:
-            Configured AnalyticsService instance ready for use
-
-        Raises:
-            ExternalServicesError: If service initialization fails
-        """
-        if self._analytics_service is None:
-            try:
-                self._analytics_service = LangFuseService(self.settings)
-            except Exception as exc:
-                raise ExternalServicesError(
-                    f"Failed to initialize analytics service: {str(exc)}"
-                ) from exc
-
-        return self._analytics_service
-
+  
+    
     @property
     def llama_index_retriever(self) -> BaseRetriever:
         """Get LlamaIndex-backed retriever for RAG pipelines.

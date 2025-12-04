@@ -22,7 +22,6 @@ from app.infrastructure.storage.object_storage.minio_client import (
     ObjectStorageClient,
     ObjectStorageConfig,
 )
-from app.domain.services.analytics_service import AnalyticsService, TraceHandle, SpanHandle
 
 logger = logging.getLogger(__name__)
 
@@ -134,15 +133,13 @@ class RagInfrastructureTask:
     with document ingestion and embedding generation.
     """
 
-    def __init__(self, verbose: bool = False, analytics_service: Optional[AnalyticsService] = None):
+    def __init__(self, verbose: bool = False):
         """Initialize the infrastructure phase.
 
         Args:
             verbose: Enable verbose logging
-            analytics_service: Optional analytics service for distributed tracing
         """
         self.verbose = verbose
-        self.analytics_service = analytics_service
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
@@ -167,30 +164,15 @@ class RagInfrastructureTask:
         )
 
     async def _validate_embedding_service(
-        self, validation_results: Dict[str, Any], errors: List[str], pipeline_id: Optional[str] = None
+        self, validation_results: Dict[str, Any], errors: List[str]
     ) -> None:
         """Validate embedding service setup.
 
         Args:
             validation_results: Dictionary to store validation results
             errors: List to append errors to
-            pipeline_id: Optional pipeline ID for tracing
         """
         logger.info("Validating embedding service...")
-
-        # Create span for embedding service validation
-        span_handle = None
-        if self.analytics_service and pipeline_id:
-            span_handle = await self.analytics_service.create_span(
-                parent_trace=pipeline_id,
-                operation="validate_embedding_service",
-                metadata={
-                    "validation_type": "embedding_service",
-                    "model_name": "Alibaba-NLP/gte-multilingual-base",
-                    "vector_dimension": 768,
-                }
-            )
-
         try:
             setup_use_case = SetupEmbeddingInfrastructureUseCase()
 
@@ -217,19 +199,6 @@ class RagInfrastructureTask:
             embedding_response = await setup_use_case.execute(setup_request)
             validation_results["embedding_service"] = embedding_response.as_dict()
 
-            # Update span with results
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={
-                        "validation_success": embedding_response.success,
-                        "weaviate_connected": embedding_response.as_dict().get("weaviate", {}).get("connected", False),
-                        "model_loaded": embedding_response.as_dict().get("embedding", {}).get("model_loaded", False),
-                        "error_count": len(embedding_response.errors) if embedding_response.errors else 0,
-                    },
-                    status="success" if embedding_response.success else "error"
-                )
-
             if self.verbose:
                 logger.info(f"Embedding service status: {embedding_response.as_dict()}")
 
@@ -237,20 +206,6 @@ class RagInfrastructureTask:
                 errors.extend(
                     [f"Critical: {error}" for error in embedding_response.errors]
                 )
-
-                # Track errors with analytics
-                if self.analytics_service:
-                    for error in embedding_response.errors:
-                        await self.analytics_service.track_error(
-                            Exception(error),
-                            "infrastructure_validation",
-                            {
-                                "component": "embedding_service",
-                                "pipeline_id": pipeline_id,
-                                "validation_type": "embedding_setup"
-                            },
-                            trace_id=pipeline_id
-                        )
             else:
                 logger.info("✅ Embedding service validation successful")
 
@@ -260,50 +215,16 @@ class RagInfrastructureTask:
             validation_results["embedding_service"] = {"error": str(e)}
             logger.error(error_msg)
 
-            # Update span with error
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={"error": str(e)},
-                    status="error"
-                )
-
-                # Track error with analytics
-                await self.analytics_service.track_error(
-                    e,
-                    "infrastructure_validation",
-                    {
-                        "component": "embedding_service",
-                        "pipeline_id": pipeline_id,
-                        "validation_type": "embedding_setup"
-                    },
-                    trace_id=pipeline_id
-                )
-
     async def _validate_weaviate_schema(
-        self, validation_results: Dict[str, Any], errors: List[str], pipeline_id: Optional[str] = None
+        self, validation_results: Dict[str, Any], errors: List[str]
     ) -> None:
         """Validate Weaviate schema exists.
 
         Args:
             validation_results: Dictionary to store validation results
             errors: List to append errors to
-            pipeline_id: Optional pipeline ID for tracing
         """
         logger.info("Validating Weaviate schema...")
-
-        # Create span for Weaviate schema validation
-        span_handle = None
-        if self.analytics_service and pipeline_id:
-            span_handle = await self.analytics_service.create_span(
-                parent_trace=pipeline_id,
-                operation="validate_weaviate_schema",
-                metadata={
-                    "validation_type": "weaviate_schema",
-                    "vector_dimension": 768,
-                }
-            )
-
         try:
             if "embedding_service" in validation_results and validation_results[
                 "embedding_service"
@@ -330,40 +251,11 @@ class RagInfrastructureTask:
                         "vector_dimension": 768,
                     }
 
-                    # Update span with results
-                    if span_handle and self.analytics_service:
-                        await self.analytics_service.update_span(
-                            span_id=span_handle.span_id,
-                            metadata={
-                                "weaviate_connected": True,
-                                "schema_exists": schema_exists,
-                                "schema_name": schema_name,
-                                "chunk_schema_exists": chunk_schema_exists,
-                                "document_schema_exists": document_schema_exists,
-                                "weaviate_url": weaviate_client.config.get_url(),
-                            },
-                            status="success" if schema_exists else "error"
-                        )
-
                     if not schema_exists:
                         errors.append(
                             "Critical: DocumentChunk or Chunk schema not found in Weaviate"
                         )
                         logger.error("❌ No valid schema found in Weaviate")
-
-                        # Track schema error
-                        if self.analytics_service:
-                            await self.analytics_service.track_error(
-                                Exception("Required schema not found"),
-                                "infrastructure_validation",
-                                {
-                                    "component": "weaviate_schema",
-                                    "pipeline_id": pipeline_id,
-                                    "validation_type": "schema_check",
-                                    "expected_schemas": ["Chunk", "DocumentChunk"]
-                                },
-                                trace_id=pipeline_id
-                            )
                     else:
                         logger.info(
                             f"✅ Weaviate schema validation successful (found {schema_name})"
@@ -376,49 +268,11 @@ class RagInfrastructureTask:
                 else:
                     errors.append("Critical: Weaviate client connection failed")
                     logger.error("❌ Weaviate client not connected")
-
-                    # Update span with connection error
-                    if span_handle and self.analytics_service:
-                        await self.analytics_service.update_span(
-                            span_id=span_handle.span_id,
-                            metadata={"connection_failed": True},
-                            status="error"
-                        )
-
-                        await self.analytics_service.track_error(
-                            Exception("Weaviate client connection failed"),
-                            "infrastructure_validation",
-                            {
-                                "component": "weaviate_client",
-                                "pipeline_id": pipeline_id,
-                                "validation_type": "connection_check"
-                            },
-                            trace_id=pipeline_id
-                        )
             else:
                 errors.append(
                     "Critical: Weaviate connection failed during embedding setup"
                 )
                 logger.error("❌ Weaviate not connected from embedding setup")
-
-                # Update span with connection error
-                if span_handle and self.analytics_service:
-                    await self.analytics_service.update_span(
-                        span_id=span_handle.span_id,
-                        metadata={"connection_failed": True, "source": "embedding_setup"},
-                        status="error"
-                    )
-
-                    await self.analytics_service.track_error(
-                        Exception("Weaviate not connected from embedding setup"),
-                        "infrastructure_validation",
-                        {
-                            "component": "weaviate_connection",
-                            "pipeline_id": pipeline_id,
-                            "validation_type": "connection_check"
-                        },
-                        trace_id=pipeline_id
-                    )
 
         except Exception as e:
             error_msg = f"Critical: Weaviate validation failed: {str(e)}"
@@ -426,27 +280,8 @@ class RagInfrastructureTask:
             validation_results["weaviate_schema"] = {"error": str(e)}
             logger.error(error_msg)
 
-            # Update span with exception
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={"error": str(e)},
-                    status="error"
-                )
-
-                await self.analytics_service.track_error(
-                    e,
-                    "infrastructure_validation",
-                    {
-                        "component": "weaviate_schema",
-                        "pipeline_id": pipeline_id,
-                        "validation_type": "schema_validation"
-                    },
-                    trace_id=pipeline_id
-                )
-
     async def _validate_object_storage(
-        self, spec: PipelineSpec, validation_results: Dict[str, Any], errors: List[str], pipeline_id: Optional[str] = None
+        self, spec: PipelineSpec, validation_results: Dict[str, Any], errors: List[str]
     ) -> None:
         """Validate object storage accessibility.
 
@@ -454,24 +289,8 @@ class RagInfrastructureTask:
             spec: Pipeline specification
             validation_results: Dictionary to store validation results
             errors: List to append errors to
-            pipeline_id: Optional pipeline ID for tracing
         """
         logger.info("Validating object storage...")
-
-        # Create span for object storage validation
-        span_handle = None
-        if self.analytics_service and pipeline_id:
-            span_handle = await self.analytics_service.create_span(
-                parent_trace=pipeline_id,
-                operation="validate_object_storage",
-                metadata={
-                    "validation_type": "object_storage",
-                    "provider": spec.storage.provider,
-                    "bucket": spec.storage.bucket,
-                    "endpoint": spec.storage.endpoint,
-                }
-            )
-
         try:
             storage_client = self._create_storage_client(spec)
 
@@ -480,14 +299,12 @@ class RagInfrastructureTask:
                 bucket_names = [bucket.name for bucket in buckets]
                 bucket_accessible = spec.storage.bucket in bucket_names
 
-                bucket_created = False
                 if not bucket_accessible:
                     logger.info(
                         f"Bucket '{spec.storage.bucket}' not found, attempting to create..."
                     )
                     await storage_client.create_bucket(spec.storage.bucket)
                     bucket_accessible = True
-                    bucket_created = True
                     logger.info(f"✅ Created bucket '{spec.storage.bucket}'")
                 else:
                     logger.info(f"✅ Bucket '{spec.storage.bucket}' already exists")
@@ -512,43 +329,13 @@ class RagInfrastructureTask:
                     "provider": spec.storage.provider,
                     "bucket_accessible": bucket_accessible,
                     "bucket_name": spec.storage.bucket,
-                    "bucket_created": bucket_created,
                     "read_write_test": read_success,
                     "endpoint": spec.storage.endpoint,
                 }
 
-                # Update span with results
-                if span_handle and self.analytics_service:
-                    await self.analytics_service.update_span(
-                        span_id=span_handle.span_id,
-                        metadata={
-                            "bucket_accessible": bucket_accessible,
-                            "bucket_created": bucket_created,
-                            "read_write_test": read_success,
-                            "existing_buckets": len(bucket_names),
-                            "test_operation_success": read_success,
-                        },
-                        status="success" if read_success else "error"
-                    )
-
                 if not read_success:
                     errors.append("Critical: Object storage read/write test failed")
                     logger.error("❌ Object storage read/write test failed")
-
-                    # Track storage error
-                    if self.analytics_service:
-                        await self.analytics_service.track_error(
-                            Exception("Object storage read/write test failed"),
-                            "infrastructure_validation",
-                            {
-                                "component": "object_storage",
-                                "pipeline_id": pipeline_id,
-                                "validation_type": "read_write_test",
-                                "provider": spec.storage.provider,
-                                "bucket": spec.storage.bucket
-                            },
-                            trace_id=pipeline_id
-                        )
                 else:
                     logger.info("✅ Object storage validation successful")
 
@@ -560,55 +347,14 @@ class RagInfrastructureTask:
                 validation_results["object_storage"] = {"error": str(storage_error)}
                 logger.error(error_msg)
 
-                # Update span with storage error
-                if span_handle and self.analytics_service:
-                    await self.analytics_service.update_span(
-                        span_id=span_handle.span_id,
-                        metadata={"storage_error": str(storage_error)},
-                        status="error"
-                    )
-
-                    await self.analytics_service.track_error(
-                        storage_error,
-                        "infrastructure_validation",
-                        {
-                            "component": "object_storage",
-                            "pipeline_id": pipeline_id,
-                            "validation_type": "storage_operations",
-                            "provider": spec.storage.provider,
-                            "bucket": spec.storage.bucket
-                        },
-                        trace_id=pipeline_id
-                    )
-
         except Exception as e:
             error_msg = f"Critical: Object storage validation failed: {str(e)}"
             errors.append(error_msg)
             validation_results["object_storage"] = {"error": str(e)}
             logger.error(error_msg)
 
-            # Update span with validation error
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={"validation_error": str(e)},
-                    status="error"
-                )
-
-                await self.analytics_service.track_error(
-                    e,
-                    "infrastructure_validation",
-                    {
-                        "component": "object_storage",
-                        "pipeline_id": pipeline_id,
-                        "validation_type": "storage_validation",
-                        "provider": spec.storage.provider
-                    },
-                    trace_id=pipeline_id
-                )
-
     async def _validate_configuration(
-        self, spec: PipelineSpec, validation_results: Dict[str, Any], errors: List[str], pipeline_id: Optional[str] = None
+        self, spec: PipelineSpec, validation_results: Dict[str, Any], errors: List[str]
     ) -> None:
         """Validate pipeline configuration.
 
@@ -616,26 +362,8 @@ class RagInfrastructureTask:
             spec: Pipeline specification
             validation_results: Dictionary to store validation results
             errors: List to append errors to
-            pipeline_id: Optional pipeline ID for tracing
         """
         logger.info("Validating pipeline configuration...")
-
-        # Create span for configuration validation
-        span_handle = None
-        if self.analytics_service and pipeline_id:
-            span_handle = await self.analytics_service.create_span(
-                parent_trace=pipeline_id,
-                operation="validate_configuration",
-                metadata={
-                    "validation_type": "configuration",
-                    "document_path": str(spec.documents.path),
-                    "patterns": spec.documents.include,
-                    "recurse": spec.documents.recurse,
-                    "storage_bucket": spec.storage.bucket,
-                    "storage_provider": spec.storage.provider,
-                }
-            )
-
         try:
             config_errors = []
 
@@ -660,8 +388,8 @@ class RagInfrastructureTask:
                 config_errors.append("Storage bucket name not specified")
 
             # Count potential documents
-            file_count = 0
             if spec.documents.path.exists():
+                file_count = 0
                 for pattern in spec.documents.include:
                     files = (
                         list(spec.documents.path.glob(pattern))
@@ -696,36 +424,6 @@ class RagInfrastructureTask:
                     "storage_provider": spec.storage.provider,
                 }
 
-            # Update span with results
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={
-                        "config_valid": len(config_errors) == 0,
-                        "document_path_exists": spec.documents.path.exists(),
-                        "document_path_is_dir": spec.documents.path.is_dir() if spec.documents.path.exists() else False,
-                        "patterns_specified": bool(spec.documents.include),
-                        "storage_bucket_specified": bool(spec.storage.bucket),
-                        "estimated_files": file_count,
-                        "config_error_count": len(config_errors),
-                    },
-                    status="success" if len(config_errors) == 0 else "error"
-                )
-
-            # Track configuration errors
-            if self.analytics_service and config_errors:
-                for error in config_errors:
-                    await self.analytics_service.track_error(
-                        Exception(error),
-                        "infrastructure_validation",
-                        {
-                            "component": "configuration",
-                            "pipeline_id": pipeline_id,
-                            "validation_type": "config_validation"
-                        },
-                        trace_id=pipeline_id
-                    )
-
             errors.extend(config_errors)
 
             if len(config_errors) == 0:
@@ -739,25 +437,6 @@ class RagInfrastructureTask:
             errors.append(error_msg)
             validation_results["configuration"] = {"error": str(e)}
             logger.error(error_msg)
-
-            # Update span with exception
-            if span_handle and self.analytics_service:
-                await self.analytics_service.update_span(
-                    span_id=span_handle.span_id,
-                    metadata={"validation_error": str(e)},
-                    status="error"
-                )
-
-                await self.analytics_service.track_error(
-                    e,
-                    "infrastructure_validation",
-                    {
-                        "component": "configuration",
-                        "pipeline_id": pipeline_id,
-                        "validation_type": "config_validation"
-                    },
-                    trace_id=pipeline_id
-                )
 
     async def execute(
         self, spec: PipelineSpec
@@ -774,62 +453,22 @@ class RagInfrastructureTask:
             InfrastructureError: If critical validation fails
         """
         from datetime import timezone
-        import uuid
-
         start_time = datetime.now(timezone.utc)
         validation_results = {}
         errors = []
 
-        # Generate pipeline ID for tracing
-        pipeline_id = str(uuid.uuid4())
-
-        # Start main trace for infrastructure validation
-        trace_handle = None
-        if self.analytics_service:
-            trace_handle = await self.analytics_service.trace_rag_pipeline(
-                pipeline_id=pipeline_id,
-                phase="infrastructure_validation",
-                metadata={
-                    "task": "RagInfrastructureTask",
-                    "start_time": start_time.isoformat(),
-                    "document_path": str(spec.documents.path),
-                    "storage_provider": spec.storage.provider,
-                    "storage_bucket": spec.storage.bucket,
-                    "patterns": spec.documents.include,
-                    "recurse": spec.documents.recurse,
-                }
-            )
-
         logger.info("Starting RAG infrastructure validation...")
 
         try:
-            # Run all validations with pipeline_id for tracing
-            await self._validate_embedding_service(validation_results, errors, pipeline_id)
-            await self._validate_weaviate_schema(validation_results, errors, pipeline_id)
-            await self._validate_object_storage(spec, validation_results, errors, pipeline_id)
-            await self._validate_configuration(spec, validation_results, errors, pipeline_id)
+            # Run all validations
+            await self._validate_embedding_service(validation_results, errors)
+            await self._validate_weaviate_schema(validation_results, errors)
+            await self._validate_object_storage(spec, validation_results, errors)
+            await self._validate_configuration(spec, validation_results, errors)
 
             # Categorize errors
             critical_errors = [e for e in errors if "Critical:" in e]
             warnings = [e for e in errors if "Critical:" not in e]
-
-            from datetime import timezone
-            end_time = datetime.now(timezone.utc)
-            execution_time = (end_time - start_time).total_seconds()
-
-            # Update main trace with final results
-            if trace_handle and self.analytics_service:
-                await self.analytics_service.update_trace(
-                    trace_id=pipeline_id,
-                    metadata={
-                        "execution_time_seconds": execution_time,
-                        "total_components": len(validation_results),
-                        "critical_errors": len(critical_errors),
-                        "warnings": len(warnings),
-                        "validation_results": validation_results,
-                    },
-                    status="success" if not critical_errors else "error"
-                )
 
             # Fail fast on critical errors
             if critical_errors:
@@ -838,6 +477,10 @@ class RagInfrastructureTask:
                 )
                 for error in critical_errors:
                     logger.error(f"   - {error}")
+
+                from datetime import timezone
+                end_time = datetime.now(timezone.utc)
+                execution_time = (end_time - start_time).total_seconds()
 
                 failed_result = InfrastructureResult(
                     success=False,
@@ -863,6 +506,10 @@ class RagInfrastructureTask:
                 for warning in warnings:
                     logger.warning(f"   - {warning}")
 
+            from datetime import timezone
+            end_time = datetime.now(timezone.utc)
+            execution_time = (end_time - start_time).total_seconds()
+
             validation_result = InfrastructureResult(
                 success=len(critical_errors) == 0,
                 validation_results=validation_results,
@@ -885,31 +532,6 @@ class RagInfrastructureTask:
             end_time = datetime.now(timezone.utc)
             execution_time = (end_time - start_time).total_seconds()
             logger.error(f"❌ Infrastructure validation failed: {str(e)}")
-
-            # Update main trace with exception
-            if trace_handle and self.analytics_service:
-                await self.analytics_service.update_trace(
-                    trace_id=pipeline_id,
-                    metadata={
-                        "execution_time_seconds": execution_time,
-                        "error": str(e),
-                        "exception_type": type(e).__name__,
-                    },
-                    status="error"
-                )
-
-                # Track the exception
-                await self.analytics_service.track_error(
-                    e,
-                    "infrastructure_validation",
-                    {
-                        "component": "RagInfrastructureTask",
-                        "pipeline_id": pipeline_id,
-                        "execution_time_seconds": execution_time,
-                        "phase": "execute"
-                    },
-                    trace_id=pipeline_id
-                )
 
             error_result = InfrastructureResult(
                 success=False,

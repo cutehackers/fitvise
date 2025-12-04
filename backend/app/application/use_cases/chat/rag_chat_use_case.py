@@ -29,6 +29,7 @@ from app.domain.services.session_service import SessionService
 from app.domain.services.context_window_manager import (
     ContextWindowManager,
 )
+from langchain_core.callbacks import BaseCallbackHandler
 from app.schemas.chat import ChatRequest, RagChatResponse, SourceCitation
 
 logger = logging.getLogger(__name__)
@@ -86,6 +87,7 @@ If the context doesn't contain relevant information, say so clearly."""
         retriever: BaseRetriever,
         context_manager: ContextWindowManager,
         session_service: SessionService,
+        callback_handler: Optional[BaseCallbackHandler] = None,
         turns_window: int = 10,
         max_session_age_hours: int = 24,
     ):
@@ -96,6 +98,7 @@ If the context doesn't contain relevant information, say so clearly."""
             retriever: Base retriever for document retrieval
             context_manager: Context window manager for fitting documents into context
             session_service: Service for session management
+            callback_handler: Optional LangChain callback handler for analytics
             turns_window: Number of conversation turns to keep in memory (default: 10)
             max_session_age_hours: Maximum age before sessions expire (default: 24)
         """
@@ -103,6 +106,7 @@ If the context doesn't contain relevant information, say so clearly."""
         self._retriever = retriever
         self._context_manager = context_manager
         self._session_service = session_service
+        self._callback_handler = callback_handler
         self._turns_window = turns_window
         self._max_session_age_hours = max_session_age_hours
 
@@ -284,8 +288,8 @@ If the context doesn't contain relevant information, say so clearly."""
                 trimmed_history = smart_trimmer(session_history.messages)
                 chain = (
                     RunnablePassthrough.assign(
-                        context=lambda x: context,
-                        history=lambda x: trimmed_history
+                        context=context,
+                        history=session_history.messages,
                     )
                     | self._prompt 
                     | self._llm
@@ -293,7 +297,10 @@ If the context doesn't contain relevant information, say so clearly."""
             else:
                 # For short conversations: add context to input
                 chain = (
-                    RunnablePassthrough.assign(context=lambda x: context)
+                    RunnablePassthrough.assign(
+                        context=context,
+                        history=session_history.messages,
+                    )
                     | self._prompt 
                     | self._llm
                 )
@@ -453,3 +460,5 @@ If the context doesn't contain relevant information, say so clearly."""
         except Exception as e:
             logger.error("RagChatUseCase health check failed: %s", str(e))
             return False
+
+    

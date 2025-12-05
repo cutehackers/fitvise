@@ -10,17 +10,17 @@ import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Dict, Any, Optional, Tuple
 
-from langchain_core.messages import (
-    BaseMessage,
-    trim_messages,
-)
+from langchain_core.messages import BaseMessage
 from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
+from langchain_classic.chains.history_aware_retriever import create_history_aware_retriever
+from langchain_classic.chains.retrieval import create_retrieval_chain
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 
 from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
 from app.domain.llm.interfaces.llm_service import LLMService
@@ -111,13 +111,20 @@ If the context doesn't contain relevant information, say so clearly."""
         self._max_session_age_hours = max_session_age_hours
 
         # RAG-specific prompt template with context placeholder
-        self._prompt = ChatPromptTemplate([
+        self._prompt = ChatPromptTemplate.from_messages([
             ("system", (
-                "You are a helpful AI fitness assistant. "
-                "Use the provided context to answer the user's question thoroughly and accurately. "
-                "If the context contains relevant information, base your answer on it. "
-                "Always cite your sources when using information from the context.\n\n"
-                "Context:\n{context}"
+                "You are Fitvise, a fitness AI assistant helping users reformulate their questions "
+                "based on conversation history for better context retrieval.\n\n"
+                "Your task is to transform the user's latest question into an effective search query "
+                "that captures their fitness-related intent, considering the full conversation context.\n\n"
+                "Guidelines:\n"
+                "- Include relevant fitness concepts from the conversation history\n"
+                "- Maintain the core intent of the original question\n"
+                "- Add specific fitness terminology when helpful\n"
+                "- Keep the query concise but comprehensive\n"
+                "- Focus on exercise, nutrition, wellness, or fitness goals\n"
+                "- Formulate a standalone question which can be understood without the chat history\n"
+                "- Do NOT answer the question, just reformulate it if needed and otherwise return it as is\n\n"
             )),
             MessagesPlaceholder(variable_name="history", optional=True),
             ("human", "{input}"),
@@ -126,47 +133,55 @@ If the context doesn't contain relevant information, say so clearly."""
         # Store LLM instance for direct access
         self._llm = llm_service.llm_instance
 
-        self._trimmer = trim_messages(
-            max_tokens=MAX_TOKENS_TABLE.get(
-                llm_service.get_model_spec().name.lower(),
-                DEFAULT_MAX_TOKEN_LENGTH
-            ),
-            token_counter=self._llm,
-            strategy="last",
-            start_on="human",
-            include_system=True,
-        )
+        # Retriever
+        self._history_aware_retriever = create_history_aware_retriever(self._llm, self._retriever, self._prompt)
 
-        # Performance optimization: Only apply trimming for conversations with >20 messages
-        self._trim_messages_threshold = 20
+        # 5. RAG prompts (documents + history)
+        self._qa_prompt = ChatPromptTemplate.from_messages([
+            ("system", (
+                "You are Fitvise, an expert fitness AI assistant. Provide comprehensive, "
+                "accurate answers using the retrieved fitness context and conversation history.\n\n"
+                "Response Guidelines:\n"
+                "- Base answers primarily on the provided context when relevant and available\n"
+                "- Cite sources using [1], [2] format when using contextual information\n"
+                "- Include specific fitness details, exercises, or nutritional information from context\n"
+                "- If no relevant context was found, state this clearly and provide general fitness guidance\n"
+                "- If the retrieved context is empty or irrelevant, rely on your fitness expertise and conversation history\n"
+                "- Maintain a supportive, professional, and safety-focused tone\n"
+                "- Prioritize evidence-based fitness information\n\n"
+                "Retrieved Context:\n{context}"
+            )),
+            MessagesPlaceholder("history"),
+            ("human", "{input}"),
+        ])
+
+        # RAG chain. merge documents to handle by LLM
+        self._question_answer_chain = create_stuff_documents_chain(self._llm, self._qa_prompt)
+
+        # Create chain for retrieving context and processing user input
+        self._chain = create_retrieval_chain(self._history_aware_retriever, self._question_answer_chain)
+        # self._chain = (
+        #     RunnableParallel({
+        #         "context": self._retriever,
+        #         "input": RunnablePassthrough()
+        #     })            
+        #     | self._prompt 
+        #     | self._llm
+        # )
+        
+        # Create runnable with history using SessionService's persistent history
+        self._runnable_with_history = RunnableWithMessageHistory(
+            self._chain,
+            lambda session_id: self._session_service.get_session_history(session_id),                
+            input_messages_key="input",
+            history_messages_key="history",
+            output_messages_key="answer",
+        )
 
         logger.info(
             "RagChatUseCase initialized with retriever, context manager, and session service"
         )
 
-    def _should_apply_trimming(self, messages: List[BaseMessage]) -> bool:
-        """Determine if message trimming should be applied.
-
-        Args:
-            messages: List of messages to evaluate
-
-        Returns:
-            True if trimming should be applied, False otherwise
-        """
-        return len(messages) > self._trim_messages_threshold
-
-    def _get_smart_trimmer(self, messages: List[BaseMessage]) -> Any:
-        """Get conditional trimmer for conversation length.
-
-        Args:
-            messages: List of messages to potentially trim
-
-        Returns:
-            Either the trimmer or identity function based on conversation length
-        """
-        if self._should_apply_trimming(messages):
-            return self._trimmer
-        return lambda x: x
 
     async def _retrieve(self, query: str) -> Tuple[str, List[Document]]:
         """Retrieve context documents for a query.
@@ -276,48 +291,11 @@ If the context doesn't contain relevant information, say so clearly."""
             # Retrieve context documents
             context, documents = await self._retrieve(request.message.content)
 
-            # Get persistent LangChain history from SessionService
-            session_history = self._session_service.get_session_history(request.session_id)
-
-            # Apply conditional trimming
-            smart_trimmer = self._get_smart_trimmer(session_history.messages)
-
-            # Create chain with context using idiomatic LangChain constructs
-            if smart_trimmer is self._trimmer:
-                # For long conversations: trim history before passing to prompt
-                trimmed_history = smart_trimmer(session_history.messages)
-                chain = (
-                    RunnablePassthrough.assign(
-                        context=context,
-                        history=session_history.messages,
-                    )
-                    | self._prompt 
-                    | self._llm
-                )
-            else:
-                # For short conversations: add context to input
-                chain = (
-                    RunnablePassthrough.assign(
-                        context=context,
-                        history=session_history.messages,
-                    )
-                    | self._prompt 
-                    | self._llm
-                )
-
-            # Create runnable with history using SessionService's persistent history
-            runnable_with_history = RunnableWithMessageHistory(
-                chain,
-                lambda session_id: self._session_service.get_session_history(session_id),
-                input_messages_key="input",
-                history_messages_key="history",
-            )
-
             # Process message and stream response
             config = {"configurable": {"session_id": request.session_id}}
             full_response = ""
 
-            async for chunk in runnable_with_history.astream(
+            async for chunk in self._runnable_with_history.astream(
                 {"input": request.message.content},
                 config=config,
             ):

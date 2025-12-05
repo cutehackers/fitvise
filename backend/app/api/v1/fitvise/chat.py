@@ -293,7 +293,7 @@ async def chat_with_rag(
         if not request.message or not request.message.content:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=_build_error_response(
+                detail=ErrorResponseBuilder.build_error_response(
                     message="Message content cannot be empty",
                     error_type="invalid_request_error",
                     code="EMPTY_MESSAGE_CONTENT",
@@ -310,7 +310,7 @@ async def chat_with_rag(
 
             except MessageValidationError as e:
                 logger.error("RAG validation error: %s", str(e))
-                error_response = _build_error_response(
+                error_response = ErrorResponseBuilder.build_error_response(
                     message=str(e),
                     error_type="invalid_request_error",
                     code="RAG_VALIDATION_ERROR",
@@ -319,7 +319,7 @@ async def chat_with_rag(
                 yield f"{error_response}\n"
             except ChatOrchestratorError as e:
                 logger.error("RAG processing error: %s", str(e))
-                error_response = _build_error_response(
+                error_response = ErrorResponseBuilder.build_error_response(
                     message=f"RAG processing failed: {str(e)}",
                     error_type="service_error",
                     code="RAG_PROCESSING_ERROR"
@@ -327,7 +327,7 @@ async def chat_with_rag(
                 yield f"{error_response}\n"
             except Exception as e:
                 logger.error("RAG streaming error: %s", str(e))
-                error_response = _build_error_response(
+                error_response = ErrorResponseBuilder.build_error_response(
                     message=f"RAG streaming failed: {str(e)}",
                     error_type="rag_stream_error",
                     code="RAG_STREAM_ERROR",
@@ -343,7 +343,7 @@ async def chat_with_rag(
         logger.error("Unexpected error in RAG chat endpoint: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=_build_error_response(
+            detail=ErrorResponseBuilder.build_error_response(
                 message="An unexpected error occurred",
                 error_type="internal_server_error",
                 code="UNEXPECTED_ERROR",

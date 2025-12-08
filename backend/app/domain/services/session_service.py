@@ -107,18 +107,17 @@ class SessionService:
         Raises:
             ValueError: If session_id is invalid
         """
+        id = session_id.strip()
         if not session_id or not session_id.strip():
             raise ValueError("Session ID cannot be empty or None")
 
-        session_id = session_id.strip()
-
         # Return existing history if available
-        if session_id in self._session_store:
-            return self._session_store[session_id]
+        if id in self._session_store:
+            return self._session_store[id]
 
         # Create new LangChain history
-        self._session_store[session_id] = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
-        return self._session_store[session_id]
+        self._session_store[id] = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
+        return self._session_store[id]
 
     def ensure_session(self, session_id: Optional[str] = None) -> tuple[str, BaseChatMessageHistory]:
         """Ensure a session exists, creating it when needed.

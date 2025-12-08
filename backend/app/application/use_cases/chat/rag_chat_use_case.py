@@ -192,12 +192,12 @@ If the context doesn't contain relevant information, say so clearly."""
     def _build_chain_with_history(self, chain: Runnable) -> RunnableWithMessageHistory:
         """Wrap a runnable with LangChain message history management."""
 
-        def get_session_history(config: Dict[str, Any]) -> BaseChatMessageHistory:
-            session_id = None
-            configurable = config.get("configurable") if isinstance(config, dict) else None
-            if configurable:
-                session_id = configurable.get("session_id")
-            # Fallback: create a session if none was provided in the config
+        def get_session_history(session_id: str) -> BaseChatMessageHistory:
+            """Return history for the provided session_id.
+
+            LangChain's RunnableWithMessageHistory passes the session_id
+            positionally, not a config dict, so we must accept a string here.
+            """
             if not session_id:
                 session_id, history = self._session_service.ensure_session()
                 logger.debug("Generated session_id for missing history: %s", session_id)
@@ -209,7 +209,6 @@ If the context doesn't contain relevant information, say so clearly."""
             get_session_history,
             input_messages_key="input",
             history_messages_key="history",
-            history_factory_config_keys=["session_id"],
         )
 
     @staticmethod

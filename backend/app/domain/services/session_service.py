@@ -67,33 +67,7 @@ class SessionService:
     def _new_session_id(self) -> str:
         """Generate a new opaque session identifier."""        
         return str(uuid4())
-
-    class _TrimmedInMemoryChatMessageHistory(InMemoryChatMessageHistory):
-        """History that applies trimming rules after each append."""
-
-        def __init__(self, trim_callback):
-            super().__init__()
-            self._trim_callback = trim_callback
-
-        def add_message(self, message):
-            super().add_message(message)
-            self._trim_callback(self)
-
-        def add_messages(self, messages):
-            super().add_messages(messages)
-            self._trim_callback(self)
-
-        def add_user_message(self, message):
-            super().add_user_message(message)
-            self._trim_callback(self)
-
-        def add_ai_message(self, message):
-            super().add_ai_message(message)
-            self._trim_callback(self)
-
-        def add_system_message(self, message):
-            super().add_system_message(message)
-            self._trim_callback(self)
+        
 
     def get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         """Get session history (matching LangChainOrchestrator interface exactly).
@@ -116,7 +90,7 @@ class SessionService:
             return self._session_store[id]
 
         # Create new LangChain history
-        self._session_store[id] = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
+        self._session_store[id] = self._TrimmerChatMessageHistory(self._trim_history)
         return self._session_store[id]
 
     def ensure_session(self, session_id: Optional[str] = None) -> tuple[str, BaseChatMessageHistory]:
@@ -133,7 +107,7 @@ class SessionService:
         history = self._session_store.get(id)
 
         if history is None:
-            history = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
+            history = self._TrimmerChatMessageHistory(self._trim_history)
             self._session_store[id] = history
 
         return id, history
@@ -310,3 +284,30 @@ class SessionService:
             "langchain_history": True,
             "auto_cleanup_enabled": self._config.auto_cleanup_expired,
         }
+    
+    class _TrimmerChatMessageHistory(InMemoryChatMessageHistory):
+        """History that applies trimming rules after each append."""
+
+        def __init__(self, trim_callback):
+            super().__init__()
+            self._trim_callback = trim_callback
+
+        def add_message(self, message):
+            super().add_message(message)
+            self._trim_callback(self)
+
+        def add_messages(self, messages):
+            super().add_messages(messages)
+            self._trim_callback(self)
+
+        def add_user_message(self, message):
+            super().add_user_message(message)
+            self._trim_callback(self)
+
+        def add_ai_message(self, message):
+            super().add_ai_message(message)
+            self._trim_callback(self)
+
+        def add_system_message(self, message):
+            super().add_system_message(message)
+            self._trim_callback(self)

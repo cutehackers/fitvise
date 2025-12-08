@@ -99,6 +99,7 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_user_message(HumanMessage(content=content))
+        self._trim_history(history)
 
     def add_assistant_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Add an assistant message to the session history.
@@ -110,6 +111,7 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_ai_message(AIMessage(content=content))
+        self._trim_history(history)
 
     def add_system_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Add a system message to the session history.
@@ -121,6 +123,7 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_message(SystemMessage(content=content))
+        self._trim_history(history)
 
     def clear_session(self, session_id: str) -> bool:
         """Clear session history for a specific session.
@@ -200,6 +203,48 @@ class SessionService:
             "system_message_count": len(system_messages),
             "langchain_history": True,
         }
+
+    def _trim_history(self, history: BaseChatMessageHistory) -> None:
+        """Trim session history according to configured limits.
+
+        Keeps the most recent turns (user/assistant) while preserving system messages.
+        """
+        messages = list(history.messages)
+
+        # First, enforce turns_window on non-system messages
+        if self._config.turns_window > 0:
+            max_non_system = self._config.turns_window * 2
+            non_system_kept = 0
+            trimmed: List = []
+
+            # Walk from newest to oldest to keep the most recent turns
+            for msg in reversed(messages):
+                if isinstance(msg, SystemMessage):
+                    trimmed.append(msg)
+                    continue
+                if non_system_kept < max_non_system:
+                    trimmed.append(msg)
+                    non_system_kept += 1
+            trimmed.reverse()
+            messages = trimmed
+
+        # Then, enforce absolute max_messages_per_session (prefer dropping non-system first)
+        max_msgs = self._config.max_messages_per_session
+        if max_msgs > 0 and len(messages) > max_msgs:
+            drop = len(messages) - max_msgs
+            trimmed_messages: List = []
+            for msg in messages:
+                if drop > 0 and not isinstance(msg, SystemMessage):
+                    drop -= 1
+                    continue
+                trimmed_messages.append(msg)
+            # If we still need to drop (all were system), drop from the front
+            if drop > 0:
+                trimmed_messages = trimmed_messages[drop:]
+            messages = trimmed_messages
+
+        # Replace underlying history if changed
+        history.messages = messages
 
     def get_global_statistics(self) -> Dict[str, Any]:
         """Get global session statistics.

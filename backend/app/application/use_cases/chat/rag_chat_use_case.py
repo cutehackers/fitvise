@@ -2,6 +2,9 @@
 
 This module implements RagChatUseCase as a complete replacement for RAG orchestrators
 with direct LangChain integration, document retrieval, and source citation generation.
+
+Uses modern LCEL (LangChain Expression Language) for chain composition instead of
+legacy langchain_classic helper functions.
 """
 
 from __future__ import annotations
@@ -10,17 +13,14 @@ import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Dict, Any, Optional, Tuple
 
-from langchain_core.messages import BaseMessage
-from langchain_core.runnables.history import RunnableWithMessageHistory
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel
+from langchain_core.messages import AIMessageChunk, BaseMessage
+from langchain_core.runnables import Runnable
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
-from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.documents import Document
-from langchain_classic.chains.history_aware_retriever import create_history_aware_retriever
-from langchain_classic.chains.retrieval import create_retrieval_chain
-from langchain_classic.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
 from app.domain.llm.interfaces.llm_service import LLMService
@@ -61,14 +61,15 @@ def _get_current_timestamp() -> str:
 
 
 class RagChatUseCase:
-    """Clean architecture RAG chat use case with direct LangChain integration.
+    """Clean architecture RAG chat use case with modern LCEL integration.
 
-    Implements all existing RAG functionality with proper clean architecture:
+    Uses LangChain Expression Language (LCEL) for transparent, composable chains:
+    - Explicit chain composition with RunnableParallel and RunnablePassthrough
+    - No legacy langchain_classic dependencies
+    - Full streaming support with native async operations
     - Session management through SessionService
     - Document retrieval through injected BaseRetriever
     - Context management through ContextWindowManager
-    - LLM integration through LLMService
-    - Full streaming support with LangChain integration
     """
 
     # RAG prompt template with citation instructions
@@ -110,8 +111,29 @@ If the context doesn't contain relevant information, say so clearly."""
         self._turns_window = turns_window
         self._max_session_age_hours = max_session_age_hours
 
-        # RAG-specific prompt template with context placeholder
-        self._prompt = ChatPromptTemplate.from_messages([
+        # Store LLM instance for direct access
+        self._llm: BaseChatModel = llm_service.llm_instance
+
+        # Store the rephrase chain for standalone usage in chat()
+        self._rephrase_chain = self._build_rephrase_chain()
+        
+        # Build the QA chain that outputs AIMessage directly (for history compatibility)
+        self._qa_chain = self._build_qa_chain()
+
+        logger.info(
+            "RagChatUseCase initialized with modern LCEL chain, retriever, context manager, and session service"
+        )
+
+    def _build_rephrase_chain(self) -> Runnable:
+        """Build the question rephrasing chain.
+        
+        This chain reformulates user questions based on conversation history
+        for more effective document retrieval.
+        
+        Returns:
+            Runnable chain that takes {"input": str, "history": List} and returns str
+        """
+        rephrase_prompt = ChatPromptTemplate.from_messages([
             ("system", (
                 "You are Fitvise, a fitness AI assistant helping users reformulate their questions "
                 "based on conversation history for better context retrieval.\n\n"
@@ -124,20 +146,26 @@ If the context doesn't contain relevant information, say so clearly."""
                 "- Keep the query concise but comprehensive\n"
                 "- Focus on exercise, nutrition, wellness, or fitness goals\n"
                 "- Formulate a standalone question which can be understood without the chat history\n"
-                "- Do NOT answer the question, just reformulate it if needed and otherwise return it as is\n\n"
+                "- Do NOT answer the question, just reformulate it if needed and otherwise return it as is\n"
             )),
             MessagesPlaceholder(variable_name="history", optional=True),
             ("human", "{input}"),
         ])
+        
+        return rephrase_prompt | self._llm | StrOutputParser()
 
-        # Store LLM instance for direct access
-        self._llm = llm_service.llm_instance
-
-        # Retriever
-        self._history_aware_retriever = create_history_aware_retriever(self._llm, self._retriever, self._prompt)
-
-        # 5. RAG prompts (documents + history)
-        self._qa_prompt = ChatPromptTemplate.from_messages([
+    def _build_qa_chain(self) -> Runnable:
+        """Build the QA answer chain.
+        
+        This chain generates the final answer using context and conversation history.
+        CRITICAL: This chain must output AIMessage directly (not a dict) for 
+        RunnableWithMessageHistory to properly track conversation history.
+        
+        Returns:
+            Runnable chain that takes {"input": str, "context": str, "history": List}
+            and returns AIMessage
+        """
+        qa_prompt = ChatPromptTemplate.from_messages([
             ("system", (
                 "You are Fitvise, an expert fitness AI assistant. Provide comprehensive, "
                 "accurate answers using the retrieved fitness context and conversation history.\n\n"
@@ -154,33 +182,42 @@ If the context doesn't contain relevant information, say so clearly."""
             MessagesPlaceholder("history"),
             ("human", "{input}"),
         ])
-
-        # RAG chain. merge documents to handle by LLM
-        self._question_answer_chain = create_stuff_documents_chain(self._llm, self._qa_prompt)
-
-        # Create chain for retrieving context and processing user input
-        self._chain = create_retrieval_chain(self._history_aware_retriever, self._question_answer_chain)
-        # self._chain = (
-        #     RunnableParallel({
-        #         "context": self._retriever,
-        #         "input": RunnablePassthrough()
-        #     })            
-        #     | self._prompt 
-        #     | self._llm
-        # )
         
-        # Create runnable with history using SessionService's persistent history
-        self._runnable_with_history = RunnableWithMessageHistory(
-            self._chain,
-            lambda session_id: self._session_service.get_session_history(session_id),                
-            input_messages_key="input",
-            history_messages_key="history",
-            output_messages_key="answer",
-        )
+        # Output AIMessage directly - do NOT use StrOutputParser
+        # This is critical for RunnableWithMessageHistory to save the response to history
+        return qa_prompt | self._llm
 
-        logger.info(
-            "RagChatUseCase initialized with retriever, context manager, and session service"
-        )
+    @staticmethod
+    def _prepare_context_documents(documents: List[Document]) -> List[Document]:
+        """Attach stable indices to documents for in-context citation."""
+        return [
+            Document(
+                page_content=f"[{idx}] {doc.page_content}",
+                metadata=doc.metadata,
+            )
+            for idx, doc in enumerate(documents, start=1)
+        ]
+
+    def _rephrase_question_with_history(
+        self, 
+        question: str, 
+        history: List[BaseMessage]
+    ) -> str:
+        """Rephrase the question using conversation history.
+        
+        Args:
+            question: The original user question
+            history: Conversation history messages
+            
+        Returns:
+            Rephrased question string, or original if no history
+        """
+        if not history:
+            return question
+        return self._rephrase_chain.invoke({
+            "input": question,
+            "history": history
+        })
 
 
     async def _retrieve(self, query: str) -> Tuple[str, List[Document]]:
@@ -197,18 +234,21 @@ If the context doesn't contain relevant information, say so clearly."""
         """
         try:
             # Step 1: Retrieve relevant documents using LangChain retriever interface
-            documents = await self._retriever.ainvoke(query)
+            documents = await self._retriever.ainvoke(query) or []
 
             if not documents:
                 logger.warning("No documents retrieved for query: %s", query)
-                return "", []
+                return "No relevant context found.", []
 
             logger.debug("Retrieved %d documents for query", len(documents))
+
+            # Attach indices for clear in-context citations
+            indexed_documents = self._prepare_context_documents(documents)
 
             # Step 2: Fit documents into context window
             try:
                 context = self._context_manager.fit_to_window(
-                    documents,
+                    indexed_documents,
                     user_query=query,
                     system_prompt=self.SYSTEM_PROMPT,
                 )
@@ -222,7 +262,7 @@ If the context doesn't contain relevant information, say so clearly."""
                 current_tokens = 0
                 max_tokens = self._context_manager.get_available_tokens()
 
-                for doc in documents:
+                for doc in indexed_documents:
                     doc_tokens = self._context_manager.estimate_document_tokens(doc)
                     if current_tokens + doc_tokens <= max_tokens:
                         context_parts.append(doc.page_content)
@@ -232,7 +272,10 @@ If the context doesn't contain relevant information, say so clearly."""
 
                 context = "\n\n".join(context_parts)
 
-            return context, documents
+            if not context:
+                context = "\n\n".join(doc.page_content for doc in indexed_documents)
+
+            return context, indexed_documents
 
         except Exception as e:
             logger.error("Failed to retrieve context: %s", str(e))
@@ -252,14 +295,15 @@ If the context doesn't contain relevant information, say so clearly."""
         Returns:
             List of source citations
         """
-        citations = []
+        citations: List[SourceCitation] = []
         for idx, doc in enumerate(documents, 1):
             metadata = doc.metadata or {}
+            content = self._normalize_citation_content(doc.page_content)
             citations.append(
                 SourceCitation(
                     index=idx,
-                    content=doc.page_content[:500],  # Truncate for display
-                    similarity_score=metadata.get("_distance", 0.0),
+                    content=content,
+                    similarity_score=metadata.get("_distance", 0.0) or 0.0,
                     document_id=metadata.get("document_id", f"doc_{idx}"),
                     chunk_id=metadata.get("chunk_id", f"chunk_{idx}"),
                     metadata=metadata,
@@ -267,11 +311,25 @@ If the context doesn't contain relevant information, say so clearly."""
             )
         return citations
 
+    @staticmethod
+    def _normalize_citation_content(content: str, max_length: int = 500) -> str:
+        """Normalize and truncate citation content for safe display."""
+        if not content:
+            return ""
+        normalized = " ".join(content.split())
+        return normalized[:max_length]
+
     async def chat(
         self,
         request: ChatRequest,
     ) -> AsyncGenerator[RagChatResponse, None]:
         """Process a chat message with RAG and generate streaming responses.
+
+        The flow:
+        1. Get session history
+        2. Rephrase question using history (for better retrieval)
+        3. Retrieve relevant documents
+        4. Stream answer using history-tracked QA chain
 
         Args:
             request: Chat request with message and session info
@@ -288,32 +346,78 @@ If the context doesn't contain relevant information, say so clearly."""
             # Validate request
             self._ensure_chat_request(request)
 
-            # Retrieve context documents
-            context, documents = await self._retrieve(request.message.content)
+            # Step 1: Get session history for rephrasing (previous turns only)
+            session_history = self._session_service.get_session_history(request.session_id)
+            history_messages = list(session_history.messages)
+            
+            # Step 2: Rephrase question if we have history (for better retrieval)
+            rephrased_question = self._rephrase_question_with_history(
+                request.message.content, 
+                history_messages
+            )
+            logger.debug(
+                "Rephrased question: '%s' -> '%s'", 
+                request.message.content, 
+                rephrased_question
+            )
 
-            # Process message and stream response
+            # Step 3: Retrieve documents using rephrased question (with robust fallbacks)
+            context, documents = await self._retrieve(rephrased_question)
+            logger.debug(
+                "Retrieved %d documents for RAG (context length=%d)",
+                len(documents),
+                len(context),
+            )
+
+            # Persist the current user turn for future prompts
+            # We are not using RunnableWithMessageHistory here, so we manage history explicitly.
+            self._session_service.add_user_message(
+                request.session_id, request.message.content
+            )
+
+            # Step 4: Stream answer using explicit history
+            # The chain receives: {"input": str, "context": str, "history": List[BaseMessage]}
+            chain_inputs = {
+                "input": request.message.content,
+                "context": context,
+                "history": history_messages,
+            }
             config = {"configurable": {"session_id": request.session_id}}
             full_response = ""
 
-            async for chunk in self._runnable_with_history.astream(
-                {"input": request.message.content},
+            async for chunk in self._qa_chain.astream(
+                chain_inputs,
                 config=config,
             ):
-                if isinstance(chunk, BaseMessage) and chunk.content and chunk.content.strip():
-                    full_response += chunk.content
+                # Handle AIMessage/AIMessageChunk from the LLM
+                chunk_content: Optional[str] = None
 
-                    # Stream response chunk (without sources - will add at end)
+                if isinstance(chunk, AIMessageChunk):
+                    chunk_content = chunk.content
+                elif isinstance(chunk, BaseMessage):
+                    chunk_content = chunk.content
+                elif isinstance(chunk, str):
+                    chunk_content = chunk
+
+                if chunk_content and chunk_content.strip():
+                    full_response += chunk_content
                     yield RagChatResponse(
                         model=self._llm_service.get_model_spec().name,
                         message=request.message.model_copy(
                             update={
                                 "role": MessageRole.ASSISTANT.value,
-                                "content": chunk.content,
+                                "content": chunk_content,
                             }
                         ),
                         done=False,
                         created_at=_get_current_timestamp(),
                     )
+
+            # Persist assistant response so the next prompt sees updated context
+            if full_response.strip():
+                self._session_service.add_assistant_message(
+                    request.session_id, full_response
+                )
 
             # Send final response with sources
             sources = self._create_source_citations(documents)
@@ -322,10 +426,12 @@ If the context doesn't contain relevant information, say so clearly."""
                 done=True,
                 sources=sources,
                 rag_metadata={
-                    "documents_retrieved": len(documents),
+                    "documents": len(documents),
+                    "context_available": bool(documents),
                     "context_tokens": self._context_manager.estimate_document_tokens(
                         Document(page_content=context)
-                    ),
+                    ) if context else 0,
+                    "rephrased_question": rephrased_question,
                 },
                 created_at=_get_current_timestamp(),
             )

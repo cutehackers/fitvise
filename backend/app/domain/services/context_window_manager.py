@@ -5,7 +5,7 @@ into LLM context windows while preserving maximum information.
 """
 
 import logging
-from typing import List, Literal
+from typing import Callable, List, Literal, Optional
 from dataclasses import dataclass
 
 from langchain_core.documents import Document
@@ -42,14 +42,21 @@ class ContextWindowManager:
 
     CHARS_PER_TOKEN = 4  # Rough estimate for English text
 
-    def __init__(self, config: ContextWindow):
+    def __init__(
+        self,
+        config: ContextWindow,
+        summarizer: Optional[Callable[[List[Document], int], str]] = None,
+    ):
         """Initialize context window manager.
 
         Args:
             config: Context window configuration
+            summarizer: Optional callable to summarize documents when truncation
+                strategy is "summarize"
         """
         self.config = config
         self._available_tokens = config.max_tokens - config.reserve_tokens
+        self._summarizer = summarizer
 
         logger.info(
             "ContextWindowManager initialized: max_tokens=%d, reserve=%d, strategy=%s",
@@ -74,6 +81,10 @@ class ContextWindowManager:
         Raises:
             ValueError: If query + system prompt exceed available tokens
         """
+        if not documents:
+            logger.debug("No documents supplied; returning empty context string")
+            return ""
+
         # Calculate tokens for query and system prompt
         query_tokens = self._estimate_tokens(user_query)
         system_tokens = self._estimate_tokens(system_prompt)
@@ -106,10 +117,16 @@ class ContextWindowManager:
 
         actual_tokens = self._estimate_tokens(context)
         logger.debug(
-            "Context fitted: strategy=%s, docs_used=%d, context_tokens=%d",
+            (
+                "Context fitted: strategy=%s, docs_used=%d, context_tokens=%d, "
+                "available_for_context=%d, query_tokens=%d, system_tokens=%d"
+            ),
             self.config.truncation_strategy,
             self._count_documents_in_context(context),
             actual_tokens,
+            available_for_context,
+            query_tokens,
+            system_tokens,
         )
 
         return context
@@ -190,8 +207,8 @@ class ContextWindowManager:
     def _summarize(self, documents: List[Document], max_tokens: int) -> str:
         """Summarize documents to fit window.
 
-        Placeholder for future enhancement with actual summarization.
-        Currently falls back to relevance-based truncation.
+        Uses injected summarizer when provided; otherwise falls back to
+        relevance-based truncation with a warning.
 
         Args:
             documents: List of documents to summarize
@@ -200,8 +217,17 @@ class ContextWindowManager:
         Returns:
             Summarized context string
         """
+        if self._summarizer:
+            try:
+                return self._summarizer(documents, max_tokens)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                logger.warning(
+                    "Summarizer callable failed (%s); falling back to relevance truncation",
+                    exc,
+                )
+
         logger.warning(
-            "Summarization not yet implemented, falling back to relevance truncation"
+            "Summarization not configured; falling back to relevance truncation"
         )
         return self._truncate_by_relevance(documents, max_tokens)
 

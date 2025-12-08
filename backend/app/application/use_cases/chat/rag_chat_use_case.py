@@ -71,17 +71,44 @@ class RagChatUseCase:
     - Session management through SessionService
     - Document retrieval through injected BaseRetriever
     - Context management through ContextWindowManager
+    
+    Prompts Guideline:
+    - Ambiguity Resolution: Specifically targeting pronouns ("it", "that") in the Rephrase chain.
+    - Topic Shifting: Ensuring the Rephrase chain detects when a user changes the subject so it doesn't pollute the query with old context.
+    - Medical/Safety Guardrails: Critical for a fitness app (QA chain).
+    - Context Faithfulness: Reducing hallucinations by explicitly defining how to handle irrelevant retrieved documents (QA chain). 
     """
 
-    # RAG prompt template with citation instructions
-    SYSTEM_PROMPT = """You are a helpful fitness assistant. Answer questions using the provided context.
-
-IMPORTANT: When using information from the context, cite your sources using [1], [2], etc.
-
-Context:
-{context}
-
-If the context doesn't contain relevant information, say so clearly."""
+    # RAG prompt template with citation instructions, question and answer prompt.
+    QA_SYSTEM_PROMPT = (
+        "You are Fitvise, an elite fitness and wellness AI assistant. "
+        "You answer questions based on the retrieved context below and conversation history.\n\n"
+        
+        "### CORE BEHAVIORS:\n"
+        "1. **Safety First, But Helpful:** If a user asks for something unsafe (e.g., 'lose 10kg in 1 week'), "
+        "**DO NOT refuse to answer.** Instead:\n"
+        "   - Acknowledge the goal.\n"
+        "   - Explain the risks (injury, burnout).\n"
+        "   - **Negotiate:** Propose a safer, realistic alternative.\n"
+        "2. **Tone:** Motivating, clear, professional, and empathetic.\n\n"
+        
+        "### INTELLIGENT CONTEXT USAGE:\n"
+        "1. **Analyze Context:** Do the retrieved documents actually answer the specific question?\n"
+        "2. **Handling Misses (Empty/Irrelevant Context):**\n"
+        "   - If the retrieved text is unrelated to the user's specific query (e.g., keyword match only), **IGNORE it**.\n"
+        "   - Fall back to your internal expert knowledge to answer the user's question directly and comprehensively.\n"
+        "   - **No Fake Citations:** Do NOT use [1], [2] citations if you are answering from general knowledge.\n"
+        "3. **Handling Hits (Good Context):**\n"
+        "   - Base your answer primarily on the context.\n"
+        "   - Cite sources using [1], [2] notation at the end of the relevant sentence.\n\n"
+        
+        "### FORMATTING RULES:\n"
+        "- Use **Markdown** (Bold key terms, Headers).\n"
+        "- Use **Bullet Points** for plans/steps.\n\n"
+        
+        "### RETRIEVED CONTEXT:\n"
+        "{context}"
+    )
 
     def __init__(
         self,
@@ -117,7 +144,7 @@ If the context doesn't contain relevant information, say so clearly."""
 
         # Store the rephrase chain for standalone usage in chat()
         self._rephrase_chain = self._build_rephrase_chain()
-        
+
         # Build the QA chain that outputs AIMessage directly (for history compatibility)
         self._qa_chain = self._build_qa_chain()
         self._chain = self._build_chain_with_history(self._qa_chain)
@@ -128,63 +155,70 @@ If the context doesn't contain relevant information, say so clearly."""
 
     def _build_rephrase_chain(self) -> Runnable:
         """Build the question rephrasing chain.
-        
+
         This chain reformulates user questions based on conversation history
         for more effective document retrieval.
-        
+
         Returns:
             Runnable chain that takes {"input": str, "history": List} and returns str
         """
         rephrase_prompt = ChatPromptTemplate.from_messages([
             ("system", (
-                "You are Fitvise, a fitness AI assistant helping users reformulate their questions "
-                "based on conversation history for better context retrieval.\n\n"
-                "Your task is to transform the user's latest question into an effective search query "
-                "that captures their fitness-related intent, considering the full conversation context.\n\n"
-                "Guidelines:\n"
-                "- Include relevant fitness concepts from the conversation history\n"
-                "- Maintain the core intent of the original question\n"
-                "- Add specific fitness terminology when helpful\n"
-                "- Keep the query concise but comprehensive\n"
-                "- Focus on exercise, nutrition, wellness, or fitness goals\n"
-                "- Formulate a standalone question which can be understood without the chat history\n"
-                "- Do NOT answer the question, just reformulate it if needed and otherwise return it as is\n"
+                "You are the 'Query Reformulator' for Fitvise, a fitness AI.\n"
+                "Your task is to rewrite the last message in the conversation into a standalone, "
+                "keyword-rich search query optimized for a vector database retrieval system.\n\n"
+                
+                "### ALGORITHM:\n"
+                "1. **Analyze the Input:** Look at the latest user message.\n"
+                "2. **Check History:** Look at the conversation history to resolve pronouns (it, they, that, the exercise) "
+                "or missing context (e.g., if user says 'how many reps?', context implies 'how many reps for [previous exercise]').\n"
+                "3. **Detect Topic Shift:** If the user changes the topic (e.g., from 'Squats' to 'Diet'), IGNORE previous history "
+                "and treat the input as a fresh query.\n"
+                "4. **Classify:**\n"
+                "   - If input is a **Greeting/Phatic** (e.g., 'Hi', 'Thanks'): Return strictly 'GREETING'.\n"
+                "   - If input is **Nonsense/Unclear**: Return the original input as is.\n"
+                "   - If input is a **Question/Command**: Reformulate it.\n\n"
+                
+                "### REFORMULATION RULES:\n"
+                "- **De-contextualize:** Replace relative terms with specific entities (e.g., 'Is *it* safe?' -> 'Is *creatine* safe?').\n"
+                "- **Expand Keywords:** Add relevant fitness domain terms (e.g., 'chest workout' -> 'pectoral hypertrophy exercises chest workout').\n"
+                "- **Maintain Intent:** Do not answer the question. Do not change the user's goal.\n"
+                "- **Conciseness:** Remove polite fillers ('Could you please tell me...').\n\n"
+                
+                "### EXAMPLES:\n"
+                "History: [User: How do I bench press?]\n"
+                "Input: 'What muscles does it work?'\n"
+                "Output: 'Target muscles worked during barbell bench press'\n\n"
+                
+                "History: [User: Tell me about Keto.]\n"
+                "Input: 'Actually, tell me about Yoga.'\n"
+                "Output: 'Yoga benefits and poses for beginners'\n\n"
+                
+                "Return ONLY the reformulated query string."
             )),
             MessagesPlaceholder(variable_name="history", optional=True),
             ("human", "{input}"),
         ])
-        
+
         return rephrase_prompt | self._llm | StrOutputParser()
 
     def _build_qa_chain(self) -> Runnable:
         """Build the QA answer chain.
-        
+
         This chain generates the final answer using context and conversation history.
-        CRITICAL: This chain must output AIMessage directly (not a dict) for 
+        CRITICAL: This chain must output AIMessage directly (not a dict) for
         RunnableWithMessageHistory to properly track conversation history.
-        
+
         Returns:
             Runnable chain that takes {"input": str, "context": str, "history": List}
             and returns AIMessage
         """
         qa_prompt = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are Fitvise, an expert fitness AI assistant. Provide comprehensive, "
-                "accurate answers using the retrieved fitness context and conversation history.\n\n"
-                "Response Guidelines:\n"
-                "- Base answers primarily on the provided context when relevant and available\n"
-                "- Cite sources using [1], [2] format when using contextual information\n"
-                "- Include specific fitness details, exercises, or nutritional information from context\n"
-                "- If no relevant context was found, state this clearly and provide general fitness guidance\n"
-                "- If the retrieved context is empty or irrelevant, rely on your fitness expertise and conversation history\n"
-                "- Maintain a supportive, professional, and safety-focused tone\n"
-                "- Prioritize evidence-based fitness information\n\n"
-                "Retrieved Context:\n{context}"
-            )),
+            ("system", self.QA_SYSTEM_PROMPT),
             MessagesPlaceholder("history"),
             ("human", "{input}"),
         ])
-        
+
         # Output AIMessage directly - do NOT use StrOutputParser
         # This is critical for RunnableWithMessageHistory to save the response to history
         return qa_prompt | self._llm
@@ -223,16 +257,16 @@ If the context doesn't contain relevant information, say so clearly."""
         ]
 
     def _rephrase_query(
-        self, 
-        question: str, 
+        self,
+        question: str,
         history: List[BaseMessage]
     ) -> str:
         """Rephrase the question using conversation history.
-        
+
         Args:
             question: The original user question
             history: Conversation history messages
-            
+
         Returns:
             Rephrased question string, or original if no history
         """
@@ -267,14 +301,14 @@ If the context doesn't contain relevant information, say so clearly."""
             logger.debug("Retrieved %d documents for query", len(documents))
 
             # Attach indices for clear in-context citations
-            indexed_documents = self._prepare_context_documents(documents)
+            docs = self._prepare_context_documents(documents)
 
             # Step 2: Fit documents into context window
             try:
                 context = self._context_manager.fit_to_window(
-                    indexed_documents,
+                    docs,
                     user_query=query,
-                    system_prompt=self.SYSTEM_PROMPT,
+                    system_prompt=self.QA_SYSTEM_PROMPT,
                 )
             except ValueError as e:
                 logger.warning(
@@ -286,7 +320,7 @@ If the context doesn't contain relevant information, say so clearly."""
                 current_tokens = 0
                 max_tokens = self._context_manager.get_available_tokens()
 
-                for doc in indexed_documents:
+                for doc in docs:
                     doc_tokens = self._context_manager.estimate_document_tokens(doc)
                     if current_tokens + doc_tokens <= max_tokens:
                         context_parts.append(doc.page_content)
@@ -297,9 +331,9 @@ If the context doesn't contain relevant information, say so clearly."""
                 context = "\n\n".join(context_parts)
 
             if not context:
-                context = "\n\n".join(doc.page_content for doc in indexed_documents)
+                context = "\n\n".join(doc.page_content for doc in docs)
 
-            return context, indexed_documents
+            return context, docs
 
         except Exception as e:
             logger.error("Failed to retrieve context: %s", str(e))
@@ -378,15 +412,15 @@ If the context doesn't contain relevant information, say so clearly."""
 
             # Step 1: Get session history for rephrasing (previous turns only)
             history_messages = list(session_history.messages)
-            
+
             # Step 2: Rephrase question if we have history (for better retrieval)
             rephrased_query = self._rephrase_query(
-                request.message.content, 
+                request.message.content,
                 history_messages
             )
             logger.debug(
-                "Rephrased question: '%s' -> '%s'", 
-                request.message.content, 
+                "Rephrased question: '%s' -> '%s'",
+                request.message.content,
                 rephrased_query
             )
 
@@ -559,5 +593,3 @@ If the context doesn't contain relevant information, say so clearly."""
         except Exception as e:
             logger.error("RagChatUseCase health check failed: %s", str(e))
             return False
-
-    

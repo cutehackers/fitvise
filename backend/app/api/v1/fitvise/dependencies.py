@@ -79,6 +79,12 @@ def get_context_window_manager() -> ContextWindowManager:
     return manager
 
 
+@lru_cache()
+def get_session_service() -> SessionService:
+    """Get shared session service to maintain chat history across requests."""
+    return SessionService()
+
+
 async def get_llama_index_retriever(
     container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
 ) -> BaseRetriever:
@@ -124,12 +130,14 @@ def get_llm_health_monitor() -> LlmHealthMonitor:
 
 
 async def get_rag_chat_use_case(
+    session_service: Annotated[SessionService, Depends(get_session_service)],
     container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)],
-    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)]
+    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)],
 ) -> RagChatUseCase:
     """Get RAG Chat use case with all dependencies.
 
     Args:
+        session_service: Shared session service for maintaining conversation history
         container: External services container with retriever and context manager
         callback_handler: Optional LangChain callback handler for analytics
 
@@ -145,9 +153,6 @@ async def get_rag_chat_use_case(
     llm_service = get_llm_service(settings, callback_handler)
     retriever = container.llama_index_retriever
     context_mgr = get_context_window_manager()
-
-    # Create session service with default configuration
-    session_service = SessionService()
 
     rag_chat_use_case = RagChatUseCase(
         llm_service=llm_service,

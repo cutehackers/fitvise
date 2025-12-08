@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 # Import LangChain for history management
 from langchain_core.chat_history import BaseChatMessageHistory, InMemoryChatMessageHistory
@@ -64,6 +64,37 @@ class SessionService:
         # LangChain history management (matching LangChainOrchestrator pattern)
         self._session_store: Dict[str, BaseChatMessageHistory] = {}
 
+    def _new_session_id(self) -> str:
+        """Generate a new opaque session identifier."""        
+        return str(uuid4())
+
+    class _TrimmedInMemoryChatMessageHistory(InMemoryChatMessageHistory):
+        """History that applies trimming rules after each append."""
+
+        def __init__(self, trim_callback):
+            super().__init__()
+            self._trim_callback = trim_callback
+
+        def add_message(self, message):
+            super().add_message(message)
+            self._trim_callback(self)
+
+        def add_messages(self, messages):
+            super().add_messages(messages)
+            self._trim_callback(self)
+
+        def add_user_message(self, message):
+            super().add_user_message(message)
+            self._trim_callback(self)
+
+        def add_ai_message(self, message):
+            super().add_ai_message(message)
+            self._trim_callback(self)
+
+        def add_system_message(self, message):
+            super().add_system_message(message)
+            self._trim_callback(self)
+
     def get_session_history(self, session_id: str) -> BaseChatMessageHistory:
         """Get session history (matching LangChainOrchestrator interface exactly).
 
@@ -86,8 +117,27 @@ class SessionService:
             return self._session_store[session_id]
 
         # Create new LangChain history
-        self._session_store[session_id] = InMemoryChatMessageHistory()
+        self._session_store[session_id] = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
         return self._session_store[session_id]
+
+    def ensure_session(self, session_id: Optional[str] = None) -> tuple[str, BaseChatMessageHistory]:
+        """Ensure a session exists, creating it when needed.
+
+        Args:
+            session_id: Optional caller-provided session identifier.
+
+        Returns:
+            Tuple of normalized session_id and its chat history instance.
+        """
+
+        id = session_id.strip() if session_id and session_id.strip() else self._new_session_id()
+        history = self._session_store.get(id)
+
+        if history is None:
+            history = self._TrimmedInMemoryChatMessageHistory(self._trim_history)
+            self._session_store[id] = history
+
+        return id, history
 
     def add_user_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Add a user message to the session history.
@@ -99,7 +149,6 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_user_message(HumanMessage(content=content))
-        self._trim_history(history)
 
     def add_assistant_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Add an assistant message to the session history.
@@ -111,7 +160,6 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_ai_message(AIMessage(content=content))
-        self._trim_history(history)
 
     def add_system_message(self, session_id: str, content: str, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Add a system message to the session history.
@@ -123,7 +171,6 @@ class SessionService:
         """
         history = self.get_session_history(session_id)
         history.add_message(SystemMessage(content=content))
-        self._trim_history(history)
 
     def clear_session(self, session_id: str) -> bool:
         """Clear session history for a specific session.

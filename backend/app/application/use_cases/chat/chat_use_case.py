@@ -171,11 +171,13 @@ class ChatUseCase:
             Exception: For unexpected errors (wrapped as ChatOrchestratorError)
         """
         try:
+            # Ensure a session exists (generate one for first-time chats)
+            session_id, session_history = self._session_service.ensure_session(request.session_id)
+            if request.session_id != session_id:
+                request = request.model_copy(update={"session_id": session_id})
+
             # Validate request using the same pattern as original orchestrators
             self._ensure_chat_request(request)
-
-            # Get persistent LangChain history from SessionService
-            session_history = self._session_service.get_session_history(request.session_id)
 
             # Apply conditional trimming
             smart_trimmer = self._get_smart_trimmer(session_history.messages)
@@ -202,7 +204,7 @@ class ChatUseCase:
             )
 
             # Process message and stream response
-            config = {"configurable": {"session_id": request.session_id}}
+            config = {"configurable": {"session_id": session_id}}
 
             async for chunk in runnable_with_history.astream(
                 {"input": request.message.content},
@@ -216,6 +218,7 @@ class ChatUseCase:
                             update={"role": MessageRole.ASSISTANT.value, "content": chunk.content}
                         ),
                         done=False,
+                        session_id=session_id,
                         created_at=_get_current_timestamp(),
                     )
 
@@ -223,6 +226,7 @@ class ChatUseCase:
             yield ChatResponse(
                 model=self._llm_service.get_model_spec().name,
                 done=True,
+                session_id=session_id,
                 created_at=_get_current_timestamp(),
             )
 
@@ -232,7 +236,7 @@ class ChatUseCase:
         except Exception as e:
             logger.error(
                 "Error processing chat message for session %s: %s",
-                request.session_id if hasattr(request, 'session_id') else 'unknown',
+                session_id,
                 str(e),
             )
             # Log detailed exception info for debugging
@@ -248,7 +252,7 @@ class ChatUseCase:
             # Wrap unexpected exceptions in ChatOrchestratorError
             raise ChatOrchestratorError(
                 f"Failed to process chat message: {str(e)}",
-                session_id=request.session_id,
+                session_id=session_id,
                 original_error=e,
             )
 

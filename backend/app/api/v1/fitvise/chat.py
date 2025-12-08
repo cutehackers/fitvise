@@ -4,7 +4,7 @@ Workout API endpoints for fitness-related LLM interactions.
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Annotated, Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -30,6 +30,7 @@ from app.schemas.chat import (
 )
 from app.domain.entities.message_role import MessageRole
 from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
+from app.application.use_cases.chat.rag_chat_use_case import RagChatUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,7 @@ async def chat(
 )
 async def chat_with_rag(
     request: ChatRequest,
-    rag_chat_use_case=Depends(get_rag_chat_use_case),
+    rag_chat_use_case: Annotated[RagChatUseCase, Depends(get_rag_chat_use_case)],
 ) -> StreamingResponse:
     """
     Handle chat requests with RAG (Retrieval-Augmented Generation).

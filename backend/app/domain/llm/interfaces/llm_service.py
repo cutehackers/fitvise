@@ -5,7 +5,7 @@ from typing import AsyncGenerator, Dict, Any, Optional
 
 from app.domain.llm.entities.message import Message
 from app.domain.llm.entities.model_spec import ModelSpec
-from langchain_core.language_models.chat_models import BaseChatModel   
+from langchain_core.language_models.chat_models import BaseChatModel
 
 
 class LLMService(ABC):

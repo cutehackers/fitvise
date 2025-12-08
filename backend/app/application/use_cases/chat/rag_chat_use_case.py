@@ -13,8 +13,9 @@ import logging
 from datetime import datetime, timezone
 from typing import AsyncGenerator, List, Dict, Any, Optional, Tuple
 
+from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.messages import AIMessageChunk, BaseMessage
-from langchain_core.runnables import Runnable
+from langchain_core.runnables import Runnable, RunnableWithMessageHistory
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.retrievers import BaseRetriever
@@ -119,6 +120,7 @@ If the context doesn't contain relevant information, say so clearly."""
         
         # Build the QA chain that outputs AIMessage directly (for history compatibility)
         self._qa_chain = self._build_qa_chain()
+        self._chain = self._build_chain_with_history(self._qa_chain)
 
         logger.info(
             "RagChatUseCase initialized with modern LCEL chain, retriever, context manager, and session service"
@@ -187,6 +189,29 @@ If the context doesn't contain relevant information, say so clearly."""
         # This is critical for RunnableWithMessageHistory to save the response to history
         return qa_prompt | self._llm
 
+    def _build_chain_with_history(self, chain: Runnable) -> RunnableWithMessageHistory:
+        """Wrap a runnable with LangChain message history management."""
+
+        def get_session_history(config: Dict[str, Any]) -> BaseChatMessageHistory:
+            session_id = None
+            configurable = config.get("configurable") if isinstance(config, dict) else None
+            if configurable:
+                session_id = configurable.get("session_id")
+            # Fallback: create a session if none was provided in the config
+            if not session_id:
+                session_id, history = self._session_service.ensure_session()
+                logger.debug("Generated session_id for missing history: %s", session_id)
+                return history
+            return self._session_service.get_session_history(session_id)
+
+        return RunnableWithMessageHistory(
+            chain,
+            get_session_history,
+            input_messages_key="input",
+            history_messages_key="history",
+            history_factory_config_keys=["session_id"],
+        )
+
     @staticmethod
     def _prepare_context_documents(documents: List[Document]) -> List[Document]:
         """Attach stable indices to documents for in-context citation."""
@@ -198,7 +223,7 @@ If the context doesn't contain relevant information, say so clearly."""
             for idx, doc in enumerate(documents, start=1)
         ]
 
-    def _rephrase_question_with_history(
+    def _rephrase_query(
         self, 
         question: str, 
         history: List[BaseMessage]
@@ -342,53 +367,48 @@ If the context doesn't contain relevant information, say so clearly."""
             ChatOrchestratorError: If RAG processing fails
             Exception: For unexpected errors (wrapped as ChatOrchestratorError)
         """
+        session_id = request.session_id
         try:
+            # Create or retrieve a session for first-time conversations
+            session_id, session_history = self._session_service.ensure_session(session_id)
+            if request.session_id != session_id:
+                request = request.model_copy(update={"session_id": session_id})
+
             # Validate request
             self._ensure_chat_request(request)
 
             # Step 1: Get session history for rephrasing (previous turns only)
-            session_history = self._session_service.get_session_history(request.session_id)
             history_messages = list(session_history.messages)
             
             # Step 2: Rephrase question if we have history (for better retrieval)
-            rephrased_question = self._rephrase_question_with_history(
+            rephrased_query = self._rephrase_query(
                 request.message.content, 
                 history_messages
             )
             logger.debug(
                 "Rephrased question: '%s' -> '%s'", 
                 request.message.content, 
-                rephrased_question
+                rephrased_query
             )
 
             # Step 3: Retrieve documents using rephrased question (with robust fallbacks)
-            context, documents = await self._retrieve(rephrased_question)
+            context, documents = await self._retrieve(rephrased_query)
             logger.debug(
                 "Retrieved %d documents for RAG (context length=%d)",
                 len(documents),
                 len(context),
             )
 
-            # Persist the current user turn for future prompts
-            # We are not using RunnableWithMessageHistory here, so we manage history explicitly.
-            self._session_service.add_user_message(
-                request.session_id, request.message.content
-            )
-
             # Step 4: Stream answer using explicit history
-            # The chain receives: {"input": str, "context": str, "history": List[BaseMessage]}
+            # The chain receives: {"input": str, "context": str}; history is injected by RunnableWithMessageHistory.
             chain_inputs = {
                 "input": request.message.content,
                 "context": context,
-                "history": history_messages,
             }
-            config = {"configurable": {"session_id": request.session_id}}
+            config = {"configurable": {"session_id": session_id}}
             full_response = ""
 
-            async for chunk in self._qa_chain.astream(
-                chain_inputs,
-                config=config,
-            ):
+            async for chunk in self._chain.astream(chain_inputs, config=config,):
                 # Handle AIMessage/AIMessageChunk from the LLM
                 chunk_content: Optional[str] = None
 
@@ -410,14 +430,9 @@ If the context doesn't contain relevant information, say so clearly."""
                             }
                         ),
                         done=False,
+                        session_id=session_id,
                         created_at=_get_current_timestamp(),
                     )
-
-            # Persist assistant response so the next prompt sees updated context
-            if full_response.strip():
-                self._session_service.add_assistant_message(
-                    request.session_id, full_response
-                )
 
             # Send final response with sources
             sources = self._create_source_citations(documents)
@@ -431,8 +446,9 @@ If the context doesn't contain relevant information, say so clearly."""
                     "context_tokens": self._context_manager.estimate_document_tokens(
                         Document(page_content=context)
                     ) if context else 0,
-                    "rephrased_question": rephrased_question,
+                    "rephrased_question": rephrased_query,
                 },
+                session_id=session_id,
                 created_at=_get_current_timestamp(),
             )
 
@@ -442,12 +458,12 @@ If the context doesn't contain relevant information, say so clearly."""
         except Exception as e:
             logger.error(
                 "Error processing RAG chat message for session %s: %s",
-                request.session_id,
+                session_id,
                 str(e),
             )
             raise ChatOrchestratorError(
                 f"Failed to process RAG chat message: {str(e)}",
-                session_id=request.session_id,
+                session_id=session_id,
                 original_error=e,
             )
 

@@ -4,10 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.documents import Document
 
 from app.main import app
-from app.schemas.chat import ChatMessage, ChatRequest
+from app.schemas.chat import ChatMessage, RagChatResponse, SourceCitation
+from app.api.v1.fitvise.dependencies import get_rag_chat_use_case, get_llm_health_monitor
+from app.infrastructure.llm.dependencies import get_chat_use_case
 
 
 class TestRagChatEndpoints:
@@ -27,29 +28,34 @@ class TestRagChatEndpoints:
     def test_chat_rag_success(self, client, mock_rag_use_case):
         """Test successful RAG chat request."""
         # Mock RAG response
-        async def mock_stream():
-            chunks = ["Exercise ", "is ", "important."]
-            for chunk in chunks:
-                yield chunk
-
-        mock_docs = [
-            Document(
-                page_content="Exercise improves health",
-                metadata={
-                    "chunk_id": "1",
-                    "document_id": "doc_1",
-                    "similarity_score": 0.92,
-                },
+        async def mock_chat(_):
+            yield RagChatResponse(
+                model="test-model",
+                session_id="session-123",
+                message=ChatMessage(role="assistant", content="Exercise "),
+                done=False,
+                created_at="2024-01-01T00:00:00Z",
             )
-        ]
+            yield RagChatResponse(
+                model="test-model",
+                session_id="session-123",
+                message=ChatMessage(role="assistant", content="is "),
+                done=False,
+                created_at="2024-01-01T00:00:01Z",
+            )
+            yield RagChatResponse(
+                model="test-model",
+                session_id="session-123",
+                done=True,
+                sources=[],
+                created_at="2024-01-01T00:00:02Z",
+            )
 
-        mock_rag_use_case.execute_rag_stream = AsyncMock(
-            return_value=(mock_stream(), mock_docs)
-        )
+        mock_rag_use_case.chat = mock_chat
 
         # Patch dependency
         with patch(
-            "app.api.v1.fitvise.chat.get_rag_use_case", return_value=mock_rag_use_case
+            "app.api.v1.fitvise.chat.get_rag_chat_use_case", return_value=mock_rag_use_case
         ):
             response = client.post(
                 "/api/v1/fitvise/chat-rag",
@@ -90,7 +96,12 @@ class TestRagChatEndpoints:
             },
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 200
+        import ast
+
+        first_line = response.text.strip().split("\n")[0]
+        parsed = ast.literal_eval(first_line)
+        assert parsed["code"] == "RAG_VALIDATION_ERROR"
 
     def test_chat_rag_missing_message(self, client):
         """Test RAG chat with missing message field."""
@@ -103,46 +114,85 @@ class TestRagChatEndpoints:
 
     def test_chat_rag_missing_session_id(self, client):
         """Test RAG chat with missing session_id."""
+        async def mock_chat(_):
+            yield RagChatResponse(
+                model="test-model",
+                session_id="generated-session",
+                message=ChatMessage(role="assistant", content="hi"),
+                done=False,
+                created_at="2024-01-01T00:00:00Z",
+            )
+            yield RagChatResponse(
+                model="test-model",
+                session_id="generated-session",
+                done=True,
+                sources=[],
+                created_at="2024-01-01T00:00:01Z",
+            )
+
+        mock_use_case = MagicMock()
+        mock_use_case.chat = mock_chat
+
+        app.dependency_overrides[get_rag_chat_use_case] = lambda: mock_use_case
         response = client.post(
             "/api/v1/fitvise/chat-rag",
             json={"message": {"role": "user", "content": "test"}},
         )
+        app.dependency_overrides.clear()
 
-        assert response.status_code == 422  # Validation error
+        assert response.status_code == 200
+
+        lines = response.text.strip().split("\n")
+        import json
+
+        first_chunk = json.loads(lines[0])
+        assert first_chunk["session_id"] == "generated-session"
 
     def test_chat_rag_streaming_response_format(self, client, mock_rag_use_case):
         """Test that streaming response follows expected format."""
-
-        async def mock_stream():
-            yield "Chunk 1"
-            yield "Chunk 2"
-
-        mock_docs = [
-            Document(
-                page_content="Source content",
-                metadata={
-                    "chunk_id": "1",
-                    "document_id": "doc_1",
-                    "similarity_score": 0.88,
-                    "source": "test.pdf",
-                },
+        async def mock_chat(_):
+            yield RagChatResponse(
+                model="test-model",
+                session_id="test-session",
+                message=ChatMessage(role="assistant", content="Chunk 1"),
+                done=False,
+                created_at="2024-01-01T00:00:00Z",
             )
-        ]
+            yield RagChatResponse(
+                model="test-model",
+                session_id="test-session",
+                message=ChatMessage(role="assistant", content="Chunk 2"),
+                done=False,
+                created_at="2024-01-01T00:00:01Z",
+            )
+            yield RagChatResponse(
+                model="test-model",
+                session_id="test-session",
+                done=True,
+                sources=[
+                    SourceCitation(
+                        index=1,
+                        content="Source content",
+                        similarity_score=0.88,
+                        document_id="doc_1",
+                        chunk_id="1",
+                        metadata={"source": "test.pdf"},
+                    )
+                ],
+                created_at="2024-01-01T00:00:02Z",
+            )
 
-        mock_rag_use_case.execute_rag_stream = AsyncMock(
-            return_value=(mock_stream(), mock_docs)
+        mock_rag_use_case.chat = mock_chat
+
+        app.dependency_overrides[get_rag_chat_use_case] = lambda: mock_rag_use_case
+        response = client.post(
+            "/api/v1/fitvise/chat-rag",
+            json={
+                "message": {"role": "user", "content": "test query"},
+                "session_id": "test-session",
+            },
         )
-
-        with patch(
-            "app.api.v1.fitvise.chat.get_rag_use_case", return_value=mock_rag_use_case
-        ):
-            response = client.post(
-                "/api/v1/fitvise/chat-rag",
-                json={
-                    "message": {"role": "user", "content": "test query"},
-                    "session_id": "test-session",
-                },
-            )
+        app.dependency_overrides.clear()
 
         # Parse response lines
         lines = response.text.strip().split("\n")
@@ -162,37 +212,42 @@ class TestRagChatEndpoints:
 
     def test_chat_rag_source_citation_format(self, client, mock_rag_use_case):
         """Test that source citations have correct format."""
-
-        async def mock_stream():
-            yield "Response"
-
-        mock_docs = [
-            Document(
-                page_content="Source content with metadata",
-                metadata={
-                    "chunk_id": "chunk_abc",
-                    "document_id": "doc_xyz",
-                    "similarity_score": 0.95,
-                    "source": "fitness_guide.pdf",
-                    "page": 42,
-                },
+        async def mock_chat(_):
+            yield RagChatResponse(
+                model="test-model",
+                session_id="test",
+                message=ChatMessage(role="assistant", content="Response"),
+                done=False,
+                created_at="2024-01-01T00:00:00Z",
             )
-        ]
+            yield RagChatResponse(
+                model="test-model",
+                session_id="test",
+                done=True,
+                sources=[
+                    SourceCitation(
+                        index=1,
+                        content="Source content with metadata",
+                        similarity_score=0.95,
+                        document_id="doc_xyz",
+                        chunk_id="chunk_abc",
+                        metadata={"source": "fitness_guide.pdf", "page": 42},
+                    )
+                ],
+                created_at="2024-01-01T00:00:01Z",
+            )
 
-        mock_rag_use_case.execute_rag_stream = AsyncMock(
-            return_value=(mock_stream(), mock_docs)
+        mock_rag_use_case.chat = mock_chat
+
+        app.dependency_overrides[get_rag_chat_use_case] = lambda: mock_rag_use_case
+        response = client.post(
+            "/api/v1/fitvise/chat-rag",
+            json={
+                "message": {"role": "user", "content": "test"},
+                "session_id": "test",
+            },
         )
-
-        with patch(
-            "app.api.v1.fitvise.chat.get_rag_use_case", return_value=mock_rag_use_case
-        ):
-            response = client.post(
-                "/api/v1/fitvise/chat-rag",
-                json={
-                    "message": {"role": "user", "content": "test"},
-                    "session_id": "test",
-                },
-            )
+        app.dependency_overrides.clear()
 
         # Parse final response with sources
         import json
@@ -235,11 +290,9 @@ class TestHealthEndpoints:
             }
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -266,11 +319,9 @@ class TestHealthEndpoints:
             }
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -294,11 +345,9 @@ class TestHealthEndpoints:
             }
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -325,11 +374,9 @@ class TestHealthEndpoints:
             }
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -343,11 +390,9 @@ class TestHealthEndpoints:
             side_effect=Exception("Health check failed")
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -361,11 +406,9 @@ class TestHealthEndpoints:
             side_effect=Exception("Metrics retrieval failed")
         )
 
-        with patch(
-            "app.api.v1.fitvise.chat.get_llm_health_monitor",
-            return_value=mock_monitor,
-        ):
-            response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides[get_llm_health_monitor] = lambda: mock_monitor
+        response = client.get("/api/v1/fitvise/health/llm/metrics")
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         data = response.json()
@@ -383,28 +426,38 @@ class TestExistingChatEndpoint:
 
     def test_regular_chat_still_works(self, client):
         """Test that regular /chat endpoint is not affected."""
-        # Mock LLM service
-        with patch("app.api.v1.fitvise.chat.llm_service") as mock_llm_service:
+        # Mock ChatUseCase dependency
+        mock_chat_use_case = MagicMock()
 
-            async def mock_chat_stream(request):
-                from app.schemas.chat import ChatResponse, ChatMessage
+        async def mock_chat_stream(_request):
+            from app.schemas.chat import ChatResponse, ChatMessage
 
-                yield ChatResponse(
-                    model="llama3.2:3b",
-                    created_at="2025-11-13T10:00:00",
-                    message=ChatMessage(role="assistant", content="Test response"),
-                    done=True,
-                )
-
-            mock_llm_service.chat = mock_chat_stream
-
-            response = client.post(
-                "/api/v1/fitvise/chat",
-                json={
-                    "message": {"role": "user", "content": "test"},
-                    "session_id": "test",
-                },
+            yield ChatResponse(
+                model="llama3.2:3b",
+                session_id="test",
+                created_at="2025-11-13T10:00:00",
+                message=ChatMessage(role="assistant", content="Test response"),
+                done=False,
             )
+            yield ChatResponse(
+                model="llama3.2:3b",
+                session_id="test",
+                created_at="2025-11-13T10:00:01",
+                done=True,
+            )
+
+        mock_chat_use_case.chat = mock_chat_stream
+        app.dependency_overrides[get_chat_use_case] = lambda: mock_chat_use_case
+
+        response = client.post(
+            "/api/v1/fitvise/chat",
+            json={
+                "message": {"role": "user", "content": "test"},
+                "session_id": "test",
+            },
+        )
+
+        app.dependency_overrides.clear()
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "application/x-ndjson"

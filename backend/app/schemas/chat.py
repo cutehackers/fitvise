@@ -111,7 +111,10 @@ class ChatRequest(BaseModel):
 
     model: str = Field(None, description="The model name")
     message: ChatMessage = Field(..., description="A chat message")
-    session_id: str = Field(..., description="Unique session identifier for chat history")
+    session_id: Optional[str] = Field(
+        None,
+        description="Unique session identifier for chat history. A new session is created when omitted.",
+    )
     tools: Optional[List[dict]] = Field(None, description="List of tools in JSON for the model to use if supported")
     think: Optional[bool] = Field(
         False,
@@ -134,6 +137,10 @@ class ChatResponse(BaseModel):
 
     model: str = Field(..., description="The model name used for the response.")
     created_at: str = Field(..., description="Timestamp of the response creation.")
+    session_id: Optional[str] = Field(
+        None,
+        description="Session identifier associated with this response.",
+    )
     message: Optional[ChatMessage] = Field(
         None,
         description="The message object from the assistant. Can be empty in the final chunk.",
@@ -177,6 +184,10 @@ class RagChatResponse(BaseModel):
 
     model: str = Field(..., description="Model used for generation")
     created_at: str = Field(..., description="Response timestamp")
+    session_id: Optional[str] = Field(
+        None,
+        description="Session identifier associated with this response.",
+    )
     message: Optional[ChatMessage] = Field(None, description="Generated message")
     done: bool = Field(..., description="Whether generation is complete")
     done_reason: Optional[str] = Field(None, description="Completion reason")

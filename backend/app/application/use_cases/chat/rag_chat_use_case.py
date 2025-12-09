@@ -31,6 +31,7 @@ from app.domain.services.context_window_manager import (
     ContextWindowManager,
 )
 from langchain_core.callbacks import BaseCallbackHandler
+from langfuse import propagate_attributes
 from app.schemas.chat import ChatRequest, RagChatResponse, SourceCitation
 
 logger = logging.getLogger(__name__)
@@ -449,31 +450,32 @@ class RagChatUseCase:
                 config["callbacks"] = self._callbacks
             full_response = ""
 
-            async for chunk in self._chain.astream(chain_inputs, config=config,):
-                # Handle AIMessage/AIMessageChunk from the LLM
-                chunk_content: Optional[str] = None
+            with propagate_attributes(session_id=session_id):
+                async for chunk in self._chain.astream(chain_inputs, config=config,):
+                    # Handle AIMessage/AIMessageChunk from the LLM
+                    chunk_content: Optional[str] = None
 
-                if isinstance(chunk, AIMessageChunk):
-                    chunk_content = chunk.content
-                elif isinstance(chunk, BaseMessage):
-                    chunk_content = chunk.content
-                elif isinstance(chunk, str):
-                    chunk_content = chunk
+                    if isinstance(chunk, AIMessageChunk):
+                        chunk_content = chunk.content
+                    elif isinstance(chunk, BaseMessage):
+                        chunk_content = chunk.content
+                    elif isinstance(chunk, str):
+                        chunk_content = chunk
 
-                if chunk_content and chunk_content.strip():
-                    full_response += chunk_content
-                    yield RagChatResponse(
-                        model=self._llm_service.get_model_spec().name,
-                        message=request.message.model_copy(
-                            update={
-                                "role": MessageRole.ASSISTANT.value,
-                                "content": chunk_content,
-                            }
-                        ),
-                        done=False,
-                        session_id=session_id,
-                        created_at=_get_current_timestamp(),
-                    )
+                    if chunk_content and chunk_content.strip():
+                        full_response += chunk_content
+                        yield RagChatResponse(
+                            model=self._llm_service.get_model_spec().name,
+                            message=request.message.model_copy(
+                                update={
+                                    "role": MessageRole.ASSISTANT.value,
+                                    "content": chunk_content,
+                                }
+                            ),
+                            done=False,
+                            session_id=session_id,
+                            created_at=_get_current_timestamp(),
+                        )
 
             # Send final response with sources
             sources = self._create_source_citations(documents)

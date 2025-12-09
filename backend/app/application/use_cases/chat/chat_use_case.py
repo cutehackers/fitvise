@@ -20,6 +20,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.callbacks import BaseCallbackHandler
+from langfuse import propagate_attributes
 
 from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
 from app.domain.llm.interfaces.llm_service import LLMService
@@ -208,26 +209,26 @@ class ChatUseCase:
                 history_messages_key="history",
             )
 
-            # Process message and stream response
             config = {"configurable": {"session_id": session_id}}
             if self._callbacks:
                 config["callbacks"] = self._callbacks
-
-            async for chunk in runnable_with_history.astream(
-                {"input": request.message.content},
-                config=config,
-            ):
-                if isinstance(chunk, BaseMessage) and chunk.content and chunk.content.strip():
-                    # Stream response chunk
-                    yield ChatResponse(
-                        model=self._llm_service.get_model_spec().name,
-                        message=request.message.model_copy(
-                            update={"role": MessageRole.ASSISTANT.value, "content": chunk.content}
-                        ),
-                        done=False,
-                        session_id=session_id,
-                        created_at=_get_current_timestamp(),
-                    )
+            
+            with propagate_attributes(session_id=session_id):
+                async for chunk in runnable_with_history.astream(
+                    {"input": request.message.content},
+                    config=config,
+                ):
+                    if isinstance(chunk, BaseMessage) and chunk.content and chunk.content.strip():
+                        # Stream response chunk
+                        yield ChatResponse(
+                            model=self._llm_service.get_model_spec().name,
+                            message=request.message.model_copy(
+                                update={"role": MessageRole.ASSISTANT.value, "content": chunk.content}
+                            ),
+                            done=False,
+                            session_id=session_id,
+                            created_at=_get_current_timestamp(),
+                        )
 
             # Send final response (empty message with done=True)
             yield ChatResponse(

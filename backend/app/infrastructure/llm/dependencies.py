@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from langchain_core.callbacks import BaseCallbackHandler
-from app.infrastructure.analytics.langchain_callbacks import LangFuseCallbackHandler
+from langfuse.langchain import CallbackHandler as LangfuseLangchainHandler
 
 from app.core.settings import Settings, settings
 from app.domain.llm.interfaces.llm_service import LLMService
@@ -47,12 +47,17 @@ def get_callback_handler(settings: Annotated[Settings, Depends(get_settings)]) -
             logger.info("LangFuse environment variables not found, analytics disabled")
             return None
 
+        # LangFuse SDK expects credentials in environment variables
+        if secret_key:
+            os.environ["LANGFUSE_SECRET_KEY"] = secret_key
+        if public_key:
+            os.environ["LANGFUSE_PUBLIC_KEY"] = public_key
+        if host:
+            os.environ["LANGFUSE_HOST"] = host
+
         # Import and create callback handler
-        callback_handler = LangFuseCallbackHandler(
-            secret_key=secret_key,
-            public_key=public_key,
-            host=host
-        )
+        # Note: LangfuseLangchainHandler does not accept credentials in __init__
+        callback_handler = LangfuseLangchainHandler(update_trace=True)
 
         logger.info("LangFuse callback handler initialized successfully")
         return callback_handler
@@ -82,12 +87,14 @@ def get_llm_service(
 def get_chat_use_case(
     llm_service: Annotated[LLMService, Depends(get_llm_service)],
     settings: Annotated[Settings, Depends(get_settings)],
+    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)],
 ) -> ChatUseCase:
     """Get Chat use case instance (replaces LangChainOrchestrator).
 
     Args:
         llm_service: LLM service
         settings: Application settings
+        callback_handler: Optional LangChain callback handler for analytics
 
     Returns:
         ChatUseCase implementation for basic chat functionality
@@ -100,5 +107,6 @@ def get_chat_use_case(
         session_service=session_service,
         turns_window=getattr(settings, 'chat_turns_window', 10),
         max_session_age_hours=getattr(settings, 'chat_max_session_age_hours', 24),
+        callback_handler=callback_handler,
     )
     return chat_use_case

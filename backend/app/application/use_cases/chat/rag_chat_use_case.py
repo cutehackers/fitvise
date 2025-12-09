@@ -136,6 +136,7 @@ class RagChatUseCase:
         self._context_manager = context_manager
         self._session_service = session_service
         self._callback_handler = callback_handler
+        self._callbacks = [callback_handler] if callback_handler else None
         self._turns_window = turns_window
         self._max_session_age_hours = max_session_age_hours
 
@@ -272,10 +273,14 @@ class RagChatUseCase:
         """
         if not history:
             return question
-        return self._rephrase_chain.invoke({
-            "input": question,
-            "history": history
-        })
+        callback_config = {"callbacks": self._callbacks} if self._callbacks else None
+        return self._rephrase_chain.invoke(
+            {
+                "input": question,
+                "history": history
+            },
+            config=callback_config,
+        )
 
 
     async def _retrieve(self, query: str) -> Tuple[str, List[Document]]:
@@ -292,7 +297,8 @@ class RagChatUseCase:
         """
         try:
             # Step 1: Retrieve relevant documents using LangChain retriever interface
-            documents = await self._retriever.ainvoke(query) or []
+            callback_config = {"callbacks": self._callbacks} if self._callbacks else None
+            documents = await self._retriever.ainvoke(query, config=callback_config) or []
 
             if not documents:
                 logger.warning("No documents retrieved for query: %s", query)
@@ -439,6 +445,8 @@ class RagChatUseCase:
                 "context": context,
             }
             config = {"configurable": {"session_id": session_id}}
+            if self._callbacks:
+                config["callbacks"] = self._callbacks
             full_response = ""
 
             async for chunk in self._chain.astream(chain_inputs, config=config,):

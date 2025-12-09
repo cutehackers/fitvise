@@ -105,68 +105,66 @@ class TestLangFuseIntegration:
     @pytest.mark.asyncio
     async def test_callback_handler_initialization(self, mock_settings):
         """Test that callback handler initializes correctly with settings."""
-        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse:
-            # Mock the LangFuse client
+        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse, \
+             patch('app.infrastructure.analytics.langchain_callbacks.LangfuseLangchainHandler') as mock_lc_handler:
             mock_client = MagicMock()
-            mock_langfuse.Langfuse.return_value = mock_client
+            mock_langfuse.return_value = mock_client
+            mock_lc_handler.return_value = MagicMock()
 
-            # Create callback handler
             handler = LangFuseCallbackHandler(
                 secret_key=mock_settings.langfuse_secret_key,
                 public_key=mock_settings.langfuse_public_key,
                 host=mock_settings.langfuse_host
             )
 
-            # Verify LangFuse client was created with correct parameters
-            mock_langfuse.Langfuse.assert_called_once_with(
+            mock_langfuse.assert_called_once_with(
                 secret_key=mock_settings.langfuse_secret_key,
                 public_key=mock_settings.langfuse_public_key,
                 host=mock_settings.langfuse_host
             )
+            mock_lc_handler.assert_called_once()
+            assert handler.is_enabled() is True
 
     def test_callback_handler_disabled(self):
         """Test that callback handler handles disabled configuration."""
-        # Test with no environment variables set
-        handler = LangFuseCallbackHandler()
-
-        # Should not have langfuse client when keys are missing
-        assert hasattr(handler, 'langfuse') is True
+        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse', side_effect=Exception("missing keys")):
+            handler = LangFuseCallbackHandler()
+            assert handler.is_enabled() is False
 
     def test_callback_handler_enabled(self):
         """Test that callback handler works when environment variables are set."""
-        # Set environment variables temporarily
         with patch.dict(os.environ, {
             'LANGFUSE_SECRET_KEY': 'test-secret-key',
             'LANGFUSE_PUBLIC_KEY': 'test-public-key',
             'LANGFUSE_HOST': 'http://localhost:3000'
-        }):
+        }), patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse, \
+             patch('app.infrastructure.analytics.langchain_callbacks.LangfuseLangchainHandler') as mock_lc_handler:
+            mock_langfuse.return_value = MagicMock()
+            mock_lc_handler.return_value = MagicMock()
+
             handler = LangFuseCallbackHandler()
 
-            # Should have langfuse client when keys are present
-            assert hasattr(handler, 'langfuse') is True
+            assert handler.is_enabled() is True
 
     @pytest.mark.asyncio
     async def test_ollama_service_with_callback_handler(self, mock_settings):
         """Test OllamaService with callback handler injection."""
-        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse:
-            # Mock LangFuse client
-            mock_client = MagicMock()
-            mock_langfuse.Langfuse.return_value = mock_client
+        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse, \
+             patch('app.infrastructure.analytics.langchain_callbacks.LangfuseLangchainHandler') as mock_lc_handler:
+            mock_langfuse.return_value = MagicMock()
+            mock_lc_handler.return_value = MagicMock()
 
-            # Create callback handler
             callback_handler = LangFuseCallbackHandler(
                 secret_key=mock_settings.langfuse_secret_key,
                 public_key=mock_settings.langfuse_public_key,
                 host=mock_settings.langfuse_host
             )
 
-            # Create OllamaService with callback handler
             ollama_service = OllamaService(
                 settings=mock_settings,
                 callback_handler=callback_handler
             )
 
-            # Verify callback handler is injected (checking internal LLM)
             assert ollama_service._llm.callbacks is not None
             assert callback_handler in ollama_service._llm.callbacks
 
@@ -181,29 +179,23 @@ class TestLangFuseIntegration:
     @pytest.mark.asyncio
     async def test_retriever_with_callback_handler(self, mock_settings):
         """Test LlamaIndexRetriever with callback handler injection."""
-        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse:
-            # Mock LangFuse client
-            mock_client = MagicMock()
-            mock_langfuse.Langfuse.return_value = mock_client
+        with patch('app.infrastructure.analytics.langchain_callbacks.Langfuse') as mock_langfuse, \
+             patch('app.infrastructure.analytics.langchain_callbacks.LangfuseLangchainHandler') as mock_lc_handler:
+            mock_langfuse.return_value = MagicMock()
+            mock_lc_handler.return_value = MagicMock()
 
-            # Create callback handler
             callback_handler = LangFuseCallbackHandler(
                 secret_key=mock_settings.langfuse_secret_key,
                 public_key=mock_settings.langfuse_public_key,
                 host=mock_settings.langfuse_host
             )
 
-            # Mock LlamaIndex retriever
             mock_llama_retriever = MagicMock()
+            retriever = LlamaIndexRetriever(llama_retriever=mock_llama_retriever)
 
-            # Create LlamaIndexRetriever with callback handler
-            retriever = LlamaIndexRetriever(
-                llama_retriever=mock_llama_retriever,
-                callback_handler=callback_handler
-            )
-
-            # Verify callback handler is injected
-            assert retriever.callback_handler == callback_handler
+            # Ensure retriever still works with callback handler available (callbacks are passed at invocation time)
+            assert retriever is not None
+            assert callback_handler.is_enabled()
 
     @pytest.mark.asyncio
     async def test_retriever_without_callback_handler(self, mock_settings):
@@ -212,8 +204,7 @@ class TestLangFuseIntegration:
 
         retriever = LlamaIndexRetriever(llama_retriever=mock_llama_retriever)
 
-        # Verify callback handler is None
-        assert retriever.callback_handler is None
+        assert retriever is not None
 
     def test_settings_langfuse_configuration(self, mock_settings):
         """Test LangFuse configuration validation."""

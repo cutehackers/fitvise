@@ -19,6 +19,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.callbacks import BaseCallbackHandler
 
 from app.domain.llm.exceptions import ChatOrchestratorError, MessageValidationError
 from app.domain.llm.interfaces.llm_service import LLMService
@@ -69,6 +70,7 @@ class ChatUseCase:
         session_service: SessionService,
         turns_window: int = 10,
         max_session_age_hours: int = 24,
+        callback_handler: Optional[BaseCallbackHandler] = None,
     ) -> None:
         """Initialize the chat use case.
 
@@ -77,11 +79,14 @@ class ChatUseCase:
             session_service: Service for session management
             turns_window: Number of conversation turns to keep in memory
             max_session_age_hours: Maximum age before sessions expire
+            callback_handler: Optional LangChain callback handler for observability
         """
         self._llm_service = llm_service
         self._session_service = session_service
         self._turns_window = turns_window
         self._max_session_age_hours = max_session_age_hours
+        self._callback_handler = callback_handler
+        self._callbacks = [callback_handler] if callback_handler else None
 
         # Basic chat prompt template
         self._prompt = ChatPromptTemplate([
@@ -205,6 +210,8 @@ class ChatUseCase:
 
             # Process message and stream response
             config = {"configurable": {"session_id": session_id}}
+            if self._callbacks:
+                config["callbacks"] = self._callbacks
 
             async for chunk in runnable_with_history.astream(
                 {"input": request.message.content},

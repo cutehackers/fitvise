@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence
 
 import pandas as pd
@@ -164,7 +164,7 @@ class ValidateQualityUseCase:
             ]
 
             metrics = DataQualityMetrics(
-                measured_at=datetime.utcnow(),
+                measured_at=datetime.now(timezone.utc),
                 validation_results=validations,
                 content_metrics=profile,
             )

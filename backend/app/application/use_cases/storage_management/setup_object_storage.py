@@ -74,7 +74,7 @@ class SetupObjectStorageUseCase:
         if request.test_object:
             now = datetime.now(timezone.utc).isoformat()
             test_put_key = f"health/initialized_at={now}.txt"
-            client.put_object(
+            await client.put_object(
                 buckets[0],
                 test_put_key,
                 f"initialized {now}".encode(),

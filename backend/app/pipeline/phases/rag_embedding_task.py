@@ -28,7 +28,9 @@ from app.application.use_cases.embedding.embed_document_chunks import (
     EmbedDocumentChunksUseCase,
 )
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
+from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
+from app.domain.repositories.embedding_repository import EmbeddingRepository
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +141,7 @@ class RagEmbeddingTask:
         self,
         external_services: ExternalServicesContainer,
         document_repository: DocumentRepository,
+        embedding_repository: EmbeddingRepository,
         verbose: bool = False,
     ):
         """Initialize the embedding phase.
@@ -149,6 +152,7 @@ class RagEmbeddingTask:
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
+        self.embedding_repository = embedding_repository
         self.external_services = external_services
         self.verbose = verbose
 
@@ -316,8 +320,7 @@ class RagEmbeddingTask:
             # Embedding use case with injected services
             embedding_use_case = EmbedDocumentChunksUseCase(
                 embedding_service=embedding_service,
-                embedding_repository=self.external_services.embedding_repository,
-                domain_service=self.external_services.embedding_domain_service,
+                embedding_repository=self.embedding_repository,
             )
 
             # Build ingestion pipeline use case with shared repository

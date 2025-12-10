@@ -115,6 +115,10 @@ class LlamaIndexRetriever(BaseRetriever):
             # Extract content from the node
             content = node.node.get_content()
 
+            # Fallback: some stored nodes may lack get_content(); use metadata text
+            if not content:
+                content = (node.node.metadata or {}).get("text", "")
+
             # Build metadata including similarity score
             metadata = dict(node.node.metadata) if node.node.metadata else {}
             metadata["_distance"] = node.score if node.score is not None else 0.0

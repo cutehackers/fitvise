@@ -29,8 +29,11 @@ from app.pipeline.phases.rag_ingestion_task import RagIngestionTaskReport
 from app.pipeline.contracts import RunSummary
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
+from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
+from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.domain.services.analytics_service import AnalyticsService
+from app.domain.repositories.embedding_repository import EmbeddingRepository
+
 from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.infrastructure.external_services import ExternalServicesContainer
 from app.core.settings import Settings, get_settings
@@ -54,7 +57,9 @@ class RepositoryBundle:
     """
 
     document_repository: DocumentRepository
+    document_repository: DocumentRepository
     data_source_repository: DataSourceRepository
+    embedding_repository: EmbeddingRepository
 
 
 class RAGWorkflow:
@@ -203,7 +208,6 @@ class RAGWorkflow:
         external_services: Optional[ExternalServicesContainer] = None,
         session: Optional[AsyncSession] = None,
         verbose: bool = False,
-        analytics_service: Optional[AnalyticsService] = None,
     ):
         """Initialize the RAG workflow orchestrator.
 
@@ -216,20 +220,12 @@ class RAGWorkflow:
                     If provided without repositories, creates SQLAlchemy-based bundle.
                     If neither provided, creates in-memory repositories.
             verbose: Enable verbose logging
-            analytics_service: Optional analytics service for distributed tracing
         """
         self.verbose = verbose
         self.session = session
-        self.analytics_service = analytics_service
 
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
-
-        # Initialize or use provided repositories
-        if repositories is None:
-            self.repositories = self._create_repository_bundle(session)
-        else:
-            self.repositories = repositories
 
         # Initialize or use provided external services (includes ML services)
         if external_services is None:
@@ -237,6 +233,17 @@ class RAGWorkflow:
             self.external_services = ExternalServicesContainer(settings)
         else:
             self.external_services = external_services
+
+        # Initialize or use provided repositories
+        if repositories is None:
+            # We need external_services for the embedding repository
+            # Helper function updated to accept external_services
+            self.repositories = self._create_repository_bundle(
+                session,
+                self.external_services
+            )
+        else:
+            self.repositories = repositories
 
         # Initialize tasks with shared repositories and ML services
         self.infrastructure_task = RagInfrastructureTask(
@@ -247,13 +254,12 @@ class RAGWorkflow:
             document_repository=self.repositories.document_repository,
             data_source_repository=self.repositories.data_source_repository,
             verbose=verbose,
-            analytics_service=analytics_service,
         )
         self.embedding_task = RagEmbeddingTask(
             external_services=self.external_services,
             document_repository=self.repositories.document_repository,
+            embedding_repository=self.repositories.embedding_repository,
             verbose=verbose,
-            analytics_service=analytics_service,
         )
 
         # Summary tracking
@@ -263,11 +269,13 @@ class RAGWorkflow:
     @staticmethod
     def _create_repository_bundle(
         session: Optional[AsyncSession] = None,
+        external_services: Optional[ExternalServicesContainer] = None,
     ) -> RepositoryBundle:
         """Create a repository bundle based on session availability.
 
         Args:
             session: Optional database session
+            external_services: Optional external services container, needed for EmbeddingRepository
 
         Returns:
             RepositoryBundle with appropriate repository implementations
@@ -276,11 +284,15 @@ class RAGWorkflow:
         settings = get_settings()
 
         # Create container with session (works for both database and in-memory)
-        container = RepositoryContainer(settings, session)
+        # Passing external_services allows creation of embedding_repository
+        # Create container with session (works for both database and in-memory)
+        # Passing external_services allows creation of embedding_repository
+        container = RepositoryContainer(settings, session, external_services)
 
         return RepositoryBundle(
             document_repository=container.document_repository,
             data_source_repository=container.data_source_repository,
+            embedding_repository=container.embedding_repository,
         )
 
     async def run_infrastructure_check(
@@ -431,24 +443,6 @@ class RAGWorkflow:
         # Generate unique workflow ID for end-to-end tracing
         workflow_id = str(uuid.uuid4())
 
-        # Start workflow-level trace
-        workflow_trace = None
-        if self.analytics_service and self.analytics_service.is_enabled():
-            workflow_trace = await self.analytics_service.trace_rag_pipeline(
-                pipeline_id=workflow_id,
-                phase="workflow_orchestration",
-                metadata={
-                    "workflow_type": "complete_pipeline",
-                    "dry_run": dry_run,
-                    "batch_size": batch_size,
-                    "document_limit": document_limit,
-                    "output_dir": output_dir,
-                    "spec_model": spec.model_dump() if hasattr(spec, 'model_dump') else str(spec),
-                    "start_time": self.start_time.isoformat(),
-                    "chunking_config": resolve_chunking_configuration(spec),
-                }
-            )
-
         logger.info("🚀 Starting RAG Build Pipeline")
         logger.info(f"Configuration: {spec}")
         logger.info(f"Output Directory: {output_dir or 'default'}")
@@ -466,136 +460,18 @@ class RAGWorkflow:
 
         try:
             # Task 1: Infrastructure Validation
-            infrastructure_span = None
-            if self.analytics_service and workflow_trace:
-                infrastructure_span = await self.analytics_service.create_span(
-                    parent_trace=workflow_trace.trace_id,
-                    operation="infrastructure_validation_phase",
-                    metadata={
-                        "workflow_id": workflow_id,
-                        "phase": "task_1_infrastructure",
-                        "operation": "infrastructure_validation",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
-
             await self._run_infrastructure_with_tracking(spec, output_dir, workflow_id)
 
-            if self.analytics_service and infrastructure_span:
-                await self.analytics_service.update_span(
-                    infrastructure_span.span_id,
-                    {
-                        "status": "success",
-                        "completion_time": datetime.now(timezone.utc).isoformat()
-                    },
-                    "success"
-                )
-
             # Task 2: Document Ingestion (performs all chunking)
-            ingestion_span = None
-            if self.analytics_service and workflow_trace:
-                ingestion_span = await self.analytics_service.create_span(
-                    parent_trace=workflow_trace.trace_id,
-                    operation="document_ingestion_phase",
-                    metadata={
-                        "workflow_id": workflow_id,
-                        "phase": "task_2_ingestion",
-                        "dry_run": dry_run,
-                        "chunking_config": chunking_config,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
-
             await self._run_ingestion_with_tracking(spec, dry_run, output_dir, workflow_id)
 
-            if self.analytics_service and ingestion_span:
-                await self.analytics_service.update_span(
-                    ingestion_span.span_id,
-                    {
-                        "status": "success",
-                        "dry_run": dry_run,
-                        "completion_time": datetime.now(timezone.utc).isoformat()
-                    },
-                    "success"
-                )
-
             # Task 3: Embedding Generation (loads chunks from Task 2, uses same chunking method for fallback)
-            embedding_span = None
-            if self.analytics_service and workflow_trace:
-                embedding_span = await self.analytics_service.create_span(
-                    parent_trace=workflow_trace.trace_id,
-                    operation="embedding_generation_phase",
-                    metadata={
-                        "workflow_id": workflow_id,
-                        "phase": "task_3_embedding",
-                        "batch_size": batch_size,
-                        "document_limit": document_limit,
-                        "chunk_load_policy": "auto_determined",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
-
             await self._run_embedding_with_tracking(
                 spec, batch_size, document_limit, output_dir, workflow_id
             )
 
-            if self.analytics_service and embedding_span:
-                await self.analytics_service.update_span(
-                    embedding_span.span_id,
-                    {
-                        "status": "success",
-                        "batch_size": batch_size,
-                        "document_limit": document_limit,
-                        "completion_time": datetime.now(timezone.utc).isoformat()
-                    },
-                    "success"
-                )
-
             # Complete pipeline
             self.summary.mark_completed()
-
-            # Update workflow trace with success
-            if self.analytics_service and workflow_trace:
-                total_execution_time = (datetime.now(timezone.utc) - self.start_time).total_seconds()
-
-                # Calculate overall statistics
-                total_documents = 0
-                total_chunks = 0
-                total_embeddings = 0
-                phases_completed = []
-
-                if hasattr(self.summary, 'infrastructure_task_report') and self.summary.infrastructure_task_report:
-                    phases_completed.append("infrastructure")
-
-                if hasattr(self.summary, 'ingestion_task_report') and self.summary.ingestion_task_report:
-                    phases_completed.append("ingestion")
-                    if self.summary.ingestion_task_report.phase_result:
-                        total_documents = getattr(self.summary.ingestion_task_report.phase_result, 'processed', 0)
-
-                if hasattr(self.summary, 'embedding_task_report') and self.summary.embedding_task_report:
-                    phases_completed.append("embedding")
-                    if self.summary.embedding_task_report.phase_result:
-                        total_chunks = getattr(self.summary.embedding_task_report.phase_result, 'total_chunks', 0)
-                        total_embeddings = getattr(self.summary.embedding_task_report.phase_result, 'embeddings_stored', 0)
-
-                await self.analytics_service.update_trace(
-                    workflow_trace.trace_id,
-                    {
-                        "workflow_id": workflow_id,
-                        "status": "completed",
-                        "final_result": "success",
-                        "total_execution_time_seconds": round(total_execution_time, 2),
-                        "phases_completed": phases_completed,
-                        "total_documents_processed": total_documents,
-                        "total_chunks_processed": total_chunks,
-                        "total_embeddings_stored": total_embeddings,
-                        "dry_run_completed": dry_run,
-                        "output_directory": output_dir,
-                        "completion_time": datetime.now(timezone.utc).isoformat(),
-                        "workflow_summary": self.summary.as_dict() if hasattr(self.summary, 'as_dict') else str(self.summary)
-                    },
-                    "success"
-                )
 
             # Save reports
             if output_dir:
@@ -609,44 +485,6 @@ class RAGWorkflow:
             if not self.summary.failure_phase:
                 self.summary.failure_phase = "Unknown"
             self.summary.mark_completed()
-
-            # Track workflow error
-            if self.analytics_service:
-                await self.analytics_service.track_error(
-                    e,
-                    "workflow_orchestration",
-                    {
-                        "workflow_id": workflow_id,
-                        "operation": "complete_pipeline_execution",
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "dry_run": dry_run,
-                        "batch_size": batch_size,
-                        "document_limit": document_limit,
-                        "failure_phase": self.summary.failure_phase,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    workflow_trace.trace_id if workflow_trace else None,
-                )
-
-            # Update workflow trace with failure
-            if self.analytics_service and workflow_trace:
-                total_execution_time = (datetime.now(timezone.utc) - self.start_time).total_seconds()
-                await self.analytics_service.update_trace(
-                    workflow_trace.trace_id,
-                    {
-                        "workflow_id": workflow_id,
-                        "status": "failed",
-                        "final_result": "workflow_execution_failed",
-                        "total_execution_time_seconds": round(total_execution_time, 2),
-                        "failure_phase": self.summary.failure_phase,
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "dry_run": dry_run,
-                        "completion_time": datetime.now(timezone.utc).isoformat(),
-                    },
-                    "failed"
-                )
 
             # Save error report
             if output_dir:
@@ -699,20 +537,6 @@ class RAGWorkflow:
             )
 
         except Exception as e:
-            # Track infrastructure phase error
-            if self.analytics_service:
-                await self.analytics_service.track_error(
-                    e,
-                    "workflow_orchestration",
-                    {
-                        "workflow_id": workflow_id,
-                        "operation": "infrastructure_phase",
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    workflow_id,
-                )
             logger.error(f"❌ Task 1 failed: {str(e)}")
             raise
 
@@ -774,21 +598,6 @@ class RAGWorkflow:
                 logger.warning("⚠️ Task 2 completed but no documents were processed")
 
         except Exception as e:
-            # Track ingestion phase error
-            if self.analytics_service:
-                await self.analytics_service.track_error(
-                    e,
-                    "workflow_orchestration",
-                    {
-                        "workflow_id": workflow_id,
-                        "operation": "ingestion_phase",
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "dry_run": dry_run,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    workflow_id,
-                )
             logger.error(f"❌ Task 2 failed: {str(e)}")
             raise
 
@@ -872,22 +681,6 @@ class RAGWorkflow:
                 )
 
         except Exception as e:
-            # Track embedding phase error
-            if self.analytics_service:
-                await self.analytics_service.track_error(
-                    e,
-                    "workflow_orchestration",
-                    {
-                        "workflow_id": workflow_id,
-                        "operation": "embedding_phase",
-                        "error_type": type(e).__name__,
-                        "error_message": str(e),
-                        "batch_size": batch_size,
-                        "document_limit": document_limit,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    },
-                    workflow_id,
-                )
             logger.error(f"❌ Task 3 failed: {str(e)}")
             raise
 

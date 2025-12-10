@@ -14,7 +14,6 @@ from app.domain.entities.chunk import Chunk
 from app.domain.entities.embedding import Embedding
 from app.domain.exceptions.embedding_exceptions import EmbeddingGenerationError
 from app.domain.repositories.embedding_repository import EmbeddingRepository
-from app.domain.services.embedding_service import EmbeddingService
 from app.domain.value_objects.embedding_vector import EmbeddingVector
 from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
     SentenceTransformerService,
@@ -99,18 +98,18 @@ class EmbedDocumentChunksUseCase:
         self,
         embedding_service: SentenceTransformerService,
         embedding_repository: EmbeddingRepository,
-        domain_service: EmbeddingService,
     ) -> None:
         """Initialize embed chunks use case.
 
         Args:
             embedding_service: Service for generating embeddings
             embedding_repository: Repository for storing embeddings
-            domain_service: Domain service for coordination
+        Args:
+            embedding_service: Service for generating embeddings
+            embedding_repository: Repository for storing embeddings
         """
         self._embedding_service = embedding_service
         self._repository = embedding_repository
-        self._domain_service = domain_service
 
     async def execute(self, request: EmbedChunksRequest) -> EmbedChunksResponse:
         """Execute chunk embedding.
@@ -180,17 +179,38 @@ class EmbedDocumentChunksUseCase:
         stored_count = 0
         if request.store_embeddings:
             try:
-                stored_embeddings = await self._domain_service.store_chunk_embeddings_batch(
-                    chunks=valid_chunks,
-                    vectors=vectors,
-                    model_name=request.model_name,
-                    model_version=request.model_version,
+                # Build Embedding entities with full metadata (including text)
+                embeddings: List[Embedding] = []
+                for chunk, vector in zip(valid_chunks, vectors):
+                    chunk_uuid = (
+                        chunk.chunk_id if isinstance(chunk.chunk_id, UUID) else UUID(str(chunk.chunk_id))
+                    )
+                    metadata = {
+                        "text": chunk.text,
+                        "sequence": chunk.metadata.sequence,
+                        "token_count": chunk.metadata.token_count or 0,
+                        "section": chunk.metadata.section or "",
+                        "source_type": chunk.metadata.source_type or "chunk",
+                    }
+                    embeddings.append(
+                        Embedding.for_chunk(
+                            vector=vector,
+                            chunk_id=chunk_uuid,
+                            document_id=chunk.document_id,
+                            model_name=request.model_name,
+                            model_version=request.model_version,
+                            metadata=metadata,
+                        )
+                    )
+
+                # Persist in batch
+                stored_count = await self._repository.batch_save(
+                    embeddings,
                     batch_size=request.batch_size,
                 )
-                stored_count = len(stored_embeddings)
 
                 # Create success results
-                for chunk, embedding in zip(valid_chunks, stored_embeddings):
+                for chunk, embedding in zip(valid_chunks, embeddings):
                     results.append(
                         ChunkEmbeddingResult(
                             chunk_id=chunk.chunk_id,

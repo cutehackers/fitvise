@@ -18,7 +18,12 @@ Usage:
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases infrastructure ingestion
     
     # Run  specific phase with --dry-run
-    python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases ingestion --dry-run 
+    python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases ingestion --dry-run
+    
+    # to run without --dry-run, we have to ensure that fitvise is setup, if not, run following command
+    `uv run alembic upgrade head`    
+    and then
+    `python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --phases ingestion`
 
     # Other options
     python scripts/build_rag_pipeline.py --config rag_pipeline.yaml --verbose --output-dir ./reports

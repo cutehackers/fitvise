@@ -1140,7 +1140,7 @@ class RagIngestionTask:
                 # Stage 5: Store Document (MinIO + Repository)
                 async with self.tracker.with_tracker("store_document"):
                     try:
-                        result = client.put_object(
+                        result = await client.put_object(
                             spec.storage.bucket,
                             object_key,
                             payload,

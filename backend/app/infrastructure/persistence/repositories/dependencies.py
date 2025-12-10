@@ -3,7 +3,7 @@
 Provides dependency injection functions for use in FastAPI endpoints
 and application services.
 """
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -103,6 +103,7 @@ def get_data_source_repository(
 
 async def create_repository_container_for_pipeline(
     settings: Settings | None = None,
+    external_services: Optional["ExternalServicesContainer"] = None,
 ) -> RepositoryContainer:
     """Create repository container for RAG pipeline execution.
 
@@ -111,39 +112,33 @@ async def create_repository_container_for_pipeline(
 
     Args:
         settings: Optional settings instance (uses default if not provided)
+        external_services: Optional external services container (needed for embedding repository)
 
     Returns:
         RepositoryContainer with all repositories ready to use
 
     Example:
         ```python
-        container = await create_repository_container_for_pipeline()
+        container = await create_repository_container_for_pipeline(
+            external_services=external_services
+        )
 
         # Access repositories
         documents = await container.document_repository.find_all()
-        sources = await container.data_source_repository.find_all()
-
-        # Use in pipeline tasks
-        task = RagIngestionTask(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
-        )
-        await task.execute(spec)
+        # Embedding repository is now available if external_services was provided
+        if container.embedding_repository:
+            embeddings = await container.embedding_repository.find_all()
         ```
-
-    Note:
-        For database repositories, the session is managed internally.
-        The container will work correctly within async contexts.
     """
     if settings is None:
         settings = get_settings()
 
     # Create session for database mode
     async for session in get_async_session():
-        return RepositoryContainer(settings, session)
+        return RepositoryContainer(settings, session, external_services)
 
     # Fallback for in-memory mode (no session needed)
-    return RepositoryContainer(settings)
+    return RepositoryContainer(settings, None, external_services)
 
 
 async def get_repository_container_with_external_services(

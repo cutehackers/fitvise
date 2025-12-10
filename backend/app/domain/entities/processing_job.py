@@ -1,5 +1,5 @@
 """Processing job domain entity for RAG system."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from enum import Enum
@@ -67,7 +67,7 @@ class ProcessingJob:
         self._description = description
         self._parameters = parameters or {}
         self._priority = priority
-        self._created_at = created_at or datetime.utcnow()
+        self._created_at = created_at or datetime.now(timezone.utc)
         self._created_by = created_by or "system"
         
         # Status tracking
@@ -283,7 +283,7 @@ class ProcessingJob:
             raise ValueError("Cannot change priority of running or completed job")
         
         self._priority = priority
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def set_parameters(self, parameters: Dict[str, Any]) -> None:
         """Update job parameters."""
@@ -291,7 +291,7 @@ class ProcessingJob:
             raise ValueError("Cannot change parameters of running or completed job")
         
         self._parameters = parameters.copy()
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def schedule(self, scheduled_at: datetime, expires_at: Optional[datetime] = None) -> None:
         """Schedule the job for execution."""
@@ -301,7 +301,7 @@ class ProcessingJob:
         self._scheduled_at = scheduled_at
         self._expires_at = expires_at
         self._status = JobStatus.QUEUED
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def start(self, total_steps: Optional[int] = None) -> None:
         """Start job execution."""
@@ -309,12 +309,12 @@ class ProcessingJob:
             raise ValueError(f"Cannot start job in status {self._status}")
         
         self._status = JobStatus.RUNNING
-        self._started_at = datetime.utcnow()
+        self._started_at = datetime.now(timezone.utc)
         self._total_steps = total_steps
         self._completed_steps = 0
         self._progress_percentage = 0.0
         self._current_step = "Starting..."
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         
         self.add_log("Job execution started")
     
@@ -330,7 +330,7 @@ class ProcessingJob:
         if current_step:
             self._current_step = current_step
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def complete_step(self, step_name: Optional[str] = None) -> None:
         """Mark a step as completed."""
@@ -345,7 +345,7 @@ class ProcessingJob:
         if step_name:
             self.add_log(f"Completed step: {step_name}")
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def complete(self, result: Optional[Dict[str, Any]] = None, 
                 execution_time: Optional[float] = None,
@@ -356,14 +356,14 @@ class ProcessingJob:
             raise ValueError("Can only complete running jobs")
         
         self._status = JobStatus.COMPLETED
-        self._completed_at = datetime.utcnow()
+        self._completed_at = datetime.now(timezone.utc)
         self._progress_percentage = 100.0
         self._current_step = "Completed"
         self._result = result or {}
         self._execution_time_seconds = execution_time
         self._memory_usage_mb = memory_usage
         self._cpu_usage_percent = cpu_usage
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         
         self.add_log("Job completed successfully")
     
@@ -379,14 +379,14 @@ class ProcessingJob:
         if self._retry_count < self._max_retries:
             self._status = JobStatus.RETRYING
             self._retry_count += 1
-            self._last_retry_at = datetime.utcnow()
+            self._last_retry_at = datetime.now(timezone.utc)
             self.add_log(f"Job failed, scheduling retry {self._retry_count}/{self._max_retries}: {error_message}")
         else:
             self._status = JobStatus.FAILED
-            self._completed_at = datetime.utcnow()
+            self._completed_at = datetime.now(timezone.utc)
             self.add_log(f"Job failed permanently after {self._retry_count} retries: {error_message}")
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def cancel(self, reason: Optional[str] = None) -> None:
         """Cancel the job."""
@@ -394,8 +394,8 @@ class ProcessingJob:
             raise ValueError("Cannot cancel completed, failed, or already cancelled job")
         
         self._status = JobStatus.CANCELLED
-        self._completed_at = datetime.utcnow()
-        self._updated_at = datetime.utcnow()
+        self._completed_at = datetime.now(timezone.utc)
+        self._updated_at = datetime.now(timezone.utc)
         
         log_message = f"Job cancelled"
         if reason:
@@ -413,7 +413,7 @@ class ProcessingJob:
         self._completed_steps = 0
         self._error_message = None
         self._error_details = None
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
         
         self.add_log(f"Job reset for retry attempt {self._retry_count}")
     
@@ -421,23 +421,23 @@ class ProcessingJob:
         """Add a job dependency."""
         if job_id not in self._depends_on:
             self._depends_on.append(job_id)
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def remove_dependency(self, job_id: UUID) -> None:
         """Remove a job dependency."""
         if job_id in self._depends_on:
             self._depends_on.remove(job_id)
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def add_blocked_job(self, job_id: UUID) -> None:
         """Add a job that this job blocks."""
         if job_id not in self._blocks:
             self._blocks.append(job_id)
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def add_log(self, message: str) -> None:
         """Add a log entry."""
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         log_entry = f"{timestamp}: {message}"
         self._logs.append(log_entry)
         
@@ -445,7 +445,7 @@ class ProcessingJob:
         if len(self._logs) > 100:
             self._logs = self._logs[-100:]
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     # Status methods
     def is_pending(self) -> bool:
@@ -490,25 +490,25 @@ class ProcessingJob:
             return False
         
         # Check if scheduled time has passed
-        if self._scheduled_at and datetime.utcnow() < self._scheduled_at:
+        if self._scheduled_at and datetime.now(timezone.utc) < self._scheduled_at:
             return False
         
         # Check if expired
-        if self._expires_at and datetime.utcnow() > self._expires_at:
+        if self._expires_at and datetime.now(timezone.utc) > self._expires_at:
             return False
         
         return True
     
     def is_expired(self) -> bool:
         """Check if job has expired."""
-        return self._expires_at is not None and datetime.utcnow() > self._expires_at
+        return self._expires_at is not None and datetime.now(timezone.utc) > self._expires_at
     
     def get_duration(self) -> Optional[float]:
         """Get job duration in seconds."""
         if not self._started_at:
             return None
 
-        end_time = self._completed_at or datetime.utcnow()
+        end_time = self._completed_at or datetime.now(timezone.utc)
         return (end_time - self._started_at).total_seconds()
 
     def get_progress_dict(self) -> Dict[str, Any]:

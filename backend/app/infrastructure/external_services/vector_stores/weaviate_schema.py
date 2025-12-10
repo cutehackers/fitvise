@@ -7,7 +7,7 @@ with embeddings and metadata, optimized for hybrid search and RAG retrieval.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from uuid import UUID
 
@@ -332,7 +332,7 @@ def create_chunk_metadata_template(
         >>> "created_at" in meta
         True
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     metadata = {
         # Core properties

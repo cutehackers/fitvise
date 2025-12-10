@@ -1,6 +1,6 @@
 """Source information value object for RAG system."""
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from enum import Enum
 
@@ -185,7 +185,7 @@ class SourceInfo:
             return True
         
         # Check if last health check was more than an hour ago
-        time_since_check = datetime.utcnow() - self.last_health_check
+        time_since_check = datetime.now(timezone.utc) - self.last_health_check
         return time_since_check.total_seconds() > 3600
     
     @property
@@ -212,7 +212,7 @@ class SourceInfo:
             max_file_size_mb=self.max_file_size_mb,
             is_active=self.is_active,
             health_check_url=self.health_check_url,
-            last_health_check=datetime.utcnow(),
+            last_health_check=datetime.now(timezone.utc),
             health_status=status,
             tags=self.tags.copy(),
             priority=self.priority,
@@ -221,5 +221,5 @@ class SourceInfo:
             average_response_time=self.average_response_time,
             error_count=new_error_count,
             last_error=error,
-            last_error_time=datetime.utcnow() if error else self.last_error_time
+            last_error_time=datetime.now(timezone.utc) if error else self.last_error_time
         )

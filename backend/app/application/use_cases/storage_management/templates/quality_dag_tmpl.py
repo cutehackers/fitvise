@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -41,7 +41,7 @@ default_args = {
 
 with DAG(
     dag_id="$dag_id",
-    start_date=datetime.utcnow(),
+    start_date=datetime.now(timezone.utc),
     schedule_interval="$schedule",
     catchup=False,
     default_args=default_args,
@@ -50,4 +50,3 @@ with DAG(
     validate = PythonOperator(
         task_id="validate_data_quality", python_callable=_validate_quality, on_failure_callback=_fail_handler
     )
-

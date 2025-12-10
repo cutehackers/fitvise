@@ -9,7 +9,7 @@ import asyncio
 import pytest
 from typing import List
 from uuid import uuid4, UUID
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.domain.entities.document import Document
 from app.domain.value_objects.document_metadata import (
@@ -32,7 +32,7 @@ def sample_metadata() -> DocumentMetadata:
         file_size=1024,
         format=DocumentFormat.PDF,
         status=DocumentStatus.PENDING,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
 
@@ -61,7 +61,7 @@ def sample_quality_metrics() -> DataQualityMetrics:
         relevance_score=0.87,
         confidence_score=0.90,
         validation_passed=True,
-        validation_timestamp=datetime.utcnow(),
+        validation_timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -428,7 +428,7 @@ class TestInMemoryDocumentRepository:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=uuid4(),
@@ -466,7 +466,7 @@ class TestInMemoryDocumentRepository:
             file_size=25600,  # 25KB
             format=DocumentFormat.PDF,
             status=DocumentStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         document = Document(
@@ -500,7 +500,7 @@ class TestInMemoryDocumentRepository:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=source_id,
@@ -651,7 +651,7 @@ class TestInMemoryRepositoryPerformance:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=uuid4(),

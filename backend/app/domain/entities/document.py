@@ -1,5 +1,5 @@
 """Document domain entity for RAG system."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 
@@ -34,8 +34,8 @@ class Document:
         self._source_id = source_id
         self._metadata = metadata
         self._content = content
-        self._created_at = created_at or datetime.utcnow()
-        self._updated_at = updated_at or datetime.utcnow()
+        self._created_at = created_at or datetime.now(timezone.utc)
+        self._updated_at = updated_at or datetime.now(timezone.utc)
         
         # Processing tracking
         self._processing_attempts: int = 0
@@ -196,7 +196,7 @@ class Document:
             self._content = content
             self._version += 1
             self._checksum = checksum
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
             
             # Reset processing-related fields when content changes
             self._extracted_text = None
@@ -211,14 +211,14 @@ class Document:
     def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update document metadata."""
         self._metadata = metadata
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def start_processing(self) -> None:
         """Mark document as starting processing."""
         self._processing_attempts += 1
         self._metadata = self._metadata.with_status(DocumentStatus.PROCESSING)
-        self._last_processed_at = datetime.utcnow()
-        self._updated_at = datetime.utcnow()
+        self._last_processed_at = datetime.now(timezone.utc)
+        self._updated_at = datetime.now(timezone.utc)
     
     def complete_processing(
         self,
@@ -231,74 +231,74 @@ class Document:
         self._structured_content = structured_content
         self._processing_duration = processing_duration
         self._metadata = self._metadata.with_status(DocumentStatus.PROCESSED)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def fail_processing(self, error_message: str) -> None:
         """Mark document processing as failed."""
         self._metadata = self._metadata.with_status(DocumentStatus.FAILED, error_message)
-        self._validation_errors.append(f"{datetime.utcnow().isoformat()}: {error_message}")
-        self._updated_at = datetime.utcnow()
+        self._validation_errors.append(f"{datetime.now(timezone.utc).isoformat()}: {error_message}")
+        self._updated_at = datetime.now(timezone.utc)
     
     def set_embeddings(self, embeddings: List[float]) -> None:
         """Set document embeddings."""
         self._embeddings = embeddings.copy()
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def set_predicted_categories(self, categories: List[str], confidence: float) -> None:
         """Set ML-predicted categories."""
         self._predicted_categories = categories.copy()
         self._category_confidence = confidence
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def add_manual_category(self, category: str) -> None:
         """Add a manual category."""
         if category not in self._manual_categories:
             self._manual_categories.append(category)
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def remove_manual_category(self, category: str) -> None:
         """Remove a manual category."""
         if category in self._manual_categories:
             self._manual_categories.remove(category)
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def set_chunks(self, chunks: List[Dict[str, Any]]) -> None:
         """Set document chunks for RAG."""
         self._chunks = chunks.copy()
         self._chunk_count = len(chunks)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def add_chunk(self, chunk: Dict[str, Any]) -> None:
         """Add a single chunk."""
         self._chunks.append(chunk)
         self._chunk_count = len(self._chunks)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def set_quality_metrics(self, metrics: DataQualityMetrics) -> None:
         """Set quality metrics."""
         self._quality_metrics = metrics
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def add_validation_error(self, error: str) -> None:
         """Add a validation error."""
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now(timezone.utc).isoformat()
         self._validation_errors.append(f"{timestamp}: {error}")
         
         # Keep only the last 20 errors
         if len(self._validation_errors) > 20:
             self._validation_errors = self._validation_errors[-20:]
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def clear_validation_errors(self) -> None:
         """Clear all validation errors."""
         self._validation_errors.clear()
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def archive(self) -> None:
         """Archive the document."""
         self._metadata = self._metadata.with_status(DocumentStatus.ARCHIVED)
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     # Status methods
     def is_processed(self) -> bool:

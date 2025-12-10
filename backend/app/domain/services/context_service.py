@@ -7,7 +7,7 @@ document fitting, and token utilization for chat conversations.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -395,7 +395,7 @@ class ContextService:
             metadata={
                 "merged_contexts": len(contexts),
                 "original_queries": [ctx.query for ctx in contexts],
-                "merge_timestamp": datetime.utcnow().isoformat(),
+                "merge_timestamp": datetime.now(timezone.utc).isoformat(),
             },
         )
 

@@ -5,7 +5,7 @@ import joblib
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -407,5 +407,5 @@ class SklearnDocumentCategorizer:
             "f1_macro": float(f1_macro),
             "num_test_docs": len(df),
             "meets_target": f1_micro >= 0.85,
-            "evaluated_at": datetime.utcnow().isoformat(),
+            "evaluated_at": datetime.now(timezone.utc).isoformat(),
         }

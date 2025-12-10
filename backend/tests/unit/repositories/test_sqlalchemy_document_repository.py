@@ -9,7 +9,7 @@ import asyncio
 import pytest
 from typing import List
 from uuid import uuid4, UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import os
 
@@ -36,7 +36,7 @@ def sample_metadata() -> DocumentMetadata:
         file_size=1024,
         format=DocumentFormat.PDF,
         status=DocumentStatus.PENDING,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
 
@@ -65,7 +65,7 @@ def sample_quality_metrics() -> DataQualityMetrics:
         relevance_score=0.87,
         confidence_score=0.90,
         validation_passed=True,
-        validation_timestamp=datetime.utcnow(),
+        validation_timestamp=datetime.now(timezone.utc),
     )
 
 
@@ -291,7 +291,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=1024,
             format=DocumentFormat.PDF,
             status=DocumentStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         pending_document = Document(source_id=uuid4(), metadata=metadata)
         await repository.save(pending_document)
@@ -303,7 +303,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=1024,
             format=DocumentFormat.PDF,
             status=DocumentStatus.FAILED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         failed_document = Document(source_id=uuid4(), metadata=failed_metadata)
         await repository.save(failed_document)
@@ -315,7 +315,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=1024,
             format=DocumentFormat.PDF,
             status=DocumentStatus.PROCESSED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         empty_document = Document(source_id=uuid4(), metadata=processed_metadata)
         empty_document.complete_processing()
@@ -494,7 +494,7 @@ class TestSQLAlchemyDocumentRepository:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=uuid4(),
@@ -532,7 +532,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=25600,  # 25KB
             format=DocumentFormat.PDF,
             status=DocumentStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         document = Document(
@@ -562,7 +562,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=2048,
             format=DocumentFormat.PDF,
             status=DocumentStatus.PROCESSED,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
 
         document = Document(
@@ -613,7 +613,7 @@ class TestSQLAlchemyDocumentRepository:
             file_size=1024,
             format=DocumentFormat.PDF,
             status=DocumentStatus.PENDING,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
         )
         document = Document(source_id=uuid4(), metadata=metadata)
 
@@ -651,7 +651,7 @@ class TestSQLAlchemyDocumentRepository:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=source_id,
@@ -836,7 +836,7 @@ class TestSQLAlchemyRepositoryPerformance:
                 file_size=1024,
                 format=DocumentFormat.PDF,
                 status=DocumentStatus.PENDING,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
             )
             doc = Document(
                 source_id=uuid4(),

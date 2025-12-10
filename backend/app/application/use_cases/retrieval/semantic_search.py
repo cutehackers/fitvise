@@ -8,7 +8,7 @@ processing to deliver relevant document chunks.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -338,7 +338,7 @@ class SemanticSearchUseCase:
                 "result_ids": result_ids,
                 "clicked_result_id": clicked_result_id,
                 "feedback_score": feedback_score,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
             # In a real implementation, this would be stored in a feedback repository
             print(f"Search feedback logged: {feedback_data}")

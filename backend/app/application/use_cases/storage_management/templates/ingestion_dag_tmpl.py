@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio, os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
@@ -57,7 +57,7 @@ default_args = {
 
 with DAG(
     dag_id="$dag_id",
-    start_date=datetime.utcnow(),
+    start_date=datetime.now(timezone.utc),
     schedule_interval="$schedule",
     catchup=False,
     default_args=default_args,
@@ -70,4 +70,3 @@ with DAG(
         task_id="ingest_incremental", python_callable=_ingest_new_data, on_failure_callback=_fail_handler
     )
     discover >> ingest
-

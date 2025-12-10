@@ -7,7 +7,7 @@ with associated metadata, tracking, and relationships to source content.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -219,12 +219,12 @@ class Embedding:
             created_at=(
                 datetime.fromisoformat(created_str)
                 if created_str
-                else datetime.utcnow()
+                else datetime.now(timezone.utc)
             ),
             updated_at=(
                 datetime.fromisoformat(updated_str)
                 if updated_str
-                else datetime.utcnow()
+                else datetime.now(timezone.utc)
             ),
         )
 
@@ -297,7 +297,7 @@ class Embedding:
     def normalize(self) -> None:
         """Normalize the embedding vector in-place."""
         self.vector = self.vector.normalize()
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     @property
     def source_type(self) -> str:

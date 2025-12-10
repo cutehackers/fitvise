@@ -14,6 +14,7 @@ from app.domain.repositories.search_repository import SearchRepository
 from app.domain.services.embedding_service import EmbeddingService
 from app.domain.value_objects.embedding_result import EmbeddingResult
 from app.domain.value_objects.similarity_score import SimilarityScore
+from datetime import datetime, timezone
 
 
 class RetrievalService:
@@ -467,7 +468,7 @@ class RetrievalService:
             RetrievalError: If search execution fails
         """
         import time
-        from datetime import datetime
+
 
         start_time = time.time()
 
@@ -506,7 +507,7 @@ class RetrievalService:
                 "min_similarity_threshold": min_similarity,
                 "top_k_requested": top_k,
                 "top_k_returned": len(results),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
         }
 

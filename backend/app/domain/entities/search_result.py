@@ -7,6 +7,7 @@ with relevance scores, document metadata, and chunk information.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -61,8 +62,7 @@ class SearchResult:
 
         # Set created_at if not provided
         if not self.created_at:
-            from datetime import datetime
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(timezone.utc).isoformat()
 
     @classmethod
     def from_chunk_with_score(

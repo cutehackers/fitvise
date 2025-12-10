@@ -13,7 +13,7 @@ from uuid import UUID
 from app.domain.entities.retrieval_context import RetrievalContext
 from app.domain.llm.entities.message import Message
 from app.domain.entities.message_role import MessageRole
-
+from datetime import datetime, timezone
 
 @dataclass
 class PromptTemplate:
@@ -47,8 +47,8 @@ class PromptTemplate:
 
         # Set created_at if not provided
         if not self.created_at:
-            from datetime import datetime
-            self.created_at = datetime.utcnow().isoformat()
+
+            self.created_at = datetime.now(timezone.utc).isoformat()
 
     def _extract_placeholders(self) -> List[str]:
         """Extract placeholder names from template text.

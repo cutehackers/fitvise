@@ -8,7 +8,7 @@ Tests cover:
 - Entity equality and identity
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
 import numpy as np
@@ -61,7 +61,7 @@ class TestEmbeddingCreation:
     def test_created_at_auto_set(self):
         """Test that created_at is automatically set."""
         vector = EmbeddingVector.from_list([1.0, 2.0, 3.0])
-        before = datetime.utcnow()
+        before = datetime.now(timezone.utc)
 
         embedding = Embedding(
             vector=vector,
@@ -69,7 +69,7 @@ class TestEmbeddingCreation:
             dimension=3,
         )
 
-        after = datetime.utcnow()
+        after = datetime.now(timezone.utc)
         assert before <= embedding.created_at <= after
 
     def test_default_metadata_empty_dict(self):

@@ -14,6 +14,7 @@ from app.domain.entities.retrieval_context import RetrievalContext
 from app.domain.exceptions.retrieval_exceptions import RetrievalError, ContextBuildingError
 from app.domain.services.context_service import ContextService
 from app.domain.services.retrieval_service import RetrievalService
+from datetime import datetime, timezone
 
 
 class DocumentRetrievalService:
@@ -147,7 +148,7 @@ class DocumentRetrievalService:
             ContextBuildingError: If context building fails
         """
         import time
-        from datetime import datetime
+
 
         start_time = time.time()
 
@@ -191,7 +192,7 @@ class DocumentRetrievalService:
                     "query_length": len(query),
                     "max_context_tokens": max_context_tokens,
                     "max_documents_requested": max_documents,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
                 "search_metrics": search_metrics,
             }
@@ -203,7 +204,7 @@ class DocumentRetrievalService:
                 "metrics": {
                     "total_processing_time_ms": total_time,
                     "error": str(e),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
                 "search_metrics": {"error": str(e)},
             }

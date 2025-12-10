@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 from typing import List, Dict, Any, Optional, Set
 from urllib.parse import urlparse, urljoin
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from app.domain.entities.data_source import DataSource
 from app.domain.repositories.data_source_repository import DataSourceRepository
@@ -341,10 +341,10 @@ class DocumentExternalApisUseCase:
             timeout = aiohttp.ClientTimeout(total=request.timeout_seconds)
             
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                start_time = datetime.utcnow()
+                start_time = datetime.now(timezone.utc)
                 
                 async with session.head(api_doc.health_check_url) as response:
-                    end_time = datetime.utcnow()
+                    end_time = datetime.now(timezone.utc)
                     response_time = (end_time - start_time).total_seconds() * 1000
                     
                     if response.status < 400:
@@ -467,7 +467,7 @@ class DocumentExternalApisUseCase:
         import aiofiles
         
         export_data = {
-            "exported_at": datetime.utcnow().isoformat(),
+            "exported_at": datetime.now(timezone.utc).isoformat(),
             "total_apis": len(apis),
             "apis": []
         }

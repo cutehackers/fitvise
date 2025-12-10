@@ -1,5 +1,5 @@
 """Data source domain entity for RAG system."""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 from uuid import UUID, uuid4
 
@@ -39,8 +39,8 @@ class DataSource:
         self._source_type = source_type
         self._description = description
         self._source_info = source_info
-        self._created_at = created_at or datetime.utcnow()
-        self._updated_at = updated_at or datetime.utcnow()
+        self._created_at = created_at or datetime.now(timezone.utc)
+        self._updated_at = updated_at or datetime.now(timezone.utc)
         self._is_active = is_active
         
         # Processing history
@@ -150,7 +150,7 @@ class DataSource:
             raise ValueError("Data source name cannot exceed 255 characters")
         
         self._name = name
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def update_description(self, description: str) -> None:
         """Update the data source description."""
@@ -160,28 +160,28 @@ class DataSource:
             raise ValueError("Data source description cannot exceed 1000 characters")
         
         self._description = description
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def update_source_info(self, source_info: SourceInfo) -> None:
         """Update the source information."""
         self._source_info = source_info
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def activate(self) -> None:
         """Activate the data source."""
         if not self._is_active:
             self._is_active = True
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def deactivate(self) -> None:
         """Deactivate the data source."""
         if self._is_active:
             self._is_active = False
-            self._updated_at = datetime.utcnow()
+            self._updated_at = datetime.now(timezone.utc)
     
     def record_scan_result(self, document_count: int, errors: List[str] = None) -> None:
         """Record the result of a data source scan."""
-        self._last_scan_time = datetime.utcnow()
+        self._last_scan_time = datetime.now(timezone.utc)
         self._last_scan_document_count = document_count
         self._total_documents_processed += document_count
         
@@ -191,7 +191,7 @@ class DataSource:
             if len(self._processing_errors) > 100:
                 self._processing_errors = self._processing_errors[-100:]
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def add_quality_metrics(self, metrics: DataQualityMetrics) -> None:
         """Add quality metrics to history."""
@@ -202,12 +202,12 @@ class DataSource:
         if len(self._quality_history) > 50:
             self._quality_history = self._quality_history[-50:]
         
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     def clear_processing_errors(self) -> None:
         """Clear all processing errors."""
         self._processing_errors.clear()
-        self._updated_at = datetime.utcnow()
+        self._updated_at = datetime.now(timezone.utc)
     
     # Status methods
     def is_healthy(self) -> bool:
@@ -240,7 +240,7 @@ class DataSource:
         # Check based on access frequency
         from app.domain.value_objects.source_info import AccessFrequency
         
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         time_since_scan = now - self._last_scan_time
         
         frequency_map = {

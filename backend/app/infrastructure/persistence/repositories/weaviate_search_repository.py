@@ -8,7 +8,7 @@ and advanced retrieval operations.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -559,7 +559,7 @@ class WeaviateSearchRepository(SearchRepository):
                 "status": "healthy" if weaviate_health and search_working else "degraded",
                 "weaviate_connected": weaviate_health,
                 "search_functionality": search_working,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "test_query": test_query_text,
                 "test_results_count": len(test_results) if search_working else 0,
             }

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
+from datetime import datetime, timezone
 
 from app.domain.value_objects.search_filters import SearchFilters
 
@@ -57,8 +58,7 @@ class SearchQuery:
 
         # Set created_at if not provided
         if not self.created_at:
-            from datetime import datetime
-            self.created_at = datetime.utcnow().isoformat()
+            self.created_at = datetime.now(timezone.utc).isoformat()
 
     @classmethod
     def create(

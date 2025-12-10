@@ -1,6 +1,6 @@
 """Quality metrics value object for RAG system."""
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from enum import Enum
 
@@ -105,7 +105,7 @@ class DataQualityMetrics:
     Examples:
         >>> content_metrics = ContentQualityMetrics(total_words=150, has_title=True)
         >>> validation_results = [ValidationResult(ValidationRule.COMPLETENESS, True, 0.9, "Complete")]
-        >>> quality = DataQualityMetrics(datetime.utcnow(), validation_results, content_metrics)
+        >>> quality = DataQualityMetrics(datetime.now(timezone.utc), validation_results, content_metrics)
         >>> quality.overall_quality_score
         0.85
         >>> quality.quality_level

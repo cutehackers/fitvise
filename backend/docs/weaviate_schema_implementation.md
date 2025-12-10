@@ -201,9 +201,9 @@ results = weaviate_client.query.get(
 
 ```python
 # Find recent chunks
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
-week_ago = datetime.utcnow() - timedelta(days=7)
+week_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
 results = weaviate_client.query.get(
     "Chunk", ["text", "created_at"]

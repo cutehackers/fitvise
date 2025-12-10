@@ -7,7 +7,7 @@ with context, sessions, and retrieval information.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -258,7 +258,7 @@ class Conversation:
 
     def _update_activity(self) -> None:
         """Update the last activity timestamp."""
-        self.last_activity = datetime.utcnow()
+        self.last_activity = datetime.now(timezone.utc)
 
     def get_conversation_summary(self) -> Dict[str, Any]:
         """Get comprehensive conversation summary.
@@ -278,7 +278,7 @@ class Conversation:
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
-            "age_hours": (datetime.utcnow() - self.created_at).total_seconds() / 3600,
+            "age_hours": (datetime.now(timezone.utc) - self.created_at).total_seconds() / 3600,
         }
 
     def as_dict(self) -> Dict[str, Any]:

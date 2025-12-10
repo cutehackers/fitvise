@@ -1,7 +1,7 @@
 """Chat session entities."""
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 import uuid
 
@@ -25,7 +25,7 @@ class ChatSession:
             message: Message to add
         """
         self.messages.append(message)
-        self.last_activity = datetime.utcnow()
+        self.last_activity = datetime.now(timezone.utc)
 
     def get_recent_messages(self, limit: Optional[int] = None) -> List[Message]:
         """Get recent messages from the session.
@@ -43,7 +43,7 @@ class ChatSession:
     def clear_messages(self) -> None:
         """Clear all messages from the session."""
         self.messages.clear()
-        self.last_activity = datetime.utcnow()
+        self.last_activity = datetime.now(timezone.utc)
 
     def is_expired(self, max_age_hours: int = 24) -> bool:
         """Check if the session is expired.
@@ -54,7 +54,7 @@ class ChatSession:
         Returns:
             True if expired, False otherwise
         """
-        age_hours = (datetime.utcnow() - self.last_activity).total_seconds() / 3600
+        age_hours = (datetime.now(timezone.utc) - self.last_activity).total_seconds() / 3600
         return age_hours > max_age_hours
 
     def to_dict(self) -> Dict[str, Any]:

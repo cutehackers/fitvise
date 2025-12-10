@@ -5,7 +5,7 @@ FastAPI endpoints, such as in maintenance scripts, data migration scripts,
 or background jobs.
 """
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.core.settings import Settings
@@ -133,7 +133,7 @@ async def example_cleanup_old_documents():
         doc_repo = container.document_repository
 
         # Find documents older than 30 days
-        cutoff_date = datetime.utcnow() - timedelta(days=30)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
 
         # Note: This assumes your repository has this method
         # If not, you'd need to implement it

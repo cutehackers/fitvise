@@ -4,7 +4,7 @@ import asyncio
 import aiofiles
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Set
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from app.domain.entities.data_source import DataSource
@@ -383,7 +383,7 @@ class DataSourceScanner:
         import json
         
         inventory_data = {
-            'exported_at': datetime.utcnow().isoformat(),
+            'exported_at': datetime.now(timezone.utc).isoformat(),
             'total_sources': len(data_sources),
             'sources': []
         }

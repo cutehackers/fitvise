@@ -2,18 +2,18 @@
 
 ## Progress
 ```
-Epic 1 Progress: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (24/24 tasks completed) - 100%
-Epic 2 Progress: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅⬜⬜⬜⬜⬜⬜ (13/21 tasks completed) - 62%
-Epic 3 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/23 tasks completed) - 0%
-Epic 4 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/29 tasks completed) - 0%
-Epic 5 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/26 tasks completed) - 0%
+Epic 1 Progress: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (14/14 tasks completed) - 100%
+Epic 2 Progress: ✅✅✅✅✅✅✅✅✅⬜⬜ (9/11 tasks completed) - 82%
+Epic 3 Progress: ⬜⬜⬜⬜⬜⬜ (0/6 tasks completed) - 0%
+Epic 4 Progress: ⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
+Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 ```
 
 ## Status Summary
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 2     |
+| todo         | 17    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
@@ -30,7 +30,7 @@ Epic 5 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
 
 ## Epic 1: DI Infrastructure Setup
 ### Progress
-✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (24/24 tasks completed) - 100%
+✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (14/14 tasks completed) - 100%
 
 ### Backlog Items
 - [x] DI-001 Install dependency-injector library
@@ -50,7 +50,7 @@ Epic 5 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
 
 ## Epic 2: API Layer Migration
 ### Progress
-✅✅✅✅✅✅✅✅✅✅✅✅✅✅⬜⬜⬜⬜⬜⬜ (13/21 tasks completed) - 62%
+✅✅✅✅✅✅✅✅✅⬜⬜ (9/11 tasks completed) - 82%
 
 ### Backlog Items
 - [x] DI-015 Update embeddings router to use DI
@@ -67,24 +67,36 @@ Epic 5 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜
 
 ## Epic 3: Service Layer Migration
 ### Progress
-⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/23 tasks completed) - 0%
+⬜⬜⬜⬜⬜⬜ (0/6 tasks completed) - 0%
 
 ### Backlog Items
-- [ ] Tasks for migrating embedding use cases, LLM use cases, domain services, and pipeline workflows to DI patterns (see detailed section)
+- [ ] DI-026 Migrate RAG workflow wiring to DI container (replace settings/ExternalServicesContainer/RepositoryContainer)
+- [ ] DI-027 Refactor pipeline phase tasks to consume DI-managed repositories/services
+- [ ] DI-028 Replace fitvise dependency helpers with DI providers (app/api/v1/fitvise/dependencies.py)
+- [ ] DI-029 Update use cases to rely on DI-managed services/config instead of direct imports
+- [ ] DI-030 Add DI lifecycle hooks for service initialization (embedding/LLM/vector clients) and remove ad-hoc init in tasks
+- [ ] DI-031 Add service-layer DI tests for workflow and use cases with container overrides
 
 ## Epic 4: Repository Layer Migration
 ### Progress
-⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/29 tasks completed) - 0%
+⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
 
 ### Backlog Items
-- [ ] Tasks for migrating SQL repositories, vector store repositories, external service clients, and container patterns to DI patterns (see detailed section)
+- [ ] DI-032 Replace RepositoryContainer entrypoints with DI repository providers and session resources
+- [ ] DI-033 Refactor repository implementations to consume DI-managed sessions/clients (SQLAlchemy + Weaviate)
+- [ ] DI-034 Add DI-driven repository health checks (database + vector store) and align API usage
+- [ ] DI-035 Remove deprecated repository helper functions once DI coverage is complete
+- [ ] DI-036 Add repository integration tests using DI containers (database + vector store)
 
 ## Epic 5: Cleanup and Documentation
 ### Progress
-⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/26 tasks completed) - 0%
+⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 
 ### Backlog Items
-- [ ] Tasks for removing legacy patterns, updating documentation, performance validation, and team training (see detailed section)
+- [ ] DI-037 Remove legacy containers and update remaining call sites/tests to DI container
+- [ ] DI-038 Update developer documentation to reflect DI patterns and provider usage
+- [ ] DI-039 Run performance/boot validation under DI (startup + pipeline)
+- [ ] DI-040 Prepare rollout/training checklist for DI usage
 
 # Backlog Items (Agent-Parseable Template)
 
@@ -1226,16 +1238,634 @@ System observability validation
 
 ---
 
-# Remaining Epics and Tasks
+## ID: DI-026
+### Title
+Migrate RAG workflow wiring to DI container
 
-## Epic 3: Service Layer Migration (Phase 3) - 0/23 tasks
-Tasks for migrating embedding use cases, LLM use cases, domain services, and pipeline workflows to DI patterns.
+### Epic
+3: Service Layer Migration
 
-## Epic 4: Repository Layer Migration (Phase 4) - 0/29 tasks
-Tasks for migrating SQL repositories, vector store repositories, external service clients, and container patterns to DI patterns.
+### Type
+Migration
 
-## Epic 5: Cleanup and Documentation (Phase 5) - 0/26 tasks
-Tasks for removing legacy patterns, updating documentation, performance validation, and team training.
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Refactor `app/pipeline/workflow.py` to consume DI providers instead of `get_settings`, `RepositoryContainer`, and `ExternalServicesContainer` wiring.
+
+### Acceptance Criteria
+- RAGWorkflow receives repositories/services via DI providers (no manual container instantiation)
+- ExternalServicesContainer removed from workflow wiring
+- Settings retrieved through DI config providers only
+- Existing workflow behavior preserved with shared repository instances
+
+### Inputs Required
+- app/pipeline/workflow.py
+- DI container providers (repositories, services, config)
+
+### Outputs Expected
+- Workflow wired through DI container
+- Legacy manual wiring removed
+
+### Dependencies
+- DI-032
+
+### Notes
+Aligns pipeline orchestration with DI lifecycle.
+
+---
+
+## ID: DI-027
+### Title
+Refactor pipeline phase tasks to consume DI-managed repositories/services
+
+### Epic
+3: Service Layer Migration
+
+### Type
+Migration
+
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Update `rag_infrastructure_task.py`, `rag_ingestion_task.py`, and `rag_embedding_task.py` to rely on DI-provided repositories/services instead of manual ExternalServicesContainer setup.
+
+### Acceptance Criteria
+- Phase constructors accept DI-managed interfaces (repos, embedding/LLM services)
+- Manual service initialization/connection steps moved to DI lifecycle hooks
+- Tests updated to use DI overrides instead of hand-built containers
+- No direct calls to `ExternalServicesContainer` inside phase logic
+
+### Inputs Required
+- app/pipeline/phases/rag_infrastructure_task.py
+- app/pipeline/phases/rag_ingestion_task.py
+- app/pipeline/phases/rag_embedding_task.py
+
+### Outputs Expected
+- Pipeline phases fully DI-driven
+- Simplified phase setup and testing
+
+### Dependencies
+- DI-026
+- DI-030
+
+### Notes
+Reduces coupling between pipeline phases and container implementations.
+
+---
+
+## ID: DI-028
+### Title
+Replace fitvise dependency helpers with DI providers
+
+### Epic
+3: Service Layer Migration
+
+### Type
+Migration
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Update `app/api/v1/fitvise/dependencies.py` to use DI container providers for repositories/external services instead of constructing `ExternalServicesContainer` and `RepositoryContainer`.
+
+### Acceptance Criteria
+- FastAPI dependencies pull from FitviseContainer providers
+- No manual `ExternalServicesContainer` creation in dependency helpers
+- Pipeline helper dependencies re-routed through DI
+- Tests updated to use container overrides
+
+### Inputs Required
+- app/api/v1/fitvise/dependencies.py
+- DI container wiring examples from API v1 routers
+
+### Outputs Expected
+- DI-aligned Fitvise dependency module
+- Cleaner dependency graph for endpoints using fitvise helpers
+
+### Dependencies
+- DI-026
+- DI-032
+
+### Notes
+Brings legacy dependency module in line with API router migration.
+
+---
+
+## ID: DI-029
+### Title
+Update use cases to rely on DI-managed services/config instead of direct imports
+
+### Epic
+3: Service Layer Migration
+
+### Type
+Refactor
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Sweep embedding/retrieval/data_ingestion/knowledge_sources use cases to remove direct `Settings`/`EmbeddingModelConfig` imports and inject needed services/config through DI.
+
+### Acceptance Criteria
+- Use cases accept injected config/services (no `Settings()` or `EmbeddingModelConfig.*()` calls)
+- Constructor signatures align with DI providers in `services.py`
+- Unit tests updated to use DI overrides/mocks
+- Documentation/examples reflect injected dependencies
+
+### Inputs Required
+- app/application/use_cases/* modules
+- app/di/providers/services.py
+
+### Outputs Expected
+- Use cases decoupled from configuration instantiation
+- Consistent DI patterns across service layer
+
+### Dependencies
+- DI-026
+
+### Notes
+Prepares use cases for full DI-managed lifecycle.
+
+---
+
+## ID: DI-030
+### Title
+Add DI lifecycle hooks for service initialization
+
+### Epic
+3: Service Layer Migration
+
+### Type
+Improvement
+
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Move LLM/embedding/vector client initialization (e.g., `SentenceTransformerService.initialize`, `WeaviateClient.connect`) into DI resources so pipeline phases and services no longer perform ad-hoc init.
+
+### Acceptance Criteria
+- DI resources handle initialization/connection for embedding + LLM + vector clients
+- Pipeline tasks no longer call `await service.initialize()` or manual `connect()`
+- Health checks leverage DI-managed initialized instances
+- Tests cover init lifecycle via DI overrides
+
+### Inputs Required
+- app/di/providers/services.py
+- app/di/providers/external.py
+- Pipeline phase initialization blocks
+
+### Outputs Expected
+- Centralized initialization lifecycle managed by DI
+- Reduced duplication in pipeline phases
+
+### Dependencies
+- DI-027
+
+### Notes
+Ensures consistent startup behavior across services.
+
+---
+
+## ID: DI-031
+### Title
+Add service-layer DI tests for workflow and use cases
+
+### Epic
+3: Service Layer Migration
+
+### Type
+Testing
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Create tests that exercise RAGWorkflow and key use cases using DI test containers/overrides to validate wiring and lifecycle.
+
+### Acceptance Criteria
+- Tests cover workflow DI wiring (repositories + services injected)
+- Use case tests use DI overrides instead of manual mocks
+- CI suite runs without manual container setup
+- Coverage reported for new DI paths
+
+### Inputs Required
+- tests/unit/pipeline
+- tests/unit/application/use_cases
+- app/di/testing.py
+
+### Outputs Expected
+- Service-layer test suite using DI containers
+- Validated DI wiring at workflow level
+
+### Dependencies
+- DI-026
+- DI-027
+
+### Notes
+Builds confidence in DI migration for services.
+
+---
+
+## ID: DI-032
+### Title
+Replace RepositoryContainer entrypoints with DI repository providers
+
+### Epic
+4: Repository Layer Migration
+
+### Type
+Migration
+
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Swap `app/infrastructure/persistence/repositories/dependencies.py` and pipeline helpers to use DI `RepositoryProviders` (session/resource) instead of constructing `RepositoryContainer`.
+
+### Acceptance Criteria
+- FastAPI deps use DI repository providers (no manual RepositoryContainer)
+- Pipeline helpers consume DI-managed session/resource providers
+- ExternalServicesContainer no longer passed into repository container
+- Compatibility shims deprecated/removed
+
+### Inputs Required
+- app/infrastructure/persistence/repositories/dependencies.py
+- app/di/providers/repositories.py
+
+### Outputs Expected
+- Repository entrypoints aligned to DI
+- Reduced container chaining between repos and external services
+
+### Dependencies
+- DI-033
+
+### Notes
+Unblocks repository DI consistency across app and pipeline.
+
+---
+
+## ID: DI-033
+### Title
+Refactor repository implementations to consume DI-managed sessions/clients
+
+### Epic
+4: Repository Layer Migration
+
+### Type
+Refactor
+
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Ensure `WeaviateEmbeddingRepository`, `WeaviateSearchRepository`, and SQLAlchemy repos take DI-provided AsyncSession/Weaviate clients, removing reliance on ExternalServicesContainer.
+
+### Acceptance Criteria
+- Repositories accept injected session/client arguments only
+- No direct instantiation of ExternalServicesContainer in repositories
+- DI providers updated to pass required dependencies explicitly
+- Backward-compat paths removed or isolated behind DI providers
+
+### Inputs Required
+- app/infrastructure/persistence/repositories/*.py
+- app/di/providers/repositories.py
+- app/infrastructure/external_services/external_services_container.py
+
+### Outputs Expected
+- DI-friendly repository constructors
+- Clear dependency graph for persistence layer
+
+### Dependencies
+- DI-032
+
+### Notes
+Clears coupling between repositories and legacy containers.
+
+---
+
+## ID: DI-034
+### Title
+Add DI-driven repository health checks (database + vector store)
+
+### Epic
+4: Repository Layer Migration
+
+### Type
+Testing
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Leverage DI providers to expose health/connection checks for DB and Weaviate repositories and ensure API health endpoints consume them.
+
+### Acceptance Criteria
+- Health check providers return DB + Weaviate status via DI
+- API health endpoints use DI health providers (no manual checks)
+- Tests validate failure/success paths for repo health
+- Metrics/hooks available for observability
+
+### Inputs Required
+- app/di/providers/repositories.py
+- app/api/v1/health endpoints
+- tests covering health checks
+
+### Outputs Expected
+- Centralized repository health status via DI
+- Tested health pathways for persistence layer
+
+### Dependencies
+- DI-032
+- DI-033
+
+### Notes
+Aligns repo health reporting with DI-managed dependencies.
+
+---
+
+## ID: DI-035
+### Title
+Remove deprecated repository helper functions once DI coverage is complete
+
+### Epic
+4: Repository Layer Migration
+
+### Type
+Cleanup
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Delete legacy helpers (`create_repository_bundle_for_pipeline`, container linking helpers) after DI repository providers are adopted across codebase.
+
+### Acceptance Criteria
+- Deprecated helpers removed from `repositories/dependencies.py`
+- References updated to DI providers
+- Documentation/tests no longer reference deprecated helpers
+
+### Inputs Required
+- app/infrastructure/persistence/repositories/dependencies.py
+- Search for helper call sites
+
+### Outputs Expected
+- Lean repository dependency surface
+- Reduced confusion from legacy helpers
+
+### Dependencies
+- DI-032
+
+### Notes
+Finalizes repository DI migration.
+
+---
+
+## ID: DI-036
+### Title
+Add repository integration tests using DI containers
+
+### Epic
+4: Repository Layer Migration
+
+### Type
+Testing
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Create integration tests that spin up DI containers for DB + vector store repos, validating transactions, search, and embedding storage flows.
+
+### Acceptance Criteria
+- Tests cover SQLAlchemy repo CRUD with DI-managed sessions
+- Tests cover Weaviate embedding/search repositories via DI
+- CI-executable with clear skip markers for external deps
+- Coverage metrics updated for persistence layer
+
+### Inputs Required
+- tests/integration
+- app/di/testing.py
+- app/di/providers/repositories.py
+
+### Outputs Expected
+- Integration test suite for persistence using DI
+- Documented test setup/fixtures
+
+### Dependencies
+- DI-032
+- DI-033
+
+### Notes
+Ensures repository DI wiring works end-to-end.
+
+---
+
+## ID: DI-037
+### Title
+Remove legacy containers and update remaining call sites/tests to DI container
+
+### Epic
+5: Cleanup and Documentation
+
+### Type
+Cleanup
+
+### Priority
+P1
+
+### Status
+todo
+
+### Description
+Eliminate `ExternalServicesContainer` and `RepositoryContainer` usages after DI migration; update any lingering scripts/tests to DI container.
+
+### Acceptance Criteria
+- No production code imports `ExternalServicesContainer` or `RepositoryContainer`
+- Scripts/tests updated to use DI providers/test container
+- Deprecation notes removed
+- Lint/search confirms legacy containers unused
+
+### Inputs Required
+- app/infrastructure/external_services
+- app/infrastructure/persistence/repositories
+- tests and scripts search
+
+### Outputs Expected
+- Clean DI-only dependency path
+- Reduced maintenance surface
+
+### Dependencies
+- DI-026
+- DI-032
+
+### Notes
+Final cleanup post-migration.
+
+---
+
+## ID: DI-038
+### Title
+Update developer documentation to reflect DI patterns and provider usage
+
+### Epic
+5: Cleanup and Documentation
+
+### Type
+Documentation
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Refresh README/AGENTS/API docs with DI guidance, provider usage examples, and testing overrides.
+
+### Acceptance Criteria
+- README and AGENTS docs include DI setup/how-to
+- API examples show DI-based dependency injection
+- Migration notes added for contributors
+- Docs validated against actual provider paths
+
+### Inputs Required
+- README.md, AGENTS.md, API docs
+- DI container/provider modules
+
+### Outputs Expected
+- Updated documentation reflecting DI architecture
+- Clear onboarding guidance
+
+### Dependencies
+- DI-026
+- DI-028
+
+### Notes
+Supports team adoption of DI patterns.
+
+---
+
+## ID: DI-039
+### Title
+Run performance/boot validation under DI (startup + pipeline)
+
+### Epic
+5: Cleanup and Documentation
+
+### Type
+Testing
+
+### Priority
+P2
+
+### Status
+todo
+
+### Description
+Benchmark DI impact on FastAPI startup and pipeline execution; capture metrics and compare to pre-DI baselines.
+
+### Acceptance Criteria
+- Startup metrics captured (uvicorn + DI container bootstrap)
+- Pipeline run time measured with DI wiring
+- Findings documented with any remediation actions
+- Performance regressions triaged
+
+### Inputs Required
+- run.py / app/main.py
+- Pipeline entrypoints
+- Benchmark scripts or notes
+
+### Outputs Expected
+- Performance/boot validation report
+- Action items if regressions found
+
+### Dependencies
+- DI-030
+
+### Notes
+Ensures DI adoption does not degrade performance.
+
+---
+
+## ID: DI-040
+### Title
+Prepare rollout/training checklist for DI usage
+
+### Epic
+5: Cleanup and Documentation
+
+### Type
+Task
+
+### Priority
+P3
+
+### Status
+todo
+
+### Description
+Compile rollout plan, training checklist, and code review guidelines for DI usage post-migration.
+
+### Acceptance Criteria
+- Checklist covering setup, wiring patterns, testing overrides, and common pitfalls
+- Shared with team (docs folder)
+- Review guidelines include DI checks
+- Links to updated examples and templates
+
+### Inputs Required
+- DI docs and provider examples
+- Team review feedback
+
+### Outputs Expected
+- Training/rollout checklist document
+- Review checklist for DI changes
+
+### Dependencies
+- DI-038
+
+### Notes
+Ensures smooth adoption after migration completes.
+
+---
 
 # How to Update This Backlog
 - Update progress bars with `⬜` and `✅`

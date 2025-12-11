@@ -9,9 +9,11 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
+from app.core.settings import Settings
+from app.di.container import FitviseContainer
 from app.schemas.search import (
     BatchSearchRequestSchema,
     DocumentSearchRequestSchema,
@@ -29,84 +31,17 @@ from app.application.use_cases.retrieval.semantic_search import (
     SemanticSearchResponse,
     SemanticSearchUseCase,
 )
-from app.domain.services.retrieval_service import RetrievalService
-from app.infrastructure.persistence.repositories.weaviate_search_repository import (
-    WeaviateSearchRepository,
-)
-from app.infrastructure.external_services.vector_stores.weaviate_client import (
-    WeaviateClient,
-)
-from app.config.vector_stores.weaviate_config import WeaviateConfig, WeaviateAuthType
-from app.core.settings import get_settings
+from app.domain.repositories.search_repository import SearchRepository
 
 router = APIRouter(prefix="/rag/search", tags=["RAG Search"])
 
 # ---------------------------------------------------------------------------
-# Dependency factories
+# DI Providers
 # ---------------------------------------------------------------------------
 
-def get_weaviate_client() -> WeaviateClient:
-    """Get Weaviate client instance."""
-    settings = get_settings()
-
-    # Create WeaviateConfig from settings
-    weaviate_config = WeaviateConfig(
-        host=settings.weaviate_url.replace("http://", "").replace("https://", "").split(":")[0],
-        port=8080 if "localhost" in settings.weaviate_url else 8080,  # Default port
-        scheme="https" if settings.weaviate_url.startswith("https") else "http",
-        api_key=settings.weaviate_api_key if settings.weaviate_api_key else None,
-        auth_type=WeaviateAuthType.API_KEY if settings.weaviate_api_key else WeaviateAuthType.NONE,
-    )
-
-    client = WeaviateClient(weaviate_config)
-    return client
-
-
-def get_search_repository(
-    client: WeaviateClient = Depends(get_weaviate_client),
-) -> WeaviateSearchRepository:
-    """Get search repository instance."""
-    from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
-        WeaviateEmbeddingRepository,
-    )
-    from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
-        SentenceTransformerService,
-    )
-
-    embedding_repo = WeaviateEmbeddingRepository(client)
-    embedding_service = SentenceTransformerService()
-
-    return WeaviateSearchRepository(
-        weaviate_client=client,
-        embedding_repository=embedding_repo,
-        embedding_service=embedding_service,
-    )
-
-
-def get_retrieval_service() -> RetrievalService:
-    """Get retrieval service instance."""
-    return RetrievalService()
-
-
-def get_semantic_search_use_case(
-    search_repo: WeaviateSearchRepository = Depends(get_search_repository),
-    retrieval_service: RetrievalService = Depends(get_retrieval_service),
-) -> SemanticSearchUseCase:
-    """Get semantic search use case instance."""
-    from app.application.use_cases.embedding.embed_query import EmbedQueryUseCase
-
-    # Create embed query use case with injected services
-    embed_query_uc = EmbedQueryUseCase(
-        embedding_service=search_repo.embedding_service,
-        embedding_repository=search_repo.embedding_repository,
-        domain_service=None,
-    )
-
-    return SemanticSearchUseCase(
-        embed_query_uc=embed_query_uc,
-        search_repository=search_repo,
-        retrieval_service=retrieval_service,
-    )
+SemanticSearchUseCaseProvider = Provide[FitviseContainer.services.semantic_search_use_case]
+SearchRepositoryProvider = Provide[FitviseContainer.repositories.search_repo_interface]
+SettingsProvider = Provide[FitviseContainer.config.settings]
 
 
 # ---------------------------------------------------------------------------
@@ -114,9 +49,11 @@ def get_semantic_search_use_case(
 # ---------------------------------------------------------------------------
 
 @router.post("/semantic", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
+@inject
 async def semantic_search(
     request: SearchRequestSchema,
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
+    settings: Settings = Depends(SettingsProvider),
 ) -> SearchResponseSchema:
     """Perform semantic search on document chunks.
 
@@ -135,9 +72,6 @@ async def semantic_search(
         HTTPException: If search operation fails
     """
     try:
-        # Validate request against configuration limits
-        settings = get_settings()
-
         # Validate top_k against configuration limits
         if request.top_k > settings.search_max_top_k:
             raise HTTPException(
@@ -206,9 +140,10 @@ async def semantic_search(
 
 
 @router.post("/similar-chunks", response_model=List[SearchResponseSchema], status_code=status.HTTP_200_OK)
+@inject
 async def find_similar_chunks(
     request: SimilarChunksRequestSchema,
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
 ):
     """Find chunks similar to given chunk IDs.
 
@@ -225,47 +160,43 @@ async def find_similar_chunks(
         HTTPException: If similarity search fails
     """
     try:
-        # Find similar chunks
         results = await use_case.find_similar_chunks(
             chunk_ids=request.chunk_ids,
             top_k=request.top_k,
             min_similarity=request.min_similarity,
         )
 
-        # Convert to response format
-        # Group results by original chunk for better organization
-        grouped_results = {}
+        response_payloads: List[SearchResponseSchema] = []
         for result in results:
-            # For simplicity, return all results as a flat list
-            # In a more sophisticated implementation, you might group by input chunk
-            similar_response = SearchResponse(
-                success=True,
-                query_id=str(UUID()),  # Generate temporary query ID
-                results=[
-                    {
-                        "result_id": str(result.result_id),
-                        "chunk_id": str(result.chunk_id),
-                        "document_id": str(result.document_id),
-                        "content": result.content,
-                        "similarity_score": result.similarity_score.score,
-                        "rank": result.rank,
-                        "document_metadata": result.document_metadata,
-                        "chunk_metadata": result.chunk_metadata,
-                        "highlight_text": result.highlight_text,
-                        "quality_label": result.similarity_score.get_quality_label(),
-                        "doc_type": result.document_metadata.get("doc_type"),
-                    }
-                ],
-                total_results=1,
-                processing_time_ms=0.0,
-                embedding_time_ms=0.0,
-                search_time_ms=0.0,
-                query_vector_dimension=768,  # Default dimension
-                avg_similarity_score=result.similarity_score.score,
+            response_payloads.append(
+                SearchResponseSchema(
+                    success=True,
+                    query_id=str(UUID()),
+                    results=[
+                        {
+                            "result_id": str(result.result_id),
+                            "chunk_id": str(result.chunk_id),
+                            "document_id": str(result.document_id),
+                            "content": result.content,
+                            "similarity_score": result.similarity_score.score,
+                            "rank": result.rank,
+                            "document_metadata": result.document_metadata,
+                            "chunk_metadata": result.chunk_metadata,
+                            "highlight_text": result.highlight_text,
+                            "quality_label": result.similarity_score.get_quality_label(),
+                            "doc_type": result.document_metadata.get("doc_type"),
+                        }
+                    ],
+                    total_results=1,
+                    processing_time_ms=0.0,
+                    embedding_time_ms=0.0,
+                    search_time_ms=0.0,
+                    query_vector_dimension=result.similarity_score.metadata.get("vector_dimension", 768),
+                    avg_similarity_score=result.similarity_score.score,
+                )
             )
-            grouped_results[str(result.chunk_id)] = similar_response
 
-        return list(grouped_results.values())
+        return response_payloads
 
     except Exception as e:
         raise HTTPException(
@@ -275,11 +206,12 @@ async def find_similar_chunks(
 
 
 @router.get("/suggestions", response_model=SearchSuggestionsResponseSchema, status_code=status.HTTP_200_OK)
+@inject
 async def get_search_suggestions(
     partial_query: str = Query(..., min_length=2, max_length=100, description="Partial search query"),
     max_suggestions: int = Query(5, ge=1, le=20, description="Maximum number of suggestions"),
     min_similarity: float = Query(0.3, ge=0.0, le=1.0, description="Minimum similarity threshold"),
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
 ):
     """Get search suggestions based on partial query.
 
@@ -330,9 +262,10 @@ async def get_search_suggestions(
 
 
 @router.post("/feedback", status_code=status.HTTP_200_OK)
+@inject
 async def submit_search_feedback(
     feedback: SearchFeedbackSchema,
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
 ):
     """Submit user feedback for search results.
 
@@ -367,8 +300,9 @@ async def submit_search_feedback(
 
 
 @router.get("/health", response_model=SearchHealthResponseSchema, status_code=status.HTTP_200_OK)
+@inject
 async def health_check(
-    search_repo: WeaviateSearchRepository = Depends(get_search_repository),
+    search_repo: SearchRepository = Depends(SearchRepositoryProvider),
 ):
     """Check the health of the search system.
 
@@ -410,9 +344,11 @@ async def health_check(
 
 
 @router.get("/metrics", response_model=SearchMetricsSchema, status_code=status.HTTP_200_OK)
+@inject
 async def get_search_metrics(
     time_range_days: int = Query(7, ge=1, le=365, description="Time range in days"),
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
+    search_repo: SearchRepository = Depends(SearchRepositoryProvider),
 ):
     """Get search performance and usage metrics.
 
@@ -433,7 +369,6 @@ async def get_search_metrics(
         metrics = await use_case.get_performance_metrics()
 
         # Get search statistics
-        search_repo = use_case._search_repository
         search_stats = await search_repo.get_search_statistics(time_range_days)
 
         # Get popular queries
@@ -461,9 +396,11 @@ async def get_search_metrics(
 
 
 @router.post("/batch", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
+@inject
 async def batch_search(
     request: BatchSearchRequestSchema,
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
+    search_repo: SearchRepository = Depends(SearchRepositoryProvider),
 ):
     """Perform multiple searches and aggregate results.
 
@@ -507,7 +444,7 @@ async def batch_search(
             search_queries.append(search_query)
 
         # Perform aggregated search
-        aggregated_results = await use_case._search_repository.aggregate_search_results(
+        aggregated_results = await search_repo.aggregate_search_results(
             queries=search_queries,
             aggregation_method=request.aggregation_method,
         )
@@ -559,9 +496,11 @@ async def batch_search(
 
 
 @router.post("/documents", response_model=SearchResponseSchema, status_code=status.HTTP_200_OK)
+@inject
 async def search_within_documents(
     request: DocumentSearchRequestSchema,
-    use_case: SemanticSearchUseCase = Depends(get_semantic_search_use_case),
+    use_case: SemanticSearchUseCase = Depends(SemanticSearchUseCaseProvider),
+    search_repo: SearchRepository = Depends(SearchRepositoryProvider),
 ):
     """Search within specific documents.
 
@@ -579,7 +518,7 @@ async def search_within_documents(
     """
     try:
         # Perform document search
-        results = await use_case._search_repository.search_by_document_ids(
+        results = await search_repo.search_by_document_ids(
             document_ids=request.document_ids,
             query_text=request.query_text,
             top_k=request.top_k,

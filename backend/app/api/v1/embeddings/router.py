@@ -15,6 +15,7 @@ import logging
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from dependency_injector.wiring import Provide, inject
 
 from app.api.v1.embeddings.schemas import (
     BatchEmbedRequest,
@@ -35,8 +36,6 @@ from app.application.use_cases.embedding import (
     SearchEmbeddingsUseCase,
     SetupEmbeddingInfrastructureUseCase,
 )
-from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
-from app.config.vector_stores.weaviate_config import WeaviateConfig
 from app.domain.entities.chunk import Chunk
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 from app.domain.services.embedding_service import EmbeddingService
@@ -47,9 +46,7 @@ from app.infrastructure.external_services.ml_services.embedding_models.sentence_
 from app.infrastructure.external_services.vector_stores.weaviate_client import (
     WeaviateClient,
 )
-from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
-    WeaviateEmbeddingRepository,
-)
+from app.di.container import FitviseContainer
 
 logger = logging.getLogger(__name__)
 
@@ -57,60 +54,19 @@ router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 
 
 # ============================================================================
-# Dependency Injection
+# Dependency Injection - Now using DI Container
 # ============================================================================
 
-
-async def get_embedding_service() -> SentenceTransformerService:
-    """Get embedding service instance.
-
-    Returns:
-        Configured embedding service
-    """
-    config = EmbeddingModelConfig.for_realtime()
-    service = SentenceTransformerService(config)
-    await service.initialize()
-    return service
-
-
-async def get_weaviate_client() -> WeaviateClient:
-    """Get Weaviate client instance.
-
-    Returns:
-        Connected Weaviate client
-    """
-    config = WeaviateConfig.for_local_development()
-    client = WeaviateClient(config)
-    await client.connect()
-    return client
-
-
-async def get_embedding_repository(
-    weaviate_client: WeaviateClient = Depends(get_weaviate_client),
-) -> EmbeddingRepository:
-    """Get embedding repository instance.
-
-    Args:
-        weaviate_client: Weaviate client dependency
-
-    Returns:
-        Configured embedding repository
-    """
-    return WeaviateEmbeddingRepository(weaviate_client)
-
-
-async def get_embedding_domain_service(
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
-) -> EmbeddingService:
-    """Get embedding domain service instance.
-
-    Args:
-        repository: Embedding repository dependency
-
-    Returns:
-        Configured domain service
-    """
-    return EmbeddingService(repository)
+# Type aliases for DI providers
+EmbeddingServiceProvider = Provide[FitviseContainer.services.sentence_transformer_service]
+WeaviateClientProvider = Provide[FitviseContainer.external.weaviate_client]
+EmbeddingRepositoryProvider = Provide[FitviseContainer.repositories.embedding_repository]
+EmbeddingDomainServiceProvider = Provide[FitviseContainer.services.embedding_domain_service]
+EmbedDocumentChunksUseCaseProvider = Provide[FitviseContainer.services.embed_document_chunks_use_case]
+EmbedQueryUseCaseProvider = Provide[FitviseContainer.services.embed_query_use_case]
+BatchEmbedUseCaseProvider = Provide[FitviseContainer.services.batch_embed_use_case]
+SearchEmbeddingsUseCaseProvider = Provide[FitviseContainer.services.search_embeddings_use_case]
+SetupEmbeddingInfrastructureUseCaseProvider = Provide[FitviseContainer.services.setup_embedding_infrastructure_use_case]
 
 
 # ============================================================================
@@ -125,8 +81,10 @@ async def get_embedding_domain_service(
     summary="Setup embedding infrastructure",
     description="Initialize embedding model and Weaviate vector database",
 )
+@inject
 async def setup_infrastructure(
     request: SetupInfrastructureRequest,
+    use_case: SetupEmbeddingInfrastructureUseCase = Depends(SetupEmbeddingInfrastructureUseCaseProvider),
 ) -> SetupInfrastructureResponse:
     """Setup embedding infrastructure endpoint.
 
@@ -137,6 +95,7 @@ async def setup_infrastructure(
 
     Args:
         request: Setup configuration request
+        use_case: DI-provided setup use case
 
     Returns:
         Setup status and configuration details
@@ -145,8 +104,6 @@ async def setup_infrastructure(
         HTTPException: If setup fails
     """
     try:
-        use_case = SetupEmbeddingInfrastructureUseCase()
-
         from app.application.use_cases.embedding.setup_embedding_infrastructure import (
             SetupRequest,
         )
@@ -192,19 +149,16 @@ async def setup_infrastructure(
     summary="Embed document chunks",
     description="Generate embeddings for document chunks and store in Weaviate",
 )
+@inject
 async def embed_chunks(
     request: EmbedChunksRequest,
-    embedding_service: SentenceTransformerService = Depends(get_embedding_service),
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
-    domain_service: EmbeddingService = Depends(get_embedding_domain_service),
+    use_case: EmbedDocumentChunksUseCase = Depends(EmbedDocumentChunksUseCaseProvider),
 ) -> EmbedChunksResponse:
     """Embed document chunks endpoint.
 
     Args:
         request: Chunks to embed
-        embedding_service: Embedding service dependency
-        repository: Repository dependency
-        domain_service: Domain service dependency
+        use_case: DI-provided embed chunks use case
 
     Returns:
         Embedding results with metadata
@@ -213,11 +167,6 @@ async def embed_chunks(
         HTTPException: If embedding fails
     """
     try:
-        use_case = EmbedDocumentChunksUseCase(
-            embedding_service=embedding_service,
-            embedding_repository=repository,
-            domain_service=domain_service,
-        )
 
         # Convert API chunks to domain chunks
         from app.application.use_cases.embedding.embed_document_chunks import (
@@ -280,19 +229,16 @@ async def embed_chunks(
     summary="Embed user query",
     description="Generate embedding for user query with caching optimization",
 )
+@inject
 async def embed_query(
     request: EmbedQueryRequest,
-    embedding_service: SentenceTransformerService = Depends(get_embedding_service),
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
-    domain_service: EmbeddingService = Depends(get_embedding_domain_service),
+    use_case: EmbedQueryUseCase = Depends(EmbedQueryUseCaseProvider),
 ) -> EmbedQueryResponse:
     """Embed query endpoint.
 
     Args:
         request: Query to embed
-        embedding_service: Embedding service dependency
-        repository: Repository dependency
-        domain_service: Domain service dependency
+        use_case: DI-provided embed query use case
 
     Returns:
         Query embedding with performance metrics
@@ -301,11 +247,6 @@ async def embed_query(
         HTTPException: If embedding fails
     """
     try:
-        use_case = EmbedQueryUseCase(
-            embedding_service=embedding_service,
-            embedding_repository=repository,
-            domain_service=domain_service,
-        )
 
         from app.application.use_cases.embedding.embed_query import (
             EmbedQueryRequest as UseCaseRequest,
@@ -348,19 +289,16 @@ async def embed_query(
     summary="Batch embed texts",
     description="Generate embeddings for large batches of texts with progress tracking",
 )
+@inject
 async def batch_embed(
     request: BatchEmbedRequest,
-    embedding_service: SentenceTransformerService = Depends(get_embedding_service),
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
-    domain_service: EmbeddingService = Depends(get_embedding_domain_service),
+    use_case: BatchEmbedUseCase = Depends(BatchEmbedUseCaseProvider),
 ) -> BatchEmbedResponse:
     """Batch embed endpoint.
 
     Args:
         request: Batch of texts to embed
-        embedding_service: Embedding service dependency
-        repository: Repository dependency
-        domain_service: Domain service dependency
+        use_case: DI-provided batch embed use case
 
     Returns:
         Batch embedding results with throughput metrics
@@ -369,11 +307,6 @@ async def batch_embed(
         HTTPException: If batch embedding fails
     """
     try:
-        use_case = BatchEmbedUseCase(
-            embedding_service=embedding_service,
-            embedding_repository=repository,
-            domain_service=domain_service,
-        )
 
         from app.application.use_cases.embedding.batch_embed import (
             BatchEmbedRequest as UseCaseRequest,
@@ -442,19 +375,16 @@ async def batch_embed(
     summary="Search embeddings",
     description="Perform similarity search on stored embeddings",
 )
+@inject
 async def search_embeddings(
     request: SearchRequest,
-    embedding_service: SentenceTransformerService = Depends(get_embedding_service),
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
-    domain_service: EmbeddingService = Depends(get_embedding_domain_service),
+    use_case: SearchEmbeddingsUseCase = Depends(SearchEmbeddingsUseCaseProvider),
 ) -> SearchResponse:
     """Search embeddings endpoint.
 
     Args:
         request: Search query and parameters
-        embedding_service: Embedding service dependency
-        repository: Repository dependency
-        domain_service: Domain service dependency
+        use_case: DI-provided search embeddings use case
 
     Returns:
         Search results with similarity scores
@@ -463,11 +393,6 @@ async def search_embeddings(
         HTTPException: If search fails
     """
     try:
-        use_case = SearchEmbeddingsUseCase(
-            embedding_service=embedding_service,
-            embedding_repository=repository,
-            domain_service=domain_service,
-        )
 
         from app.application.use_cases.embedding.search_embeddings import (
             SearchRequest as UseCaseRequest,
@@ -531,15 +456,16 @@ async def search_embeddings(
     summary="Health check",
     description="Check embedding service and Weaviate health",
 )
+@inject
 async def health_check(
-    embedding_service: SentenceTransformerService = Depends(get_embedding_service),
-    repository: EmbeddingRepository = Depends(get_embedding_repository),
+    embedding_service: SentenceTransformerService = Depends(EmbeddingServiceProvider),
+    repository: EmbeddingRepository = Depends(EmbeddingRepositoryProvider),
 ) -> Dict[str, Any]:
     """Health check endpoint.
 
     Args:
-        embedding_service: Embedding service dependency
-        repository: Repository dependency
+        embedding_service: DI-provided embedding service
+        repository: DI-provided repository
 
     Returns:
         Health status of services

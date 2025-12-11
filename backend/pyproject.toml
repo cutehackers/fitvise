@@ -55,6 +55,7 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "llama-index-vector-stores-weaviate>=1.4.1",
     "langfuse>=3.10.3",
+    "dependency-injector>=4.48.3",
 ]
 
 [tool.isort]

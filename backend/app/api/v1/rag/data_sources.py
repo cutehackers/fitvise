@@ -2,34 +2,35 @@
 import datetime
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query
+
+from dependency_injector.wiring import Provide, inject
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.application.use_cases.knowledge_sources.audit_data_sources import (
     AuditDataSourcesUseCase,
     AuditDataSourcesRequest,
-    AuditDataSourcesResponse
+    AuditDataSourcesResponse,
 )
 from app.application.use_cases.knowledge_sources.document_external_apis import (
     DocumentExternalApisUseCase,
-    DocumentExternalApisRequest, 
-    DocumentExternalApisResponse
+    DocumentExternalApisRequest,
+    DocumentExternalApisResponse,
 )
 from app.application.use_cases.knowledge_sources.categorize_sources import (
     CategorizeSourcesUseCase,
     CategorizeSourcesRequest,
-    CategorizeSourcesResponse
+    CategorizeSourcesResponse,
 )
+from app.di.container import FitviseContainer
 from app.domain.repositories.data_source_repository import DataSourceRepository
-from app.infrastructure.persistence.repositories.dependencies import get_data_source_repository
-from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import (
-    SklearnDocumentCategorizer
-)
 
 router = APIRouter(prefix="/rag/data-sources", tags=["RAG Data Sources"])
 
-def get_categorizer():
-    return SklearnDocumentCategorizer()
+DataSourceRepositoryProvider = Provide[FitviseContainer.repositories.data_source_repo_interface]
+AuditDataSourcesUseCaseProvider = Provide[FitviseContainer.services.audit_data_sources_use_case]
+DocumentExternalApisUseCaseProvider = Provide[FitviseContainer.services.document_external_apis_use_case]
+CategorizeSourcesUseCaseProvider = Provide[FitviseContainer.services.categorize_sources_use_case]
 
 # Request/Response Models
 class DataSourceScanRequest(BaseModel):
@@ -95,9 +96,10 @@ class CategorizationResponse(BaseModel):
 # API Endpoints
 
 @router.get("/", response_model=List[DataSourceResponse])
+@inject
 async def list_data_sources(
     active_only: bool = Query(False, description="Return only active sources"),
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(DataSourceRepositoryProvider),
 ):
     """List all data sources in the inventory."""
     try:
@@ -123,9 +125,10 @@ async def list_data_sources(
 
 
 @router.get("/{source_id}", response_model=DataSourceResponse)
+@inject
 async def get_data_source(
     source_id: UUID,
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(DataSourceRepositoryProvider),
 ):
     """Get a specific data source by ID."""
     try:
@@ -149,15 +152,13 @@ async def get_data_source(
 
 
 @router.post("/scan", response_model=InventoryResponse)
+@inject
 async def scan_and_catalog_sources(
     request: DataSourceScanRequest,
-    background_tasks: BackgroundTasks,
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    use_case: AuditDataSourcesUseCase = Depends(AuditDataSourcesUseCaseProvider),
 ):
     """Scan and catalog data sources (Task 1.1.1)."""
     try:
-        use_case = AuditDataSourcesUseCase(repository)
-        
         audit_request = AuditDataSourcesRequest(
             scan_paths=request.scan_paths,
             database_configs=request.database_configs,
@@ -184,14 +185,13 @@ async def scan_and_catalog_sources(
 
 
 @router.post("/document-apis", response_model=ApiDocumentationResponse)
+@inject
 async def document_external_apis(
     request: ApiDocumentationRequest,
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    use_case: DocumentExternalApisUseCase = Depends(DocumentExternalApisUseCaseProvider),
 ):
     """Document external API sources (Task 1.1.2)."""
     try:
-        use_case = DocumentExternalApisUseCase(repository)
-        
         api_request = DocumentExternalApisRequest(
             api_endpoints=request.api_endpoints,
             include_common_apis=request.include_common_apis,
@@ -217,15 +217,13 @@ async def document_external_apis(
 
 
 @router.post("/categorize", response_model=CategorizationResponse)
+@inject
 async def categorize_sources(
     request: CategorizationRequest,
-    repository: DataSourceRepository = Depends(get_data_source_repository),
-    categorizer = Depends(get_categorizer)
+    use_case: CategorizeSourcesUseCase = Depends(CategorizeSourcesUseCaseProvider),
 ):
     """Categorize sources using ML (Task 1.1.3)."""
     try:
-        use_case = CategorizeSourcesUseCase(repository, categorizer)
-        
         cat_request = CategorizeSourcesRequest(
             train_model=request.train_model,
             use_synthetic_data=request.use_synthetic_data,
@@ -252,12 +250,12 @@ async def categorize_sources(
 
 
 @router.get("/statistics/inventory")
+@inject
 async def get_inventory_statistics(
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    use_case: AuditDataSourcesUseCase = Depends(AuditDataSourcesUseCaseProvider),
 ):
     """Get inventory statistics and summary."""
     try:
-        use_case = AuditDataSourcesUseCase(repository)
         summary = await use_case.get_audit_summary()
         return summary
     except Exception as e:
@@ -265,12 +263,12 @@ async def get_inventory_statistics(
 
 
 @router.get("/statistics/apis")
+@inject
 async def get_api_registry_statistics(
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    use_case: DocumentExternalApisUseCase = Depends(DocumentExternalApisUseCaseProvider),
 ):
     """Get API registry statistics."""
     try:
-        use_case = DocumentExternalApisUseCase(repository)
         summary = await use_case.get_api_registry_summary()
         return summary
     except Exception as e:
@@ -278,13 +276,12 @@ async def get_api_registry_statistics(
 
 
 @router.get("/statistics/categorization")
+@inject
 async def get_categorization_statistics(
-    repository: DataSourceRepository = Depends(get_data_source_repository),
-    categorizer = Depends(get_categorizer)
+    use_case: CategorizeSourcesUseCase = Depends(CategorizeSourcesUseCaseProvider),
 ):
     """Get categorization system statistics."""
     try:
-        use_case = CategorizeSourcesUseCase(repository, categorizer)
         stats = await use_case.get_categorization_statistics()
         return stats
     except Exception as e:
@@ -292,8 +289,9 @@ async def get_categorization_statistics(
 
 
 @router.get("/health")
+@inject
 async def health_check(
-    repository: DataSourceRepository = Depends(get_data_source_repository)
+    repository: DataSourceRepository = Depends(DataSourceRepositoryProvider),
 ):
     """Health check for RAG data sources system."""
     try:

@@ -5,9 +5,11 @@ import base64
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 
+from app.di.container import FitviseContainer
 from app.application.use_cases.data_ingestion import (
     SetupAirflowUseCase,
     SetupAirflowRequest,
@@ -27,23 +29,13 @@ router = APIRouter(prefix="/rag/ingestion", tags=["RAG Ingestion"])
 
 
 # ---------------------------------------------------------------------------
-# Dependency factories (provide override hooks for tests)
+# DI Providers
 # ---------------------------------------------------------------------------
 
-def get_airflow_use_case() -> SetupAirflowUseCase:
-    return SetupAirflowUseCase()
-
-
-def get_tika_use_case() -> IntegrateTikaUseCase:
-    return IntegrateTikaUseCase()
-
-
-def get_db_use_case() -> ConnectDatabasesUseCase:
-    return ConnectDatabasesUseCase()
-
-
-def get_scraping_use_case() -> SetupWebScrapingUseCase:
-    return SetupWebScrapingUseCase()
+SetupAirflowUseCaseProvider = Provide[FitviseContainer.services.setup_airflow_use_case]
+IntegrateTikaUseCaseProvider = Provide[FitviseContainer.services.integrate_tika_use_case]
+ConnectDatabasesUseCaseProvider = Provide[FitviseContainer.services.connect_databases_use_case]
+SetupWebScrapingUseCaseProvider = Provide[FitviseContainer.services.setup_web_scraping_use_case]
 
 
 # ---------------------------------------------------------------------------
@@ -162,9 +154,10 @@ class WebScrapingResponseModel(BaseModel):
 
 
 @router.post("/airflow/setup", response_model=AirflowSetupResponseModel, status_code=status.HTTP_201_CREATED)
+@inject
 async def create_airflow_environment(
     payload: AirflowSetupPayload,
-    use_case: SetupAirflowUseCase = Depends(get_airflow_use_case),
+    use_case: SetupAirflowUseCase = Depends(SetupAirflowUseCaseProvider),
 ):
     """Generate Airflow support artefacts (env file, docker-compose and hello-world DAG)."""
     try:
@@ -191,9 +184,10 @@ async def create_airflow_environment(
 
 
 @router.post("/tika/extract", response_model=TikaExtractionResponse)
+@inject
 async def extract_documents_via_tika(
     payload: TikaExtractionPayload,
-    use_case: IntegrateTikaUseCase = Depends(get_tika_use_case),
+    use_case: IntegrateTikaUseCase = Depends(IntegrateTikaUseCaseProvider),
 ):
     """Run Apache Tika (or fallbacks) across supplied documents."""
     try:
@@ -224,9 +218,10 @@ async def extract_documents_via_tika(
 
 
 @router.post("/databases/connect", response_model=DatabaseConnectorResponse)
+@inject
 async def connect_to_databases(
     payload: DatabaseConnectorPayload,
-    use_case: ConnectDatabasesUseCase = Depends(get_db_use_case),
+    use_case: ConnectDatabasesUseCase = Depends(ConnectDatabasesUseCaseProvider),
 ):
     """Test database connectivity and fetch optional samples using configured connectors."""
     try:
@@ -240,7 +235,7 @@ async def connect_to_databases(
                 username=connector.username,
                 password=connector.password,
                 database=connector.database,
-                schema=connector.schema,
+                schema=connector.database_schema,
                 params=connector.params or {},
                 use_ssl=connector.use_ssl,
             )
@@ -267,9 +262,10 @@ async def connect_to_databases(
 
 
 @router.post("/web-scraping/run", response_model=WebScrapingResponseModel)
+@inject
 async def run_web_scraping_job(
     payload: WebScrapingPayload,
-    use_case: SetupWebScrapingUseCase = Depends(get_scraping_use_case),
+    use_case: SetupWebScrapingUseCase = Depends(SetupWebScrapingUseCaseProvider),
 ):
     """Kick off a scrape against supplied URLs using the framework stack."""
     try:

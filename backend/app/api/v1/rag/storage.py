@@ -1,12 +1,13 @@
 """RAG object storage API endpoints (Task 1.4.1)."""
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from dependency_injector.wiring import Provide, inject
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.di.container import FitviseContainer
 from app.application.use_cases.storage_management import (
     SetupObjectStorageRequest,
     SetupObjectStorageResponse,
@@ -16,9 +17,7 @@ from app.application.use_cases.storage_management import (
 
 router = APIRouter(prefix="/rag/storage", tags=["RAG Storage"])
 
-
-def get_storage_use_case() -> SetupObjectStorageUseCase:
-    return SetupObjectStorageUseCase()
+SetupObjectStorageUseCaseProvider = Provide[FitviseContainer.services.setup_object_storage_use_case]
 
 
 class ObjectStorageSetupPayload(BaseModel):
@@ -40,9 +39,10 @@ class ObjectStorageSetupResponse(BaseModel):
 
 
 @router.post("/setup", response_model=ObjectStorageSetupResponse)
+@inject
 async def setup_object_storage(
     payload: ObjectStorageSetupPayload,
-    use_case: SetupObjectStorageUseCase = Depends(get_storage_use_case),
+    use_case: SetupObjectStorageUseCase = Depends(SetupObjectStorageUseCaseProvider),
 ):
     try:
         request = SetupObjectStorageRequest(
@@ -64,4 +64,3 @@ async def setup_object_storage(
         )
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-

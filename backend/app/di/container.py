@@ -139,6 +139,13 @@ class FitviseContainer(containers.DeclarativeContainer):
             await self.external.init_resources()
         if hasattr(self.services, 'init_resources'):
             await self.services.init_resources()
+        # Initialize critical external services
+        if hasattr(self.external, "init_weaviate_client"):
+            await self.external.init_weaviate_client()
+        if hasattr(self.external, "init_sentence_transformer"):
+            await self.external.init_sentence_transformer()
+        if hasattr(self.external, "init_ollama_service"):
+            await self.external.init_ollama_service()
 
     async def shutdown_resources(self):
         """Shutdown all container resources.

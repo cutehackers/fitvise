@@ -94,6 +94,7 @@ def create_fastapi_app(
     from app.api.v1.rag import search as rag_search_module
     from app.api.v1.rag import data_sources as rag_data_sources_module
     from app.api.v1.rag import storage as rag_storage_module
+    from app.api.v1.fitvise import dependencies as fitvise_dependencies_module
 
     di_container.wire(
         embeddings_module,
@@ -101,6 +102,7 @@ def create_fastapi_app(
         rag_search_module,
         rag_data_sources_module,
         rag_storage_module,
+        fitvise_dependencies_module,
     )
     
     # Configure CORS

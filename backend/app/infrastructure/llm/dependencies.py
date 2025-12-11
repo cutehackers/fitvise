@@ -24,19 +24,8 @@ def get_settings() -> Settings:
     return settings
 
 
-@lru_cache()
-def get_callback_handler(settings: Annotated[Settings, Depends(get_settings)]) -> BaseCallbackHandler | None:
-    """Get LangChain callback handler for analytics.
-
-    Uses standard LangFuse environment variables for configuration.
-    If no environment variables are set, returns None to disable analytics.
-
-    Args:
-        settings: Application settings
-
-    Returns:
-        LangChain callback handler for analytics, None if disabled
-    """
+def build_callback_handler(settings: Settings) -> BaseCallbackHandler | None:
+    """Build LangChain callback handler for analytics using provided settings."""
     try:
         # Check if LangFuse environment variables are set
         secret_key = settings.langfuse_secret_key or os.getenv("LANGFUSE_SECRET_KEY")
@@ -67,6 +56,17 @@ def get_callback_handler(settings: Annotated[Settings, Depends(get_settings)]) -
         return None
 
 
+@lru_cache()
+def get_callback_handler(settings: Annotated[Settings, Depends(get_settings)]) -> BaseCallbackHandler | None:
+    """Get LangChain callback handler for analytics."""
+    return build_callback_handler(settings)
+
+
+def build_llm_service(settings: Settings, callback_handler: BaseCallbackHandler | None) -> LLMService:
+    """Build LLM service using provided settings and callback handler."""
+    return OllamaService(settings, callback_handler)
+
+
 def get_llm_service(
     settings: Annotated[Settings, Depends(get_settings)],
     callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)],
@@ -80,7 +80,7 @@ def get_llm_service(
     Returns:
         LLM service implementation
     """
-    return OllamaService(settings, callback_handler)
+    return build_llm_service(settings, callback_handler)
 
 
 @lru_cache()

@@ -10,7 +10,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,14 +29,15 @@ from app.pipeline.phases.rag_ingestion_task import RagIngestionTaskReport
 from app.pipeline.contracts import RunSummary
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
-from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
-from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.embedding_repository import EmbeddingRepository
-
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
-from app.infrastructure.external_services import ExternalServicesContainer
-from app.core.settings import Settings, get_settings
+from app.application.use_cases.embedding.setup_embedding_infrastructure import (
+    SetupEmbeddingInfrastructureUseCase,
+)
+from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
+    SentenceTransformerService,
+)
+from app.infrastructure.external_services.vector_stores.weaviate_client import WeaviateClient
 from scripts.rag_summary import (
     RagBuildSummary,
     create_infrastructure_phase_result,
@@ -57,9 +58,18 @@ class RepositoryBundle:
     """
 
     document_repository: DocumentRepository
-    document_repository: DocumentRepository
     data_source_repository: DataSourceRepository
     embedding_repository: EmbeddingRepository
+
+
+@dataclass
+class PipelineServices:
+    """Bundle of DI-managed external services for pipeline execution."""
+
+    embedding_service: SentenceTransformerService
+    embedding_model: Any
+    weaviate_client: WeaviateClient
+    setup_use_case: SetupEmbeddingInfrastructureUseCase
 
 
 class RAGWorkflow:
@@ -205,21 +215,19 @@ class RAGWorkflow:
     def __init__(
         self,
         repositories: Optional[RepositoryBundle] = None,
-        external_services: Optional[ExternalServicesContainer] = None,
+        services: Optional[PipelineServices] = None,
         session: Optional[AsyncSession] = None,
         verbose: bool = False,
+        container=None,
     ):
         """Initialize the RAG workflow orchestrator.
 
         Args:
-            repositories: Optional pre-configured repository bundle.
-                         If not provided, creates repositories based on session parameter.
-            external_services: Optional pre-configured external services container.
-                             If not provided, creates new container with settings.
-            session: Optional database session for SQLAlchemy repositories.
-                    If provided without repositories, creates SQLAlchemy-based bundle.
-                    If neither provided, creates in-memory repositories.
+            repositories: Optional pre-configured repository bundle (DI-managed)
+            services: Optional DI-managed external services bundle
+            session: Optional database session (retained for backward compatibility)
             verbose: Enable verbose logging
+            container: Optional DI container override
         """
         self.verbose = verbose
         self.session = session
@@ -227,73 +235,74 @@ class RAGWorkflow:
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        # Initialize or use provided external services (includes ML services)
-        if external_services is None:
-            settings = get_settings()
-            self.external_services = ExternalServicesContainer(settings)
-        else:
-            self.external_services = external_services
+        di_container = None
+        if repositories is None or services is None:
+            from app.di import container as global_container
 
-        # Initialize or use provided repositories
+            di_container = container or global_container
+
         if repositories is None:
-            # We need external_services for the embedding repository
-            # Helper function updated to accept external_services
-            self.repositories = self._create_repository_bundle(
-                session,
-                self.external_services
+            if session is not None and di_container is not None:
+                from app.infrastructure.persistence.repositories.async_document_repository import (
+                    AsyncDocumentRepository,
+                )
+                from app.infrastructure.persistence.repositories.async_data_source_repository import (
+                    AsyncDataSourceRepository,
+                )
+
+                repositories = RepositoryBundle(
+                    document_repository=AsyncDocumentRepository(session=session),
+                    data_source_repository=AsyncDataSourceRepository(session=session),
+                    embedding_repository=di_container.repositories.weaviate_embedding_repository(),
+                )
+            elif di_container is not None:
+                repositories = RepositoryBundle(
+                    document_repository=di_container.repositories.document_repository(),
+                    data_source_repository=di_container.repositories.data_source_repository(),
+                    embedding_repository=di_container.repositories.weaviate_embedding_repository(),
+                )
+
+        if services is None:
+            services = PipelineServices(
+                embedding_service=di_container.external.sentence_transformer_service(),
+                embedding_model=di_container.external.llama_index_embedding(),
+                weaviate_client=di_container.external.weaviate_client(),
+                setup_use_case=di_container.services.setup_embedding_infrastructure_use_case(),
             )
-        else:
-            self.repositories = repositories
+
+        if repositories is None or services is None:
+            raise ValueError(
+                "RAGWorkflow requires repositories and services; provide them explicitly or supply a DI container."
+            )
+
+        self.repositories = repositories
+        self.services = services
 
         # Initialize tasks with shared repositories and ML services
         self.infrastructure_task = RagInfrastructureTask(
-            verbose=verbose
+            setup_use_case=self.services.setup_use_case,
+            weaviate_client=self.services.weaviate_client,
+            embedding_service=self.services.embedding_service,
+            verbose=verbose,
         )
         self.ingestion_task = RagIngestionTask(
-            external_services=self.external_services,
+            embedding_model=self.services.embedding_model,
             document_repository=self.repositories.document_repository,
             data_source_repository=self.repositories.data_source_repository,
             verbose=verbose,
         )
         self.embedding_task = RagEmbeddingTask(
-            external_services=self.external_services,
             document_repository=self.repositories.document_repository,
             embedding_repository=self.repositories.embedding_repository,
+            embedding_service=self.services.embedding_service,
+            embedding_model=self.services.embedding_model,
+            weaviate_client=self.services.weaviate_client,
             verbose=verbose,
         )
 
         # Summary tracking
         self.summary = RagBuildSummary()
         self.start_time: Optional[datetime] = None
-
-    @staticmethod
-    def _create_repository_bundle(
-        session: Optional[AsyncSession] = None,
-        external_services: Optional[ExternalServicesContainer] = None,
-    ) -> RepositoryBundle:
-        """Create a repository bundle based on session availability.
-
-        Args:
-            session: Optional database session
-            external_services: Optional external services container, needed for EmbeddingRepository
-
-        Returns:
-            RepositoryBundle with appropriate repository implementations
-        """
-        # Get settings
-        settings = get_settings()
-
-        # Create container with session (works for both database and in-memory)
-        # Passing external_services allows creation of embedding_repository
-        # Create container with session (works for both database and in-memory)
-        # Passing external_services allows creation of embedding_repository
-        container = RepositoryContainer(settings, session, external_services)
-
-        return RepositoryBundle(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
-            embedding_repository=container.embedding_repository,
-        )
 
     async def run_infrastructure_check(
         self, spec: PipelineSpec

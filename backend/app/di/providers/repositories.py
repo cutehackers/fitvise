@@ -7,12 +7,10 @@ It handles database repositories, vector store repositories, and other data acce
 from dependency_injector import containers, providers
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.settings import Settings
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 from app.domain.repositories.search_repository import SearchRepository
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.infrastructure.persistence.repositories.async_document_repository import (
     AsyncDocumentRepository,
 )
@@ -74,30 +72,10 @@ class RepositoryProviders(containers.DeclarativeContainer):
         embedding_service=external_services.sentence_transformer_service,
     )
 
-    # Unified repository container (for backward compatibility)
-    repository_container = providers.Factory(
-        RepositoryContainer,
-        settings=config.settings,
-        session=session,
-        external_services=external_services,
-    )
-
-    async def _document_repo_interface(container: RepositoryContainer) -> DocumentRepository:
-        return container.document_repository
-
-    async def _data_source_repo_interface(container: RepositoryContainer) -> DataSourceRepository:
-        return container.data_source_repository
-
-    async def _embedding_repo_interface(container: RepositoryContainer) -> EmbeddingRepository:
-        return container.embedding_repository
-
-    async def _search_repo_interface(repository: WeaviateSearchRepository) -> SearchRepository:
-        return repository
-
-    document_repo_interface = providers.Factory(_document_repo_interface, container=repository_container)
-    data_source_repo_interface = providers.Factory(_data_source_repo_interface, container=repository_container)
-    embedding_repo_interface = providers.Factory(_embedding_repo_interface, container=repository_container)
-    search_repo_interface = providers.Factory(_search_repo_interface, repository=search_repository)
+    document_repo_interface = providers.Factory(lambda repo: repo, repo=document_repository)
+    data_source_repo_interface = providers.Factory(lambda repo: repo, repo=data_source_repository)
+    embedding_repo_interface = providers.Factory(lambda repo: repo, repo=weaviate_embedding_repository)
+    search_repo_interface = providers.Factory(lambda repo: repo, repo=search_repository)
 
     def _repository_bundle(
         document_repo: DocumentRepository,
@@ -179,13 +157,4 @@ class RepositoryProviders(containers.DeclarativeContainer):
         _active_embedding_repository,
         weaviate_repo=weaviate_embedding_repository,
         database_url=config.database_url,
-    )
-
-    def _in_memory_repositories(settings: Settings) -> RepositoryContainer:
-        settings.database_url = "sqlite:///:memory:"
-        return RepositoryContainer(settings, external_services=None)
-
-    in_memory_repositories = providers.Factory(
-        _in_memory_repositories,
-        settings=config.settings,
     )

@@ -4,7 +4,7 @@
 ```
 Epic 1 Progress: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (14/14 tasks completed) - 100%
 Epic 2 Progress: ✅✅✅✅✅✅✅✅✅⬜⬜ (9/11 tasks completed) - 82%
-Epic 3 Progress: ⬜⬜⬜⬜⬜⬜ (0/6 tasks completed) - 0%
+Epic 3 Progress: ✅✅✅✅✅✅ (6/6 tasks completed) - 100%
 Epic 4 Progress: ⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
 Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 ```
@@ -13,11 +13,11 @@ Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 17    |
+| todo         | 11    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 23    |
+| done         | 29    |
 ```
 
 # Meta
@@ -67,15 +67,15 @@ Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 
 ## Epic 3: Service Layer Migration
 ### Progress
-⬜⬜⬜⬜⬜⬜ (0/6 tasks completed) - 0%
+✅✅✅✅✅✅ (6/6 tasks completed) - 100%
 
 ### Backlog Items
-- [ ] DI-026 Migrate RAG workflow wiring to DI container (replace settings/ExternalServicesContainer/RepositoryContainer)
-- [ ] DI-027 Refactor pipeline phase tasks to consume DI-managed repositories/services
-- [ ] DI-028 Replace fitvise dependency helpers with DI providers (app/api/v1/fitvise/dependencies.py)
-- [ ] DI-029 Update use cases to rely on DI-managed services/config instead of direct imports
-- [ ] DI-030 Add DI lifecycle hooks for service initialization (embedding/LLM/vector clients) and remove ad-hoc init in tasks
-- [ ] DI-031 Add service-layer DI tests for workflow and use cases with container overrides
+- [x] DI-026 Migrate RAG workflow wiring to DI container (replace settings/ExternalServicesContainer/RepositoryContainer)
+- [x] DI-027 Refactor pipeline phase tasks to consume DI-managed repositories/services
+- [x] DI-028 Replace fitvise dependency helpers with DI providers (app/api/v1/fitvise/dependencies.py)
+- [x] DI-029 Update use cases to rely on DI-managed services/config instead of direct imports
+- [x] DI-030 Add DI lifecycle hooks for service initialization (embedding/LLM/vector clients) and remove ad-hoc init in tasks
+- [x] DI-031 Add service-layer DI tests for workflow and use cases with container overrides
 
 ## Epic 4: Repository Layer Migration
 ### Progress
@@ -1073,7 +1073,7 @@ Testing
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Validate that all API endpoints use DI dependencies instead of manual instantiation
@@ -1162,7 +1162,7 @@ Testing
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Create comprehensive test suite for all API endpoints with both real and mocked dependencies
@@ -1252,7 +1252,7 @@ Migration
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Refactor `app/pipeline/workflow.py` to consume DI providers instead of `get_settings`, `RepositoryContainer`, and `ExternalServicesContainer` wiring.
@@ -1293,7 +1293,7 @@ Migration
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Update `rag_infrastructure_task.py`, `rag_ingestion_task.py`, and `rag_embedding_task.py` to rely on DI-provided repositories/services instead of manual ExternalServicesContainer setup.
@@ -1336,7 +1336,7 @@ Migration
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Update `app/api/v1/fitvise/dependencies.py` to use DI container providers for repositories/external services instead of constructing `ExternalServicesContainer` and `RepositoryContainer`.
@@ -1378,7 +1378,7 @@ Refactor
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Sweep embedding/retrieval/data_ingestion/knowledge_sources use cases to remove direct `Settings`/`EmbeddingModelConfig` imports and inject needed services/config through DI.
@@ -1419,7 +1419,7 @@ Improvement
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Move LLM/embedding/vector client initialization (e.g., `SentenceTransformerService.initialize`, `WeaviateClient.connect`) into DI resources so pipeline phases and services no longer perform ad-hoc init.

@@ -14,7 +14,6 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from app.infrastructure.external_services import ExternalServicesContainer
 from app.pipeline.config import PipelineSpec
 from app.pipeline.chunking_config_resolver import resolve_chunking_configuration
 from app.application.use_cases.indexing.build_ingestion_pipeline import (
@@ -31,6 +30,10 @@ from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.embedding_repository import EmbeddingRepository
+from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
+    SentenceTransformerService,
+)
+from app.infrastructure.external_services.vector_stores.weaviate_client import WeaviateClient
 
 logger = logging.getLogger(__name__)
 
@@ -139,21 +142,27 @@ class RagEmbeddingTask:
 
     def __init__(
         self,
-        external_services: ExternalServicesContainer,
         document_repository: DocumentRepository,
         embedding_repository: EmbeddingRepository,
+        embedding_service: SentenceTransformerService,
+        embedding_model,
+        weaviate_client: WeaviateClient,
         verbose: bool = False,
     ):
         """Initialize the embedding phase.
 
         Args:
-            external_services: External services container with all required services (ML models, embedding services, etc.)
             document_repository: Shared document repository instance
+            embedding_service: DI-managed sentence transformer service
+            embedding_model: DI-managed embedding model for chunking fallbacks
+            weaviate_client: DI-managed Weaviate client
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
         self.embedding_repository = embedding_repository
-        self.external_services = external_services
+        self.embedding_service = embedding_service
+        self.embedding_model = embedding_model
+        self.weaviate_client = weaviate_client
         self.verbose = verbose
 
         if verbose:
@@ -296,26 +305,17 @@ class RagEmbeddingTask:
             # Initialize use cases with SHARED repository
             logger.info("Initializing embedding use cases...")
 
-            # Step 1: Ensure Weaviate client is connected
-            logger.info("🔗 Ensuring Weaviate client connection...")
-            try:
-                await self.external_services.ensure_weaviate_connected()
-                logger.info("✅ Weaviate client connected successfully")
-            except Exception as weaviate_error:
-                error_msg = f"Failed to connect Weaviate client: {str(weaviate_error)}"
-                logger.error(error_msg)
-                raise EmbeddingPipelineError(error_msg) from weaviate_error
+            # Step 1: Validate external dependencies are ready (initialized by DI resources)
+            if not self.weaviate_client.is_connected:
+                raise EmbeddingPipelineError(
+                    "Weaviate client is not connected. Initialize DI external resources before running embeddings."
+                )
 
-            # Step 2: Ensure embedding service is initialized before use
-            embedding_service = self.external_services.sentence_transformer_service
-            logger.info(f"Initializing embedding model: {embedding_service.model_name}")
-            try:
-                await embedding_service.initialize()
-                logger.info("Embedding model initialized successfully")
-            except Exception as init_error:
-                error_msg = f"Failed to initialize embedding model '{embedding_service.model_name}': {str(init_error)}"
-                logger.error(error_msg)
-                raise EmbeddingPipelineError(error_msg) from init_error
+            embedding_service = self.embedding_service
+            if hasattr(embedding_service, "is_loaded") and not embedding_service.is_loaded:
+                raise EmbeddingPipelineError(
+                    "Embedding service is not initialized. Initialize DI external resources before running embeddings."
+                )
 
             # Embedding use case with injected services
             embedding_use_case = EmbedDocumentChunksUseCase(
@@ -328,7 +328,7 @@ class RagEmbeddingTask:
             # but chunks will be loaded from repository, not re-chunked
             chunking_use_case = SemanticChunkingUseCase(
                 document_repository=self.document_repository,
-                embedding_model=self.external_services.embedding_model
+                embedding_model=self.embedding_model,
             )
 
             build_use_case = BuildIngestionPipelineUseCase(

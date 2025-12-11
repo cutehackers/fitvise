@@ -111,6 +111,10 @@ class ServiceProviders(containers.DeclarativeContainer):
 
     setup_embedding_infrastructure_use_case = providers.Factory(
         SetupEmbeddingInfrastructureUseCase,
+        embedding_service=external_services.sentence_transformer_service,
+        weaviate_client=external_services.weaviate_client,
+        embedding_config=config.realtime_embedding_config,
+        weaviate_config=config.weaviate_config,
     )
 
     retrieval_service = providers.Factory(
@@ -163,32 +167,67 @@ class ServiceProviders(containers.DeclarativeContainer):
     )
 
     # Pipeline service providers
-    def _pipeline_workflow(
-        repositories_bundle: dict,
-        external_services_container,
-        session,
-        verbose: bool,
-    ) -> "RAGWorkflow":
-        from app.pipeline.workflow import RAGWorkflow, RepositoryBundle
+    def _pipeline_repositories(
+        document_repo: DocumentRepository,
+        data_source_repo: DataSourceRepository,
+        embedding_repo: EmbeddingRepository,
+    ) -> "RepositoryBundle":
+        from app.pipeline.workflow import RepositoryBundle
 
-        repo_bundle = RepositoryBundle(
-            document_repository=repositories_bundle["document_repository"],
-            data_source_repository=repositories_bundle["data_source_repository"],
-            embedding_repository=repositories_bundle["embedding_repository"],
+        return RepositoryBundle(
+            document_repository=document_repo,
+            data_source_repository=data_source_repo,
+            embedding_repository=embedding_repo,
         )
 
+    pipeline_repositories = providers.Factory(
+        _pipeline_repositories,
+        document_repo=repositories.document_repo_interface,
+        data_source_repo=repositories.data_source_repo_interface,
+        embedding_repo=repositories.embedding_repo_interface,
+    )
+
+    def _pipeline_services(
+        embedding_service: SentenceTransformerService,
+        embedding_model,
+        weaviate_client: WeaviateClient,
+        setup_use_case: SetupEmbeddingInfrastructureUseCase,
+    ) -> "PipelineServices":
+        from app.pipeline.workflow import PipelineServices
+
+        return PipelineServices(
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
+            setup_use_case=setup_use_case,
+        )
+
+    pipeline_services = providers.Factory(
+        _pipeline_services,
+        embedding_service=external_services.sentence_transformer_service,
+        embedding_model=external_services.llama_index_embedding,
+        weaviate_client=external_services.weaviate_client,
+        setup_use_case=setup_embedding_infrastructure_use_case,
+    )
+
+    def _pipeline_workflow(
+        repositories_bundle,
+        services_bundle,
+        verbose: bool,
+    ) -> "RAGWorkflow":
+        from app.pipeline.workflow import RAGWorkflow
+
         return RAGWorkflow(
-            repositories=repo_bundle,
-            external_services=external_services_container,
-            session=session,
+            repositories=repositories_bundle,
+            services=services_bundle,
+            session=None,
             verbose=verbose,
         )
 
     pipeline_workflow = providers.Factory(
         _pipeline_workflow,
-        repositories_bundle=repositories.repository_bundle,
-        external_services_container=external_services,
-        session=repositories.session,
+        repositories_bundle=pipeline_repositories,
+        services_bundle=pipeline_services,
         verbose=config.debug_enabled,
     )
 

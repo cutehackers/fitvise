@@ -1,82 +1,55 @@
-"""Dependency injection for Fitvise API endpoints."""
+"""Dependency injection helpers for Fitvise API endpoints."""
 
 import logging
 from functools import lru_cache
 from typing import Annotated
 
+from dependency_injector.wiring import Provide, inject
 from fastapi import Depends
-from langchain_core.retrievers import BaseRetriever
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.retrievers import BaseRetriever
 
-from app.core.settings import settings, Settings
+from app.di import container as di_container
+from app.di.container import FitviseContainer
+from app.core.settings import Settings
+from app.domain.llm.interfaces.llm_service import LLMService
 from app.domain.services.context_window_manager import (
     ContextWindow,
     ContextWindowManager,
 )
-from app.infrastructure.external_services.external_services_container import (
-    ExternalServicesContainer,
-)
+from app.domain.services.session_service import SessionService
+from app.infrastructure.external_services.vector_stores.weaviate_client import WeaviateClient
+from app.infrastructure.llm.dependencies import build_callback_handler
 from app.infrastructure.external_services.ml_services.llm_services.llm_health_monitor import (
     LlmHealthMonitor,
 )
-from app.infrastructure.external_services.ml_services.llm_services.ollama_service import (
-    OllamaService,
-)
-from app.infrastructure.llm.dependencies import get_llm_service, get_callback_handler
-from app.domain.services.session_service import SessionService
 from app.application.use_cases.chat.rag_chat_use_case import RagChatUseCase
 
 logger = logging.getLogger(__name__)
 
 
-@lru_cache()
-def get_settings_instance() -> Settings:
-    """Get cached settings instance.
-
-    Returns:
-        Application settings
-    """
-    return settings
+SettingsProvider = Provide[FitviseContainer.config.settings]
+LlmServiceProvider = Provide[FitviseContainer.services.llm_service]
+WeaviateClientProvider = Provide[FitviseContainer.external.weaviate_client]
 
 
 @lru_cache()
-def get_external_services_container(
-    settings_instance: Annotated[Settings, Depends(get_settings_instance)]
-) -> ExternalServicesContainer:
-    """Get external services container singleton.
-
-    Args:
-        settings_instance: Application settings
-
-    Returns:
-        ExternalServicesContainer with all external services initialized
-    """
-    container = ExternalServicesContainer(settings_instance)
-    logger.info("ExternalServicesContainer initialized")
-    return container
-
-
-
-
-@lru_cache()
-def get_context_window_manager() -> ContextWindowManager:
-    """Get context window manager singleton.
-
-    Returns:
-        ContextWindowManager configured with settings
-    """
+@inject
+def get_context_window_manager(
+    settings: Settings = Depends(SettingsProvider),
+) -> ContextWindowManager:
+    """Create context window manager from DI-managed settings."""
     config = ContextWindow(
         max_tokens=settings.llm_context_window,
         reserve_tokens=settings.llm_reserve_tokens,
         truncation_strategy=settings.context_truncation_strategy,
     )
-    manager = ContextWindowManager(config)
     logger.info(
         "ContextWindowManager initialized: max_tokens=%d, strategy=%s",
         config.max_tokens,
         config.truncation_strategy,
     )
-    return manager
+    return ContextWindowManager(config)
 
 
 @lru_cache()
@@ -85,81 +58,49 @@ def get_session_service() -> SessionService:
     return SessionService()
 
 
+@inject
+def get_llm_health_monitor(
+    llm_service: LLMService = Depends(LlmServiceProvider),
+) -> LlmHealthMonitor:
+    """Return health monitor bound to DI-managed LLM service."""
+    return LlmHealthMonitor(llm_service)
+
+
+@inject
+def get_callback_handler(
+    settings: Settings = Depends(SettingsProvider),
+) -> BaseCallbackHandler | None:
+    """Build LangChain callback handler using DI-managed settings."""
+    return build_callback_handler(settings)
+
+
+@inject
 async def get_llama_index_retriever(
-    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)]
+    weaviate_client: WeaviateClient = Depends(WeaviateClientProvider),
 ) -> BaseRetriever:
-    """Get LlamaIndex retriever with connected Weaviate.
-
-    Ensures Weaviate connection is established before creating retriever.
-
-    Args:
-        container: External services container
-
-    Returns:
-        LlamaIndex-backed retriever for semantic search
-
-    Raises:
-        ExternalServicesError: If Weaviate connection fails
-    """
-    # Ensure Weaviate is connected
-    await container.ensure_weaviate_connected()
-
-    # Get retriever from container
-    retriever = container.llama_index_retriever
-    logger.info(
-        "LlamaIndex retriever obtained: top_k=%d, threshold=%.2f",
-        settings.rag_retrieval_top_k,
-        settings.rag_retrieval_similarity_threshold,
-    )
-    return retriever
+    """Get LlamaIndex retriever, ensuring Weaviate client is initialized via DI."""
+    if not weaviate_client.is_connected:
+        await di_container.external.init_weaviate_client()
+    return di_container.external.llama_index_retriever()
 
 
-@lru_cache()
-def get_llm_health_monitor() -> LlmHealthMonitor:
-    """Get LLM health monitor singleton.
-
-    Returns:
-        LlmHealthMonitor for health tracking
-    """
-    # Create a temporary wrapper for health monitoring
-    settings_instance = Settings()
-    ollama_service = OllamaService(settings_instance)
-    monitor = LlmHealthMonitor(ollama_service)
-    logger.info("LlmHealthMonitor initialized")
-    return monitor
-
-
+@inject
 async def get_rag_chat_use_case(
     session_service: Annotated[SessionService, Depends(get_session_service)],
-    container: Annotated[ExternalServicesContainer, Depends(get_external_services_container)],
-    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)],
+    llm_service: LLMService = Depends(LlmServiceProvider),
+    retriever: BaseRetriever = Depends(get_llama_index_retriever),
+    callback_handler: Annotated[BaseCallbackHandler | None, Depends(get_callback_handler)] = None,
+    settings: Settings = Depends(SettingsProvider),
 ) -> RagChatUseCase:
-    """Get RAG Chat use case with all dependencies.
+    """Construct RagChatUseCase using DI-managed services."""
+    context_manager = get_context_window_manager(settings)
 
-    Args:
-        session_service: Shared session service for maintaining conversation history
-        container: External services container with retriever and context manager
-        callback_handler: Optional LangChain callback handler for analytics
-
-    Returns:
-        RagChatUseCase for RAG-enabled chat with document retrieval
-
-    Raises:
-        ExternalServicesError: If Weaviate connection fails
-    """
-    # Ensure Weaviate is connected
-    await container.ensure_weaviate_connected()
-
-    llm_service = get_llm_service(settings, callback_handler)
-    retriever = container.llama_index_retriever
-    context_mgr = get_context_window_manager()
-
-    rag_chat_use_case = RagChatUseCase(
+    return RagChatUseCase(
         llm_service=llm_service,
         retriever=retriever,
-        context_manager=context_mgr,
+        context_manager=context_manager,
         session_service=session_service,
         callback_handler=callback_handler,
+        turns_window=getattr(settings, "chat_turns_window", 10),
+        max_session_age_hours=getattr(settings, "chat_max_session_age_hours", 24),
     )
-    logger.info("RagChatUseCase initialized (replaces RagOrchestrator)")
-    return rag_chat_use_case

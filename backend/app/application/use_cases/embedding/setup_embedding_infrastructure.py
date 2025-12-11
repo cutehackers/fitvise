@@ -7,6 +7,7 @@ creating necessary schemas and verifying connectivity.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Any, Dict, List, Optional
 
 from app.config.ml_models.embedding_model_configs import EmbeddingModelConfig
@@ -24,6 +25,8 @@ from app.infrastructure.external_services.vector_stores.weaviate_client import (
 from app.infrastructure.external_services.vector_stores.weaviate_schema import (
     WeaviateSchema,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -64,7 +67,7 @@ class SetupEmbeddingInfrastructureUseCase:
     creates necessary schemas, and verifies system health.
 
     Examples:
-        >>> use_case = SetupEmbeddingInfrastructureUseCase()
+        >>> use_case = SetupEmbeddingInfrastructureUseCase(...)
         >>> request = SetupRequest()
         >>> response = await use_case.execute(request)
         >>> response.success
@@ -77,17 +80,23 @@ class SetupEmbeddingInfrastructureUseCase:
 
     def __init__(
         self,
-        embedding_service: Optional[SentenceTransformerService] = None,
-        weaviate_client: Optional[WeaviateClient] = None,
+        embedding_service: SentenceTransformerService,
+        weaviate_client: WeaviateClient,
+        embedding_config: EmbeddingModelConfig,
+        weaviate_config: WeaviateConfig,
     ) -> None:
         """Initialize setup use case.
 
         Args:
-            embedding_service: Optional pre-configured embedding service
-            weaviate_client: Optional pre-configured Weaviate client
+            embedding_service: DI-managed embedding service instance
+            weaviate_client: DI-managed Weaviate client
+            embedding_config: Active embedding configuration
+            weaviate_config: Active Weaviate configuration
         """
         self._embedding_service = embedding_service
         self._weaviate_client = weaviate_client
+        self._embedding_config = embedding_config
+        self._weaviate_config = weaviate_config
 
     async def execute(self, request: SetupRequest) -> SetupResponse:
         """Execute infrastructure setup.
@@ -151,12 +160,23 @@ class SetupEmbeddingInfrastructureUseCase:
             ModelLoadError: If model loading fails
         """
         # Create or use existing service
-        if self._embedding_service is None:
-            config_dict = request.embedding_config or {}
-            config = EmbeddingModelConfig.from_dict(config_dict) if config_dict else EmbeddingModelConfig.default()
-            self._embedding_service = SentenceTransformerService(config)
+        requested_config = (
+            EmbeddingModelConfig.from_dict(request.embedding_config)
+            if request.embedding_config
+            else self._embedding_config
+        )
 
-        # Initialize model
+        # Enforce DI-managed configuration to avoid runtime drift
+        if request.embedding_config and requested_config != self._embedding_config:
+            raise ModelLoadError(
+                message=(
+                    "Embedding configuration overrides must be applied via DI settings. "
+                    "Update application configuration to change embedding model parameters."
+                ),
+                model_name=requested_config.model_name,
+            )
+
+        # Initialize model using DI-managed service
         await self._embedding_service.initialize()
 
         # Health check
@@ -182,13 +202,23 @@ class SetupEmbeddingInfrastructureUseCase:
         Raises:
             EmbeddingStorageError: If connection fails
         """
-        # Create or use existing client
-        if self._weaviate_client is None:
-            config_dict = request.weaviate_config or {}
-            config = WeaviateConfig.from_dict(config_dict) if config_dict else WeaviateConfig.for_local_development()
-            self._weaviate_client = WeaviateClient(config)
+        requested_config = (
+            WeaviateConfig.from_dict(request.weaviate_config)
+            if request.weaviate_config
+            else self._weaviate_config
+        )
 
-        # Connect
+        if request.weaviate_config and requested_config != self._weaviate_config:
+            raise EmbeddingStorageError(
+                message=(
+                    "Weaviate configuration overrides must be applied via DI settings. "
+                    "Update application configuration to change vector store parameters."
+                ),
+                operation="setup_weaviate",
+                details="Configuration override does not match DI-managed configuration",
+            )
+
+        # Connect using DI-managed client
         await self._weaviate_client.connect()
 
         # Health check

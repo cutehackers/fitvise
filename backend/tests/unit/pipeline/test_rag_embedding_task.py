@@ -27,56 +27,104 @@ from app.pipeline.config import PipelineSpec, ChunkingOptions
 from app.domain.entities.chunk_load_policy import ChunkLoadPolicy
 from app.domain.entities.document import Document
 from app.domain.entities.chunk import Chunk
-from app.domain.value_objects.document_metadata import DocumentMetadata, DocumentFormat
-from app.domain.exceptions import ProcessingError
-from app.infrastructure.external_services import ExternalServicesContainer
 from app.application.use_cases.indexing.build_ingestion_pipeline import (
     BuildIngestionPipelineResponse,
     DeduplicationStats,
 )
 
 
+@pytest.fixture
+def embedding_service():
+    service = AsyncMock()
+    service.model_name = "test-model"
+    service.is_loaded = True
+    return service
+
+
+@pytest.fixture
+def embedding_model():
+    return Mock()
+
+
+@pytest.fixture
+def weaviate_client():
+    client = Mock()
+    client.is_connected = True
+    return client
+
+
+@pytest.fixture
+def document_repository():
+    repo = AsyncMock()
+    return repo
+
+
+@pytest.fixture
+def embedding_repository():
+    repo = AsyncMock()
+    return repo
+
+
 class TestRagEmbeddingTaskInitialization:
     """Test RagEmbeddingTask initialization."""
 
-    def test_task_initialization_with_defaults(self):
+    def test_task_initialization_with_defaults(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        document_repository,
+        embedding_repository,
+    ):
         """Test task initialization with default parameters."""
-        external_services = Mock(spec=ExternalServicesContainer)
-        document_repository = Mock()
-
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
-        assert task.external_services is external_services
         assert task.document_repository is document_repository
         assert task.verbose is False
 
-    def test_task_initialization_with_verbose(self):
+    def test_task_initialization_with_verbose(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        document_repository,
+        embedding_repository,
+    ):
         """Test task initialization with verbose logging enabled."""
-        external_services = Mock(spec=ExternalServicesContainer)
-        document_repository = Mock()
-
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
             verbose=True,
         )
 
         assert task.verbose is True
 
-    def test_task_initialization_stores_repositories(self):
+    def test_task_initialization_stores_repositories(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        document_repository,
+        embedding_repository,
+    ):
         """Test that task stores both external services and repository."""
-        external_services = Mock(spec=ExternalServicesContainer)
-        document_repository = Mock()
-
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
-        assert hasattr(task, "external_services")
         assert hasattr(task, "document_repository")
 
 
@@ -84,9 +132,14 @@ class TestGetProcessedDocumentIds:
     """Test _get_processed_document_ids method."""
 
     @pytest.mark.asyncio
-    async def test_get_processed_documents_success(self):
+    async def test_get_processed_documents_success(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test retrieving processed document IDs successfully."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         # Create mock documents
@@ -105,8 +158,11 @@ class TestGetProcessedDocumentIds:
         ]
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._get_processed_document_ids()
@@ -118,9 +174,14 @@ class TestGetProcessedDocumentIds:
         document_repository.find_processed_documents.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_get_processed_documents_with_limit(self):
+    async def test_get_processed_documents_with_limit(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test retrieving processed documents with limit."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_ids = [uuid4() for _ in range(5)]
@@ -129,8 +190,11 @@ class TestGetProcessedDocumentIds:
         document_repository.find_processed_documents.return_value = mock_docs
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._get_processed_document_ids(limit=2)
@@ -140,16 +204,24 @@ class TestGetProcessedDocumentIds:
         assert result[1] == doc_ids[1]
 
     @pytest.mark.asyncio
-    async def test_get_processed_documents_empty(self):
+    async def test_get_processed_documents_empty(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test when no processed documents exist."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         document_repository.find_processed_documents.return_value = []
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._get_processed_document_ids()
@@ -157,9 +229,14 @@ class TestGetProcessedDocumentIds:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_get_processed_documents_repository_error(self):
+    async def test_get_processed_documents_repository_error(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test error handling when repository fails."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         document_repository.find_processed_documents.side_effect = Exception(
@@ -167,8 +244,11 @@ class TestGetProcessedDocumentIds:
         )
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         with pytest.raises(EmbeddingPipelineError, match="Document retrieval failed"):
@@ -179,9 +259,14 @@ class TestValidateChunkAvailability:
     """Test _validate_chunk_availability method (Task 2 handover validation)."""
 
     @pytest.mark.asyncio
-    async def test_validate_chunks_all_present(self):
+    async def test_validate_chunks_all_present(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test validation when all documents have chunks."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id_1 = uuid4()
@@ -199,8 +284,11 @@ class TestValidateChunkAvailability:
         document_repository.find_by_id.side_effect = [mock_doc_1, mock_doc_2]
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._validate_chunk_availability(document_ids)
@@ -211,9 +299,14 @@ class TestValidateChunkAvailability:
         assert result["documents_without_chunks"] == []
 
     @pytest.mark.asyncio
-    async def test_validate_chunks_some_missing(self):
+    async def test_validate_chunks_some_missing(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test validation when some documents lack chunks."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id_1 = uuid4()
@@ -230,8 +323,11 @@ class TestValidateChunkAvailability:
         document_repository.find_by_id.side_effect = [mock_doc_1, mock_doc_2, mock_doc_3]
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._validate_chunk_availability(document_ids)
@@ -244,9 +340,14 @@ class TestValidateChunkAvailability:
         assert str(doc_id_3) in result["documents_without_chunks"]
 
     @pytest.mark.asyncio
-    async def test_validate_chunks_document_not_found(self):
+    async def test_validate_chunks_document_not_found(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test validation when document doesn't exist in repository."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id_1 = uuid4()
@@ -255,8 +356,11 @@ class TestValidateChunkAvailability:
         document_repository.find_by_id.return_value = None
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         result = await task._validate_chunk_availability(document_ids)
@@ -267,9 +371,14 @@ class TestValidateChunkAvailability:
         assert str(doc_id_1) in result["documents_without_chunks"]
 
     @pytest.mark.asyncio
-    async def test_validate_chunks_repository_error(self):
+    async def test_validate_chunks_repository_error(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test error handling when repository fails during validation."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id_1 = uuid4()
@@ -278,8 +387,11 @@ class TestValidateChunkAvailability:
         document_repository.find_by_id.side_effect = Exception("Database error")
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         with pytest.raises(
@@ -292,22 +404,17 @@ class TestEmbeddingExecution:
     """Test execute method for embedding generation."""
 
     @pytest.mark.asyncio
-    async def test_execute_success_basic(self):
+    async def test_execute_success_basic(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test basic successful embedding generation."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        # Mock embedding service
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "sentence-transformers/all-MiniLM-L6-v2"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         # Mock processed documents
         chunk = Mock(spec=Chunk)
@@ -338,8 +445,11 @@ class TestEmbeddingExecution:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options
@@ -353,25 +463,24 @@ class TestEmbeddingExecution:
             assert result.phase_result.embeddings_stored == 1
 
     @pytest.mark.asyncio
-    async def test_execute_no_documents(self):
+    async def test_execute_no_documents(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution when no processed documents exist."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         document_repository.find_processed_documents.return_value = []
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         spec = Mock(spec=PipelineSpec)
@@ -383,21 +492,43 @@ class TestEmbeddingExecution:
         assert len(result.phase_result.warnings) == 1
 
     @pytest.mark.asyncio
-    async def test_execute_no_chunks_available(self):
+    async def test_execute_requires_connected_weaviate(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
+        """Ensure execute fails fast when Weaviate is not connected."""
+        document_repository = AsyncMock()
+        weaviate_client.is_connected = False
+
+        task = RagEmbeddingTask(
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
+            document_repository=document_repository,
+            embedding_repository=embedding_repository,
+        )
+
+        spec = Mock(spec=PipelineSpec)
+        result = await task.execute(spec)
+
+        assert result.success is False
+        assert "Weaviate client is not connected" in result.phase_result.errors[0]
+
+    @pytest.mark.asyncio
+    async def test_execute_no_chunks_available(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution when documents have no chunks (Task 2 failed)."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         # Mock processed documents without chunks
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[])
@@ -405,8 +536,11 @@ class TestEmbeddingExecution:
         document_repository.find_by_id.return_value = mock_doc
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         spec = Mock(spec=PipelineSpec)
@@ -418,55 +552,43 @@ class TestEmbeddingExecution:
         assert "No chunks available" in result.phase_result.errors[0]
 
     @pytest.mark.asyncio
-    async def test_execute_embedding_initialization_fails(self):
-        """Test error handling when embedding service fails to initialize."""
-        external_services = Mock(spec=ExternalServicesContainer)
+    async def test_execute_embedding_initialization_fails(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
+        """Test error handling when embedding service is not initialized."""
         document_repository = AsyncMock()
-
-        doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock(
-            side_effect=Exception("Model loading failed")
-        )
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
-
-        mock_doc = Mock(spec=Document, id=doc_id, chunks=[Mock(spec=Chunk)])
-        document_repository.find_processed_documents.return_value = [mock_doc]
+        embedding_service.is_loaded = False
 
         task = RagEmbeddingTask(
-            external_services=external_services,
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
             document_repository=document_repository,
+            embedding_repository=embedding_repository,
         )
 
         spec = Mock(spec=PipelineSpec)
         result = await task.execute(spec)
 
         assert result.success is False
-        assert len(result.phase_result.errors) > 0
-        assert "Failed to initialize embedding model" in result.phase_result.errors[0]
+        assert "Embedding service is not initialized" in result.phase_result.errors[0]
 
     @pytest.mark.asyncio
-    async def test_execute_with_deduplication(self):
+    async def test_execute_with_deduplication(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution with deduplication enabled."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         chunk = Mock(spec=Chunk)
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[chunk])
@@ -496,8 +618,11 @@ class TestEmbeddingExecution:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options
@@ -511,21 +636,17 @@ class TestEmbeddingExecution:
             assert result.phase_result.duplicates_removed == 15
 
     @pytest.mark.asyncio
-    async def test_execute_with_batch_size(self):
+    async def test_execute_with_batch_size(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution with custom batch size."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         chunk = Mock(spec=Chunk)
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[chunk])
@@ -548,8 +669,11 @@ class TestEmbeddingExecution:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options
@@ -563,21 +687,17 @@ class TestEmbeddingExecution:
             assert call_args[0][0].batch_size == 64
 
     @pytest.mark.asyncio
-    async def test_execute_with_chunk_load_policy(self):
+    async def test_execute_with_chunk_load_policy(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution with different chunk load policies."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         chunk = Mock(spec=Chunk)
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[chunk])
@@ -600,8 +720,11 @@ class TestEmbeddingExecution:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options
@@ -823,21 +946,17 @@ class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
     @pytest.mark.asyncio
-    async def test_execute_with_max_retries(self):
+    async def test_execute_with_max_retries(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution with custom max retries."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         chunk = Mock(spec=Chunk)
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[chunk])
@@ -860,8 +979,11 @@ class TestEdgeCases:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options
@@ -874,21 +996,17 @@ class TestEdgeCases:
             assert call_args[0][0].max_retries == 5
 
     @pytest.mark.asyncio
-    async def test_execute_timing_calculation(self):
+    async def test_execute_timing_calculation(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test that execution timing is calculated correctly."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         doc_id = uuid4()
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         chunk = Mock(spec=Chunk)
         mock_doc = Mock(spec=Document, id=doc_id, chunks=[chunk])
@@ -911,8 +1029,11 @@ class TestEdgeCases:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             spec = Mock(spec=PipelineSpec)
@@ -923,9 +1044,14 @@ class TestEdgeCases:
             assert result.end_time is not None
 
     @pytest.mark.asyncio
-    async def test_execute_large_document_set(self):
+    async def test_execute_large_document_set(
+        self,
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        embedding_repository,
+    ):
         """Test execution with large number of documents."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = AsyncMock()
 
         # Create 100 documents
@@ -934,15 +1060,6 @@ class TestEdgeCases:
             Mock(spec=Document, id=doc_id, chunks=[Mock(spec=Chunk)])
             for doc_id in doc_ids
         ]
-
-        embedding_service = AsyncMock()
-        embedding_service.model_name = "test-model"
-        embedding_service.initialize = AsyncMock()
-
-        external_services.sentence_transformer_service = embedding_service
-        external_services.embedding_repository = Mock()
-        external_services.embedding_domain_service = Mock()
-        external_services.embedding_model = Mock()
 
         document_repository.find_processed_documents.return_value = mock_docs
         document_repository.find_by_id.side_effect = mock_docs
@@ -963,8 +1080,11 @@ class TestEdgeCases:
             mock_pipeline.return_value = mock_instance
 
             task = RagEmbeddingTask(
-                external_services=external_services,
+                embedding_service=embedding_service,
+                embedding_model=embedding_model,
+                weaviate_client=weaviate_client,
                 document_repository=document_repository,
+                embedding_repository=embedding_repository,
             )
 
             # Create properly configured mock spec with chunking options

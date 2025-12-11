@@ -22,6 +22,10 @@ from app.infrastructure.storage.object_storage.minio_client import (
     ObjectStorageClient,
     ObjectStorageConfig,
 )
+from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
+    SentenceTransformerService,
+)
+from app.infrastructure.external_services.vector_stores.weaviate_client import WeaviateClient
 
 logger = logging.getLogger(__name__)
 
@@ -133,13 +137,25 @@ class RagInfrastructureTask:
     with document ingestion and embedding generation.
     """
 
-    def __init__(self, verbose: bool = False):
+    def __init__(
+        self,
+        setup_use_case: SetupEmbeddingInfrastructureUseCase,
+        weaviate_client: WeaviateClient,
+        embedding_service: SentenceTransformerService,
+        verbose: bool = False,
+    ):
         """Initialize the infrastructure phase.
 
         Args:
+            setup_use_case: DI-managed setup use case
+            weaviate_client: Connected Weaviate client managed by DI
+            embedding_service: DI-managed embedding service instance
             verbose: Enable verbose logging
         """
         self.verbose = verbose
+        self._setup_use_case = setup_use_case
+        self._weaviate_client = weaviate_client
+        self._embedding_service = embedding_service
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
@@ -174,29 +190,12 @@ class RagInfrastructureTask:
         """
         logger.info("Validating embedding service...")
         try:
-            setup_use_case = SetupEmbeddingInfrastructureUseCase()
-
-            # Prepare embedding configuration
-            embedding_config = {
-                "model_name": "Alibaba-NLP/gte-multilingual-base",
-                "device": "auto",
-                "trust_remote_code": True,
-            }
-
-            # Prepare Weaviate configuration
-            weaviate_config = {
-                "url": "http://localhost:8080",
-                "timeout_config": (10, 30),
-            }
-
             setup_request = SetupRequest(
-                vector_dimension=768,
-                embedding_config=embedding_config,
-                weaviate_config=weaviate_config,
+                vector_dimension=self._embedding_service.model_dimension,
                 recreate_schema=False,
             )
 
-            embedding_response = await setup_use_case.execute(setup_request)
+            embedding_response = await self._setup_use_case.execute(setup_request)
             validation_results["embedding_service"] = embedding_response.as_dict()
 
             if self.verbose:
@@ -226,53 +225,40 @@ class RagInfrastructureTask:
         """
         logger.info("Validating Weaviate schema...")
         try:
-            if "embedding_service" in validation_results and validation_results[
-                "embedding_service"
-            ].get("weaviate", {}).get("connected"):
-                setup_use_case = SetupEmbeddingInfrastructureUseCase()
-                await setup_use_case.execute(SetupRequest())
-                weaviate_client = setup_use_case.get_weaviate_client()
+            if not self._weaviate_client or not self._weaviate_client.is_connected:
+                errors.append("Critical: Weaviate client connection failed")
+                logger.error("❌ Weaviate client not connected")
+                return
 
-                if weaviate_client and weaviate_client.is_connected:
-                    schema = WeaviateSchema(weaviate_client._client)
-                    chunk_schema_exists = await schema.class_exists("Chunk")
-                    document_schema_exists = await schema.class_exists("DocumentChunk")
+            schema = WeaviateSchema(self._weaviate_client._client)
+            chunk_schema_exists = await schema.class_exists("Chunk")
+            document_schema_exists = await schema.class_exists("DocumentChunk")
 
-                    schema_exists = document_schema_exists or chunk_schema_exists
-                    schema_name = (
-                        "DocumentChunk" if document_schema_exists else "Chunk"
-                    )
+            schema_exists = document_schema_exists or chunk_schema_exists
+            schema_name = "DocumentChunk" if document_schema_exists else "Chunk"
 
-                    validation_results["weaviate_schema"] = {
-                        "connected": True,
-                        "schema_exists": schema_exists,
-                        "schema_name": schema_name,
-                        "url": weaviate_client.config.get_url(),
-                        "vector_dimension": 768,
-                    }
+            validation_results["weaviate_schema"] = {
+                "connected": True,
+                "schema_exists": schema_exists,
+                "schema_name": schema_name,
+                "url": self._weaviate_client.config.get_url(),
+                "vector_dimension": self._embedding_service.model_dimension,
+            }
 
-                    if not schema_exists:
-                        errors.append(
-                            "Critical: DocumentChunk or Chunk schema not found in Weaviate"
-                        )
-                        logger.error("❌ No valid schema found in Weaviate")
-                    else:
-                        logger.info(
-                            f"✅ Weaviate schema validation successful (found {schema_name})"
-                        )
-
-                    if self.verbose:
-                        logger.info(
-                            f"Weaviate connection: {weaviate_client.config.get_url()}"
-                        )
-                else:
-                    errors.append("Critical: Weaviate client connection failed")
-                    logger.error("❌ Weaviate client not connected")
-            else:
+            if not schema_exists:
                 errors.append(
-                    "Critical: Weaviate connection failed during embedding setup"
+                    "Critical: DocumentChunk or Chunk schema not found in Weaviate"
                 )
-                logger.error("❌ Weaviate not connected from embedding setup")
+                logger.error("❌ No valid schema found in Weaviate")
+            else:
+                logger.info(
+                    f"✅ Weaviate schema validation successful (found {schema_name})"
+                )
+
+            if self.verbose:
+                logger.info(
+                    f"Weaviate connection: {self._weaviate_client.config.get_url()}"
+                )
 
         except Exception as e:
             error_msg = f"Critical: Weaviate validation failed: {str(e)}"

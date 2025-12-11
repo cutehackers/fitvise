@@ -46,47 +46,49 @@ from app.domain.exceptions import (
     SourceNotReachableError,
     ChunkingError,
 )
-from app.infrastructure.external_services import ExternalServicesContainer
+
+
+@pytest.fixture
+def embedding_model():
+    """Provide a shared embedding model mock for ingestion tests."""
+    return Mock()
 
 
 class TestRagIngestionTaskInitialization:
     """Test RagIngestionTask initialization."""
 
-    def test_task_initialization_with_defaults(self):
+    def test_task_initialization_with_defaults(self, embedding_model):
         """Test task initialization with default parameters."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
 
-        assert task.external_services is external_services
+        assert task.embedding_model is embedding_model
         assert task.document_repository is document_repository
         assert task.verbose is False
 
-    def test_task_initialization_with_verbose(self):
+    def test_task_initialization_with_verbose(self, embedding_model):
         """Test task initialization with verbose logging enabled."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
             verbose=True,
         )
 
         assert task.verbose is True
 
-    def test_task_initialization_with_data_source_repository(self):
+    def test_task_initialization_with_data_source_repository(self, embedding_model):
         """Test task initialization with custom data source repository."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
         data_source_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
             data_source_repository=data_source_repository,
         )
@@ -98,13 +100,12 @@ class TestDocumentDiscovery:
     """Test document discovery methods."""
 
     @pytest.fixture
-    def task_setup(self, tmp_path):
+    def task_setup(self, tmp_path, embedding_model):
         """Setup task with temporary directory."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task, tmp_path
@@ -321,14 +322,12 @@ class TestDocumentProcessing:
     """Test document processing pipeline."""
 
     @pytest.fixture
-    def task_setup(self):
+    def task_setup(self, embedding_model):
         """Setup task with mocked dependencies."""
-        external_services = Mock(spec=ExternalServicesContainer)
-        external_services.embedding_model = Mock()
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task
@@ -506,13 +505,12 @@ class TestDocumentEntity:
     """Test document entity construction."""
 
     @pytest.fixture
-    def task_setup(self):
+    def task_setup(self, embedding_model):
         """Setup task."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task
@@ -699,13 +697,12 @@ class TestErrorHandling:
     """Test error handling in RagIngestionTask."""
 
     @pytest.fixture
-    def task_setup(self):
+    def task_setup(self, embedding_model):
         """Setup task."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task
@@ -766,14 +763,12 @@ class TestIntegrationScenarios:
     """Test end-to-end integration scenarios."""
 
     @pytest.fixture
-    def task_setup(self):
+    def task_setup(self, embedding_model):
         """Setup task with mocked use cases."""
-        external_services = Mock(spec=ExternalServicesContainer)
-        external_services.embedding_model = Mock()
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task
@@ -863,13 +858,12 @@ class TestPerformanceTracking:
     """Test performance tracking functionality."""
 
     @pytest.fixture
-    def task_setup(self):
+    def task_setup(self, embedding_model):
         """Setup task."""
-        external_services = Mock(spec=ExternalServicesContainer)
         document_repository = Mock()
 
         task = RagIngestionTask(
-            external_services=external_services,
+            embedding_model=embedding_model,
             document_repository=document_repository,
         )
         return task

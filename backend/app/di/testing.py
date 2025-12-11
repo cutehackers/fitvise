@@ -402,29 +402,84 @@ class MockServiceProviders(containers.DeclarativeContainer):
         )
     )
 
-    # Mock workflow
-    pipeline_workflow = providers.Singleton(
-        lambda repositories_bundle, external_services_container: MagicMock(
-            run_complete_pipeline=AsyncMock(return_value=MagicMock(
-                success=True,
-                documents_processed=0,
-                embeddings_stored=0,
-            )),
-            run_infrastructure_check=AsyncMock(return_value=MagicMock(
-                success=True,
-                execution_time_seconds=0.1,
-            )),
-            run_ingestion=AsyncMock(return_value=MagicMock(
-                success=True,
-                execution_time_seconds=0.1,
-            )),
-            run_embedding=AsyncMock(return_value=MagicMock(
-                success=True,
-                execution_time_seconds=0.1,
-            )),
-        ),
-        repositories_bundle=repositories.repository_bundle,
-        external_services_container=external_services,
+    setup_embedding_infrastructure_use_case = providers.Singleton(
+        lambda: MagicMock(
+            execute=AsyncMock(
+                return_value=MagicMock(
+                    success=True,
+                    embedding_service_status={"is_loaded": True},
+                    weaviate_status={"connected": True},
+                    schema_created=True,
+                    errors=[],
+                    as_dict=lambda: {
+                        "success": True,
+                        "embedding_service": {"is_loaded": True},
+                        "weaviate": {"connected": True},
+                        "schema_created": True,
+                        "errors": [],
+                    },
+                )
+            )
+        )
+    )
+
+    def _pipeline_repositories(
+        document_repo,
+        data_source_repo,
+        embedding_repo,
+    ):
+        from app.pipeline.workflow import RepositoryBundle
+
+        return RepositoryBundle(
+            document_repository=document_repo,
+            data_source_repository=data_source_repo,
+            embedding_repository=embedding_repo,
+        )
+
+    pipeline_repositories = providers.Factory(
+        _pipeline_repositories,
+        document_repo=repositories.document_repository,
+        data_source_repo=repositories.data_source_repository,
+        embedding_repo=repositories.embedding_repository,
+    )
+
+    def _pipeline_services(
+        embedding_service,
+        embedding_model,
+        weaviate_client,
+        setup_use_case,
+    ):
+        from app.pipeline.workflow import PipelineServices
+
+        return PipelineServices(
+            embedding_service=embedding_service,
+            embedding_model=embedding_model,
+            weaviate_client=weaviate_client,
+            setup_use_case=setup_use_case,
+        )
+
+    pipeline_services = providers.Factory(
+        _pipeline_services,
+        embedding_service=external_services.sentence_transformer_service,
+        embedding_model=external_services.llama_index_embedding,
+        weaviate_client=external_services.weaviate_client,
+        setup_use_case=setup_embedding_infrastructure_use_case,
+    )
+
+    # Mock workflow (real instance wired with mocked dependencies)
+    def _build_pipeline_workflow(repositories_bundle, services_bundle):
+        from app.pipeline.workflow import RAGWorkflow
+
+        return RAGWorkflow(
+            repositories=repositories_bundle,
+            services=services_bundle,
+            verbose=True,
+        )
+
+    pipeline_workflow = providers.Factory(
+        _build_pipeline_workflow,
+        repositories_bundle=pipeline_repositories,
+        services_bundle=pipeline_services,
     )
 
     # Mock health checks

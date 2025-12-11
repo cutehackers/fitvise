@@ -1,6 +1,6 @@
 # BACKLOG.md
 
-## Global Progress
+## Progress
 ```
 Epic 1 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/10 tasks completed) - 0%
 Epic 2 Progress: ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/12 tasks completed) - 0%
@@ -21,42 +21,51 @@ Epic 3 Progress: ⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
 # Meta
 - **Goal:** Maintain an agent-compatible backlog for structured planning and execution.
 - **Scope:** Infrastructure, retrieval systems, orchestration, and general tasks.
-- **Version:** 1.0
+- **Version:** 1.1
 - **Updated:** YYYY-MM-DD
 
 # Epics Overview
+
+---
 
 ## Epic 1: Core Infrastructure
 ### Progress
 ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/10 tasks completed) - 0%
 
-### Tasks
-- ⬜ T1.1: [Task Title]
-- ⬜ T1.2: [Task Title]
-- ⬜ T1.3: [Task Title]
+### Backlog Items
+- [ ] {item_unique_id}: {item_short_title}
+
+ex)
+- [x] DI-001 Install dependency-injector library
+- [x] DI-002 Create DI directory structure
+
+---
 
 ## Epic 2: RAG System
 ### Progress
 ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ (0/12 tasks completed) - 0%
 
-### Tasks
-- ⬜ T2.1.1: [Task Title]
-- ⬜ T2.1.2: [Task Title]
-- ⬜ T2.1.3: [Task Title]
+### Backlog Items
+- [ ] {item_unique_id}: {item_short_title}
+- [ ] {item_unique_id}: {item_short_title}
+
+---
 
 ## Epic 3: Agent Orchestration
 ### Progress
 ⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
 
-### Tasks
-- ⬜ T3.1: [Task Title]
-- ⬜ T3.2: [Task Title]
-- ⬜ T3.3: [Task Title]
+### Backlog Items
+- [ ] {item_unique_id}: {item_short_title}
+- [ ] {item_unique_id}: {item_short_title}
+
+---
 
 # Backlog Items (Agent-Parseable Template)
-## ID: <unique_id>
+
+## ID: <item_unique_id>
 ### Title
-<short title>
+<item_short_title>
 
 ### Epic
 <Epic ID>
@@ -92,6 +101,7 @@ todo | in_progress | blocked | review | done
 <any constraints or important considerations>
 
 # How to Update This Backlog
-- Update progress bars with `⬜` and `✅`
-- Update Status Summary table
+- Maintain checkbox state (`[ ]` or `[x]`)
+- Update progress bars using `⬜` and `✅`
+- Keep Status Summary updated
 - Add tasks following the template

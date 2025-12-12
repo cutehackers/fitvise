@@ -206,7 +206,7 @@ The codebase follows DDD principles with clear domain boundaries:
 
 ### Key Design Patterns
 - **Dependency Injection**: Services injected through FastAPI's dependency system
-- **Repository Pattern**: Data access abstraction through RepositoryContainer
+- **Repository Pattern**: Data access via DI providers (no manual containers)
 - **Domain-Driven Design**: Clear separation between domain, application, and infrastructure
 - **Value Objects**: Immutable domain concepts with validation
 - **Async Operations**: Non-blocking I/O throughout the stack
@@ -214,83 +214,9 @@ The codebase follows DDD principles with clear domain boundaries:
 - **Comprehensive Error Handling**: Graceful degradation with meaningful error messages
 - **Health Monitoring**: Service and dependency health checking
 
-### Repository Container Pattern
+### Repository Pattern (DI-first)
 
-The application uses **RepositoryContainer** for dependency injection of data repositories. This pattern provides:
-
-**Benefits**:
-- ✅ Works in both FastAPI endpoints and standalone scripts
-- ✅ Configuration-driven repository selection (in-memory vs database)
-- ✅ Lazy initialization for optimal performance
-- ✅ Easy testing with dependency overrides
-- ✅ Clean property-based API
-
-**Location**: `app/infrastructure/repositories/container.py`
-
-**Usage in FastAPI Endpoints**:
-```python
-from fastapi import Depends
-from app.infrastructure.repositories.dependencies import (
-    get_repository_container,
-    get_document_repository,
-)
-from app.domain.repositories import DocumentRepository
-
-@router.post("/documents")
-async def create_document(
-    # Option 1: Inject specific repository
-    repo: DocumentRepository = Depends(get_document_repository),
-):
-    document = await repo.save(new_document)
-    return document
-
-@router.get("/documents")
-async def list_documents(
-    # Option 2: Inject entire container for multiple repositories
-    container: RepositoryContainer = Depends(get_repository_container),
-):
-    documents = await container.document_repository.find_all()
-    sources = await container.data_source_repository.find_all()
-    return {"documents": documents, "sources": sources}
-```
-
-**Usage in Scripts**:
-```python
-import asyncio
-from app.core.settings import Settings
-from app.infrastructure.repositories.container import RepositoryContainer
-from app.infrastructure.database.database import AsyncSessionLocal
-
-async def maintenance_script():
-    """Example maintenance script using RepositoryContainer."""
-    settings = Settings()
-
-    # For database operations
-    async with AsyncSessionLocal() as session:
-        container = RepositoryContainer(settings, session)
-
-        # Access repositories
-        documents = await container.document_repository.find_all()
-        for doc in documents:
-            # Process documents
-            pass
-
-        await session.commit()
-
-async def quick_test():
-    """Quick test using in-memory repositories."""
-    settings = Settings()
-    settings.database_url = "sqlite:///:memory:"
-
-    # No session needed for in-memory mode
-    container = RepositoryContainer(settings)
-
-    # Use repositories directly
-    await container.document_repository.save(document)
-
-if __name__ == "__main__":
-    asyncio.run(maintenance_script())
-```
+Repositories are resolved via `Provide[FitviseContainer.repositories.*]` and transaction sessions via `container.repositories.transaction_session()`. Use DI overrides in tests; no legacy repository containers remain.
 
 **Usage in Pipeline Phases**:
 ```python

@@ -204,7 +204,7 @@ app/
 - **Query Handlers**: Query processing for read operations
 
 **Infrastructure Layer** (`app/infrastructure/`)
-- **RepositoryContainer**: Dependency injection pattern for repositories
+- **Repositories**: DI-managed async repositories for documents, sources, embeddings, search
 - **Database**: SQLAlchemy async session management with SQLite/PostgreSQL support
 - **LLM Service** (`app/infrastructure/services/llm_service.py`)
   - Async HTTP client for LLM API communication
@@ -415,75 +415,37 @@ asyncio.run(test_fitness_api())
 python api_example.py
 ```
 
-## 🔌 Dependency Injection & Repository Container
+## 🔌 Dependency Injection (DI)
 
-The application uses the **RepositoryContainer** pattern for flexible dependency injection that works in FastAPI endpoints, scripts, and pipeline phases.
+The DI container (`app.di.container`) provides repositories, services, and external clients. Use providers directly rather than manual containers.
 
 ### Using in FastAPI Endpoints
 
 ```python
 from fastapi import Depends
-from app.infrastructure.repositories.dependencies import (
-    get_repository_container,
-    get_document_repository,
-)
-from app.domain.repositories import DocumentRepository
-
-@router.post("/documents")
-async def create_document(
-    # Option 1: Inject specific repository
-    repo: DocumentRepository = Depends(get_document_repository),
-):
-    document = await repo.save(new_document)
-    return document
+from dependency_injector.wiring import inject, Provide
+from app.di.container import FitviseContainer
+from app.domain.repositories.document_repository import DocumentRepository
 
 @router.get("/documents")
+@inject
 async def list_documents(
-    # Option 2: Inject entire container for multiple repositories
-    container = Depends(get_repository_container),
+    repo: DocumentRepository = Depends(Provide[FitviseContainer.repositories.document_repository]),
 ):
-    documents = await container.document_repository.find_all()
-    sources = await container.data_source_repository.find_all()
-    return {"documents": documents, "sources": sources}
+    return await repo.find_all()
 ```
 
 ### Using in Scripts and Pipeline
 
 ```python
-import asyncio
-from app.core.settings import Settings
-from app.infrastructure.repositories.container import RepositoryContainer
-from app.infrastructure.database.database import AsyncSessionLocal
-from app.pipeline.phases.rag_ingestion_task import IngestionPhase
+from app.di import container
+from app.pipeline.workflow import RAGWorkflow
 
-async def run_pipeline():
-    """Run RAG pipeline with repository container."""
-    settings = Settings()
-
-    async with AsyncSessionLocal() as session:
-        # Create container once for entire pipeline
-        container = RepositoryContainer(settings, session)
-
-        # Pass to pipeline phases
-        phase = IngestionPhase(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
-        )
-
-        await phase.execute(spec)
-        await session.commit()
-
-asyncio.run(run_pipeline())
+workflow = RAGWorkflow(
+    repositories=container.services.pipeline_repositories(),
+    services=container.services.pipeline_services(),
+)
 ```
-
-### Configuration-Based Repository Selection
-
-The container automatically selects repository implementation based on `DATABASE_URL`:
-
-- **In-Memory Mode**: `sqlite:///:memory:` (ideal for testing)
-- **SQLite**: `sqlite+aiosqlite:///./fitvise.db`
-- **PostgreSQL**: `postgresql+asyncpg://user:password@localhost/fitvise`
-- **MySQL**: `mysql+aiomysql://` or `mysql+asyncmy://`
 
 ## 🎯 Critical Development Patterns
 
@@ -505,10 +467,9 @@ The container automatically selects repository implementation based on `DATABASE
 
 ### Repository Access Patterns
 
-✅ **Use RepositoryContainer for DI** - Provides consistent repository access
-✅ **Access via FastAPI Depends** - `Depends(get_repository_container)` in endpoints
-✅ **Manual creation in scripts** - With Settings and AsyncSession
-✅ **Mock in tests with AsyncMock** - Realistic return values
+✅ **Use DI providers** - `Provide[FitviseContainer.repositories.document_repository]`  
+✅ **Transaction scope** - `container.repositories.transaction_session()` for explicit transactions  
+✅ **Mock in tests** - `create_test_container()` with overrides
 
 ### Error Handling
 

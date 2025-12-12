@@ -162,6 +162,12 @@ class MockRepositoryProviders(containers.DeclarativeContainer):
         lambda: AsyncMock()
     )
 
+    async def _transaction_session():
+        mock_session = AsyncMock()
+        yield mock_session
+
+    transaction_session = providers.Resource(_transaction_session)
+
     # Mock repositories
     document_repository = providers.Singleton(
         lambda: AsyncMock(
@@ -222,13 +228,16 @@ class MockRepositoryProviders(containers.DeclarativeContainer):
 
     # Mock health checks
     database_health_check = providers.Factory(lambda: AsyncMock(return_value=True))
-    repositories_health = providers.Factory(
-        lambda database=True, weaviate=True: {
+
+    async def _repositories_health(database=True, weaviate=True):
+        return {
             "overall": database and weaviate,
             "database": database,
             "weaviate": weaviate,
         }
-    )
+
+    repositories_health = providers.Factory(_repositories_health)
+    repositories_health_check = providers.Factory(_repositories_health)
 
 
 class MockServiceProviders(containers.DeclarativeContainer):

@@ -3,7 +3,7 @@
 Provides unified repository access for both FastAPI endpoints and standalone scripts.
 The container manages repository lifecycle and configuration-based instantiation.
 """
-from typing import Optional
+from typing import Optional, Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,7 +33,7 @@ class RepositoryContainer:
     - Configuration-driven implementation selection
     - Lazy initialization of repositories
     - Session lifecycle management
-    - External services integration for embedding repositories
+    - Optional Weaviate client integration for embedding repositories
 
     Usage in FastAPI:
         container = RepositoryContainer(settings, session)
@@ -49,18 +49,18 @@ class RepositoryContainer:
         self,
         settings: Settings,
         session: Optional[AsyncSession] = None,
-        external_services: Optional["ExternalServicesContainer"] = None,
+        weaviate_client: Optional[Any] = None,
     ):
         """Initialize container with configuration.
 
         Args:
             settings: Application settings
             session: Optional database session for database repositories
-            external_services: Optional external services container for embedding repositories
+            weaviate_client: Optional Weaviate client instance for embedding repositories
         """
         self.settings = settings
         self.session = session
-        self.external_services = external_services
+        self.weaviate_client = weaviate_client
         self._use_database = self._should_use_database()
 
         # Lazy-initialized repositories
@@ -127,36 +127,25 @@ class RepositoryContainer:
 
     @property
     def embedding_repository(self) -> EmbeddingRepository:
-        """Get embedding repository instance using external services.
-
-        Returns a WeaviateEmbeddingRepository using the external services container.
-        Requires external_services to be provided during initialization.
+        """Get embedding repository instance using the provided Weaviate client.
 
         Returns:
             WeaviateEmbeddingRepository instance
 
         Raises:
-            ValueError: If external_services is not provided
-            ExternalServicesError: If repository initialization fails
+            ValueError: If no Weaviate client is provided
+            RuntimeError: If repository initialization fails
         """
         if self._embedding_repository is None:
-            if self.external_services is None:
+            if self.weaviate_client is None:
                 raise ValueError(
-                    "ExternalServicesContainer required for embedding repository. "
-                    "Pass external_services to RepositoryContainer constructor."
+                    "Weaviate client required for embedding repository. "
+                    "Pass weaviate_client to RepositoryContainer constructor."
                 )
 
             try:
-                # Create WeaviateEmbeddingRepository using external services
-                weaviate_client = self.external_services.weaviate_client
-                self._embedding_repository = WeaviateEmbeddingRepository(weaviate_client)
+                self._embedding_repository = WeaviateEmbeddingRepository(self.weaviate_client)
             except Exception as exc:
-                # Import here to avoid circular dependency
-                from app.infrastructure.external_services.external_services_container import (
-                    ExternalServicesError,
-                )
-                raise ExternalServicesError(
-                    f"Failed to initialize embedding repository: {str(exc)}"
-                ) from exc
+                raise RuntimeError(f"Failed to initialize embedding repository: {exc}") from exc
 
         return self._embedding_repository

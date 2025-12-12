@@ -133,8 +133,6 @@ class FitviseContainer(containers.DeclarativeContainer):
         all resources are properly initialized.
         """
         # Initialize resource providers
-        if hasattr(self.repositories, 'init_resources'):
-            await self.repositories.init_resources()
         if hasattr(self.external, 'init_resources'):
             await self.external.init_resources()
         if hasattr(self.services, 'init_resources'):
@@ -158,8 +156,6 @@ class FitviseContainer(containers.DeclarativeContainer):
             await self.services.shutdown_resources()
         if hasattr(self.external, 'shutdown_resources'):
             await self.external.shutdown_resources()
-        if hasattr(self.repositories, 'shutdown_resources'):
-            await self.repositories.shutdown_resources()
 
 
 # Type hints for dependency injection

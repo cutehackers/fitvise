@@ -44,9 +44,14 @@ class RepositoryProviders(containers.DeclarativeContainer):
         expire_on_commit=False,
     )
 
+    async def _session_resource(session_factory: async_sessionmaker) -> AsyncSession:
+        async with session_factory() as session:
+            yield session
+
     # Current database session (scoped to request)
     session = providers.Resource(
-        session_factory,
+        _session_resource,
+        session_factory=session_factory,
     )
 
     # Individual repository providers

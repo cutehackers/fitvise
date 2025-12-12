@@ -5,7 +5,7 @@
 Epic 1 Progress: ✅✅✅✅✅✅✅✅✅✅✅✅✅✅ (14/14 tasks completed) - 100%
 Epic 2 Progress: ✅✅✅✅✅✅✅✅✅⬜⬜ (9/11 tasks completed) - 82%
 Epic 3 Progress: ✅✅✅✅✅✅ (6/6 tasks completed) - 100%
-Epic 4 Progress: ⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
+Epic 4 Progress: ✅✅✅✅✅ (5/5 tasks completed) - 100%
 Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 ```
 
@@ -13,11 +13,11 @@ Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 11    |
+| todo         | 6     |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 29    |
+| done         | 34    |
 ```
 
 # Meta
@@ -79,14 +79,14 @@ Epic 5 Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 
 ## Epic 4: Repository Layer Migration
 ### Progress
-⬜⬜⬜⬜⬜ (0/5 tasks completed) - 0%
+✅✅✅✅✅ (5/5 tasks completed) - 100%
 
 ### Backlog Items
-- [ ] DI-032 Replace RepositoryContainer entrypoints with DI repository providers and session resources
-- [ ] DI-033 Refactor repository implementations to consume DI-managed sessions/clients (SQLAlchemy + Weaviate)
-- [ ] DI-034 Add DI-driven repository health checks (database + vector store) and align API usage
-- [ ] DI-035 Remove deprecated repository helper functions once DI coverage is complete
-- [ ] DI-036 Add repository integration tests using DI containers (database + vector store)
+- [x] DI-032 Replace RepositoryContainer entrypoints with DI repository providers and session resources
+- [x] DI-033 Refactor repository implementations to consume DI-managed sessions/clients (SQLAlchemy + Weaviate)
+- [x] DI-034 Add DI-driven repository health checks (database + vector store) and align API usage
+- [x] DI-035 Remove deprecated repository helper functions once DI coverage is complete
+- [x] DI-036 Add repository integration tests using DI containers (database + vector store)
 
 ## Epic 5: Cleanup and Documentation
 ### Progress
@@ -1504,7 +1504,7 @@ Migration
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Swap `app/infrastructure/persistence/repositories/dependencies.py` and pipeline helpers to use DI `RepositoryProviders` (session/resource) instead of constructing `RepositoryContainer`.
@@ -1545,7 +1545,7 @@ Refactor
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Ensure `WeaviateEmbeddingRepository`, `WeaviateSearchRepository`, and SQLAlchemy repos take DI-provided AsyncSession/Weaviate clients, removing reliance on ExternalServicesContainer.
@@ -1587,7 +1587,7 @@ Testing
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Leverage DI providers to expose health/connection checks for DB and Weaviate repositories and ensure API health endpoints consume them.
@@ -1630,7 +1630,7 @@ Cleanup
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Delete legacy helpers (`create_repository_bundle_for_pipeline`, container linking helpers) after DI repository providers are adopted across codebase.
@@ -1670,7 +1670,7 @@ Testing
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Create integration tests that spin up DI containers for DB + vector store repos, validating transactions, search, and embedding storage flows.

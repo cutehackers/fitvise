@@ -220,7 +220,7 @@ def configure_health_routes(app: FastAPI, container: FitviseContainer) -> None:
     @app.get("/health", tags=["health"])
     async def health_check(
         services_health: dict = Depends(container.services.services_health_check.provider),
-        external_health: dict = Depends(container.external.external_services_health_check.provider),
+        external_health: dict = Depends(container.external.external_services_health.provider),
         repositories_health: dict = Depends(container.repositories.repositories_health_check.provider),
     ):
         """Comprehensive health check endpoint."""

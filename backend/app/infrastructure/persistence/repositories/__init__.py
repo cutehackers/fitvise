@@ -6,31 +6,30 @@ from app.infrastructure.persistence.repositories.in_memory_document_repository i
 from app.infrastructure.persistence.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
 from app.infrastructure.persistence.repositories.dependencies import (
-    get_repository_container,
     get_document_repository,
     get_data_source_repository,
-    create_repository_container_for_pipeline,
-    create_repository_bundle_for_pipeline,  # Deprecated but kept for backward compatibility
+    get_embedding_repository,
+    get_search_repository,
+    get_transaction_session,
+    repositories_health,
 )
 
-# Backward-compatible aliases
-PostgresDocumentRepository = SQLAlchemyDocumentRepository  # Works with both PostgreSQL and SQLite
+# Aliases
+PostgresDocumentRepository = SQLAlchemyDocumentRepository
 SQLiteDocumentRepository = SQLAlchemyDocumentRepository  # Same implementation, different name
 
 __all__ = [
     # Repository implementations
     "InMemoryDocumentRepository",
     "SQLAlchemyDocumentRepository",
-    "PostgresDocumentRepository",  # Alias for backward compatibility
+    "PostgresDocumentRepository",
     "SQLiteDocumentRepository",  # Alias for clarity
-    # Container and dependencies (NEW - Recommended)
-    "RepositoryContainer",
-    "get_repository_container",
+    # Dependency helpers (DI-first)
     "get_document_repository",
     "get_data_source_repository",
-    "create_repository_container_for_pipeline",
-    # Deprecated but kept for backward compatibility
-    "create_repository_bundle_for_pipeline",
+    "get_embedding_repository",
+    "get_search_repository",
+    "get_transaction_session",
+    "repositories_health",
 ]

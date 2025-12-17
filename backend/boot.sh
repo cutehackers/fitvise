@@ -15,7 +15,7 @@ SYNC_REQUIRED=false
 
 # Function to show usage
 show_help() {
-    echo "🏋️ Starting Fitvise server"
+    echo "🏋️ starting fitvise server"
     echo "======================================"
     echo ""
     echo "Usage: $0 [OPTIONS]"
@@ -60,7 +60,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "🏋️ Starting Fitvise server"
+echo "🏋️ starting fitvise server"
 echo "====================================="
 
 # Check if uv is available
@@ -68,43 +68,29 @@ check_uv
 
 # Step 1: Ensure virtual environment exists or create it
 if [ ! -d ".venv" ]; then
-    echo "📦 Creating virtual environment with uv..."
+    echo "📦 creating virtual environment with uv..."
     uv venv
-    echo "✅ Virtual environment created"
+    echo "✅ virtual environment created"
 fi
 
 # Step 2: Install/Update dependencies (conditional)
 if [ "$SYNC_REQUIRED" = true ]; then
-    echo "📥 Installing or updating dependencies with uv..."
+    echo "📥 installing or updating dependencies with uv..."
     uv sync
-    echo "✅ Dependencies installed/updated"
+    echo "✅ dependencies installed/updated"
 else
-    echo "⏭️  Skipping dependency installation (use -i to install)"
+    echo "⏭️  skipping dependency installation (use -i to install)"
 fi
 
 # Step 3: Check if .env file exists
 if [ ! -f ".env" ]; then
-    echo "⚠️  Warning: .env file not found. You may need to create one."
-    echo "   You can test configuration with: python test_settings.py"
+    echo "⚠️  warning: .env file not found. you may need to create one."
+    echo "   you can test configuration with: python test_settings.py"
 fi
 
-# Step 4: Test configuration (optional)
-echo "🔧 Testing configuration..."
-if uv run python test_settings.py > /dev/null 2>&1; then
-    echo "✅ Configuration test passed"
-else
-    echo "⚠️  Configuration test failed - check your .env file"
-    echo "   Continue anyway? (y/N)"
-    read -r response
-    if [[ ! "$response" =~ ^[Yy]$ ]]; then
-        echo "❌ Startup cancelled"
-        exit 1
-    fi
-fi
-
-# Step 5: Start the server
-echo "🚀 Starting Fitvise Backend API server..."
-echo "   Press Ctrl+C to stop the server"
+# Step 4: Start the server
+echo "🚀 starting fitvise server..."
+echo "   press Ctrl+C to stop the server"
 echo ""
 
 uv run python run.py

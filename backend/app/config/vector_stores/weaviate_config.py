@@ -59,14 +59,14 @@ class WeaviateConfig:
         >>> config.port
         8080
 
-        >>> prod_config = WeaviateConfig.for_production(
+        >>> prod_config = WeaviateConfig.production(
         ...     host="weaviate.example.com",
         ...     api_key="secret-key"
         ... )
         >>> prod_config.scheme
         'https'
 
-        >>> local_config = WeaviateConfig.for_local_development()
+        >>> local_config = WeaviateConfig.local()
         >>> local_config.auth_type
         <WeaviateAuthType.NONE: 'none'>
     """
@@ -88,16 +88,7 @@ class WeaviateConfig:
     grpc_secure: bool = False
 
     @classmethod
-    def default(cls) -> WeaviateConfig:
-        """Create default Weaviate configuration.
-
-        Returns:
-            Default configuration for local development.
-        """
-        return cls()
-
-    @classmethod
-    def for_local_development(cls) -> WeaviateConfig:
+    def local(cls) -> WeaviateConfig:
         """Create configuration for local development.
 
         Returns:
@@ -115,7 +106,7 @@ class WeaviateConfig:
         )
 
     @classmethod
-    def for_production(
+    def production(
         cls,
         host: str,
         api_key: str,
@@ -150,7 +141,7 @@ class WeaviateConfig:
         )
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> WeaviateConfig:
+    def from_dict(cls, configs: Dict[str, Any]) -> WeaviateConfig:
         """Create configuration from dictionary.
 
         Args:
@@ -160,37 +151,37 @@ class WeaviateConfig:
             WeaviateConfig instance
         """
         # Handle URL parameter - parse it into host, port, scheme
-        if "url" in config_dict:
+        if "url" in configs:
             from urllib.parse import urlparse
-            parsed_url = urlparse(config_dict["url"])
+            parsed_url = urlparse(configs["url"])
             if parsed_url.hostname:
-                config_dict["host"] = parsed_url.hostname
+                configs["host"] = parsed_url.hostname
             if parsed_url.port:
-                config_dict["port"] = parsed_url.port
+                configs["port"] = parsed_url.port
             if parsed_url.scheme:
-                config_dict["scheme"] = parsed_url.scheme
+                configs["scheme"] = parsed_url.scheme
             # Remove 'url' from dict as it's not a dataclass field
-            del config_dict["url"]
+            del configs["url"]
 
         # Handle timeout_config tuple
-        if "timeout_config" in config_dict:
-            timeout_tuple = config_dict["timeout_config"]
+        if "timeout_config" in configs:
+            timeout_tuple = configs["timeout_config"]
             if isinstance(timeout_tuple, (tuple, list)) and len(timeout_tuple) >= 2:
-                config_dict["connection_timeout"] = float(timeout_tuple[0])
-                config_dict["timeout"] = float(timeout_tuple[1])
-                del config_dict["timeout_config"]
+                configs["connection_timeout"] = float(timeout_tuple[0])
+                configs["timeout"] = float(timeout_tuple[1])
+                del configs["timeout_config"]
 
         # Convert string enums
-        if "auth_type" in config_dict and isinstance(config_dict["auth_type"], str):
-            config_dict["auth_type"] = WeaviateAuthType(config_dict["auth_type"])
-        if "consistency_level" in config_dict and isinstance(
-            config_dict["consistency_level"], str
+        if "auth_type" in configs and isinstance(configs["auth_type"], str):
+            configs["auth_type"] = WeaviateAuthType(configs["auth_type"])
+        if "consistency_level" in configs and isinstance(
+            configs["consistency_level"], str
         ):
-            config_dict["consistency_level"] = ConsistencyLevel(
-                config_dict["consistency_level"]
+            configs["consistency_level"] = ConsistencyLevel(
+                configs["consistency_level"]
             )
 
-        return cls(**config_dict)
+        return cls(**configs)
 
     def as_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary.
@@ -275,4 +266,4 @@ def get_weaviate_config(
     """
     if config_dict:
         return WeaviateConfig.from_dict(config_dict)
-    return WeaviateConfig.for_local_development()
+    return WeaviateConfig.local()

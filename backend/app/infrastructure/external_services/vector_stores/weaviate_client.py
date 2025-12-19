@@ -68,7 +68,15 @@ class WeaviateClient:
         """
         self.config = config
         self._client = None
-        self.is_connected = False
+        self._is_connected = False
+        
+    @property
+    def is_connected(self) -> bool:
+        return self._is_connected
+
+    @is_connected.setter
+    def is_connected(self, value: bool) -> None:
+        self._is_connected = value
 
     async def connect(self) -> None:
         """Connect to Weaviate server using Weaviate v4 API.
@@ -76,7 +84,7 @@ class WeaviateClient:
         Raises:
             EmbeddingStorageError: If connection fails
         """
-        if self.is_connected and self._client is not None:
+        if self._is_connected and self._client is not None:
             logger.info("Already connected to Weaviate")
             return
 
@@ -112,7 +120,7 @@ class WeaviateClient:
                 # Collection doesn't exist, which is expected - connection is working
                 pass
 
-            self.is_connected = True
+            self._is_connected = True
             logger.info("Successfully connected to Weaviate")
 
         except Exception as e:
@@ -127,7 +135,7 @@ class WeaviateClient:
         if self._client is not None:
             # Weaviate client doesn't need explicit cleanup in v3
             self._client = None
-            self.is_connected = False
+            self._is_connected = False
             logger.info("Disconnected from Weaviate")
 
     def validate_connected(self) -> None:
@@ -136,7 +144,7 @@ class WeaviateClient:
         Raises:
             EmbeddingStorageError: If not connected
         """
-        if not self.is_connected or self._client is None:
+        if not self._is_connected or self._client is None:
             raise EmbeddingStorageError(
                 message="Not connected to Weaviate. Call connect() first.",
                 operation="validate_connection",
@@ -498,11 +506,11 @@ class WeaviateClient:
             Health status dictionary
         """
         health = {
-            "connected": self.is_connected,
+            "connected": self._is_connected,
             "url": self.config.get_url(),
         }
 
-        if not self.is_connected or self._client is None:
+        if not self._is_connected or self._client is None:
             health["status"] = "disconnected"
             return health
 

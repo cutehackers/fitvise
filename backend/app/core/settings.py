@@ -5,8 +5,8 @@ from typing import List, Literal, Optional
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Get absolute path to .env file
-_env_file = Path(__file__).parent.parent.parent / ".env"
+# project root
+BASE_DIR = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -33,6 +33,7 @@ class Settings(BaseSettings):
         cors_allow_credentials (bool): Allow CORS credentials.
         cors_allow_methods (str): Allowed CORS methods (comma-separated or "*").
         cors_allow_headers (str): Allowed CORS headers (comma-separated or "*").
+        database_type (str): Type of database to use (SQLite, PostgreSQL, MySQL, etc.).
         database_url (str): Database connection URL.
         database_echo (bool): Enable SQL query logging.
         vector_store_type (Literal["chromadb", "faiss", "weaviate"]): Vector store type.
@@ -70,12 +71,11 @@ class Settings(BaseSettings):
     """
 
     model_config = SettingsConfigDict(
-        env_file=str(_env_file),  # Absolute path to .env file
+        case_sensitive=False,
+        env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
-        case_sensitive=False,  # Allow case-insensitive env var matching
-        extra="ignore",
-        env_prefix="",  # No prefix for cleaner env vars
-        env_nested_delimiter="__",  # Use __ for nested config if needed
+        env_prefix="",
+        extra="ignore",        
     )
 
     # App Information
@@ -128,6 +128,7 @@ class Settings(BaseSettings):
         return [header.strip() for header in self.cors_allow_headers.split(",") if header.strip()]
 
     # Database Configuration
+    database_type: str
     database_url: str
     database_echo: bool  # Set to True for SQL query logging
 
@@ -145,6 +146,19 @@ class Settings(BaseSettings):
     weaviate_api_key: Optional[str] = None
     weaviate_timeout: float = 30.0
     weaviate_batch_size: int = 100
+    weaviate_connection_timeout: float = 10.0
+    weaviate_read_timeout: float = 30.0
+    weaviate_startup_period: int = 10
+    weaviate_max_retries: int = 3
+    weaviate_retry_delay: float = 1.0
+    weaviate_consistency_level: Literal["ONE", "QUORUM", "ALL"] = "ONE"
+    weaviate_additional_headers: Optional[dict] = None
+    weaviate_grpc_secure: bool = False
+    
+    llama_index_similarity_threshold=0.7
+    llama_index_top_k=5
+    llama_index_index_name="Chunk"
+    llama_index_text_key='text'
 
     @property
     def weaviate_url(self) -> str:
@@ -160,6 +174,20 @@ class Settings(BaseSettings):
     sentence_transformer_normalize: bool = True
     sentence_transformer_cache_strategy: Literal["MEMORY", "DISK", "HYBRID", "NONE"] = "MEMORY"
     sentence_transformer_cache_size_mb: int = 256
+
+    # ============ EMBEDDING MODEL CONFIGURATION (NEW DI SYSTEM) ============
+    # These settings are used by the dependency injection container (container.py)
+    # for configuring the embedding model via providers.Configuration
+    embedding_model_name: str = "Alibaba-NLP/gte-multilingual-base"
+    embedding_model_dimension: int = 768
+    embedding_device: Literal["auto", "cpu", "cuda", "mps"] = "auto"
+    embedding_batch_size: int = 32
+    embedding_max_seq_length: int = 512
+    embedding_normalize_embeddings: bool = True
+    embedding_cache_strategy: Literal["none", "memory", "disk", "hybrid"] = "memory"
+    embedding_num_workers: int = 4
+    embedding_show_progress: bool = True
+    embedding_trust_remote_code: bool = True
 
     # Search Configuration
     search_max_top_k: int = 1000  # Maximum results per search
@@ -459,6 +487,7 @@ class Settings(BaseSettings):
             raise ValueError('LangChain max message length for tracing cannot exceed 10000')
         return v
 
+    
     def validate_framework_observability_configuration(self) -> None:
         """Validate complete framework observability configuration for consistency."""
         # If any framework tracing is enabled, basic analytics should be enabled
@@ -488,6 +517,7 @@ class Settings(BaseSettings):
             self.framework_tracing_sample_rate > 0
         )
 
+  
     def model_post_init(self, __context) -> None:
         """Validate configuration after model initialization."""
         try:

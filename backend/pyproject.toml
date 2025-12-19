@@ -55,6 +55,7 @@ dependencies = [
     "aiosqlite>=0.21.0",
     "llama-index-vector-stores-weaviate>=1.4.1",
     "langfuse>=3.10.3",
+    "dependency-injector>=4.48.3",
 ]
 
 [tool.isort]
@@ -79,9 +80,13 @@ exclude = '''
 )/
 '''
 
+[tool.ruff]
+line-length = 120
+
 [dependency-groups]
 dev = [
     "isort>=6.0.1",
     "pytest>=8.4.2",
     "pytest-asyncio>=1.2.0",
+    "ruff>=0.14.9",
 ]

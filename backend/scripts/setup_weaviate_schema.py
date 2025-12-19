@@ -50,7 +50,7 @@ async def init_schema(force: bool = False, dimension: int = None) -> None:
     logger.info(f"Schema version: {SCHEMA_VERSION}")
 
     # Load configuration
-    config = WeaviateConfig.for_local_development()
+    config = WeaviateConfig.local()
     logger.info(f"Connecting to Weaviate at {config.get_url()}")
 
     # Get dimension from config if not provided

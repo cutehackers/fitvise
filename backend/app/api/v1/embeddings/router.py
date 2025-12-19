@@ -79,7 +79,7 @@ async def get_weaviate_client() -> WeaviateClient:
     Returns:
         Connected Weaviate client
     """
-    config = WeaviateConfig.for_local_development()
+    config = WeaviateConfig.local()
     client = WeaviateClient(config)
     await client.connect()
     return client

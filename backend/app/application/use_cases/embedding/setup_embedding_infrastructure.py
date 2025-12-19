@@ -185,7 +185,7 @@ class SetupEmbeddingInfrastructureUseCase:
         # Create or use existing client
         if self._weaviate_client is None:
             config_dict = request.weaviate_config or {}
-            config = WeaviateConfig.from_dict(config_dict) if config_dict else WeaviateConfig.for_local_development()
+            config = WeaviateConfig.from_dict(config_dict) if config_dict else WeaviateConfig.local()
             self._weaviate_client = WeaviateClient(config)
 
         # Connect

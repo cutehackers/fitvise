@@ -68,7 +68,7 @@ async def embedding_service():
 @pytest.fixture(scope="module")
 async def weaviate_client():
     """Create and connect Weaviate client for performance testing."""
-    config = WeaviateConfig.for_local_development()
+    config = WeaviateConfig.local()
     client = WeaviateClient(config)
     await client.connect()
     yield client

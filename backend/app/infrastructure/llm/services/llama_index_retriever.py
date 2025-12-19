@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from langchain_core.callbacks import CallbackManagerForRetrieverRun
 from langchain_core.documents import Document
-from langchain_core.retrievers import BaseRetriever
+from langchain_core.retrievers import BaseRetriever as LangChainBaseRetriever
 from llama_index.core import VectorStoreIndex
 from llama_index.core.retrievers import BaseRetriever as LlamaIndexBaseRetriever
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -24,7 +24,7 @@ from app.infrastructure.external_services.vector_stores.weaviate_client import (
 logger = logging.getLogger(__name__)
 
 
-class LlamaIndexRetriever(BaseRetriever):
+class LlamaIndexRetriever(LangChainBaseRetriever):
     """Flexible wrapper for any LlamaIndex BaseRetriever.
 
     This wrapper provides LangChain BaseRetriever compatibility for any
@@ -62,7 +62,7 @@ class LlamaIndexRetriever(BaseRetriever):
         self,
         query: str,
         *,
-        run_manager: CallbackManagerForRetrieverRun = None,
+        run_manager: CallbackManagerForRetrieverRun | None = None,
     ) -> List[Document]:
         """Retrieve documents synchronously.
 
@@ -80,7 +80,7 @@ class LlamaIndexRetriever(BaseRetriever):
         self,
         query: str,
         *,
-        run_manager: CallbackManagerForRetrieverRun = None,
+        run_manager: CallbackManagerForRetrieverRun | None = None,
     ) -> List[Document]:
         """Retrieve documents asynchronously.
 
@@ -140,7 +140,7 @@ def create_llama_index_weaviate_retriever(
     index_name: str = "Chunk",
     text_key: str = "text",
     embed_model_name: str = "Alibaba-NLP/gte-multilingual-base",
-) -> BaseRetriever:
+) -> LangChainBaseRetriever:
     """Create LlamaIndex-backed retriever with LangChain interface.
 
     Uses LlamaIndex's VectorStoreIndex for native Weaviate integration,

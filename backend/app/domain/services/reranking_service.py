@@ -7,9 +7,30 @@ the contract for result reranking operations.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from app.domain.entities.vector_retrieval_config import RerankingStrategy
+
+class RerankingStrategy(str, Enum):
+    """Enumeration of available reranking strategies."""
+
+    RELEVANCE_SCORE = "relevance_score"
+    """Rerank by relevance score (default)."""
+
+    SEMANTIC_SIMILARITY = "semantic_similarity"
+    """Rerank by semantic similarity to query."""
+
+    DIVERSITY = "diversity"
+    """Rerank to maximize result diversity."""
+
+    RECENCY = "recency"
+    """Rerank by recency/temporal ordering."""
+
+    COMBINED = "combined"
+    """Combine multiple ranking factors."""
+
+    CUSTOM = "custom"
+    """Use custom reranking logic."""
 
 
 class RerankingService(ABC):

@@ -286,3 +286,27 @@ class SearchResultFormatError(RetrievalError):
             details=details,
         )
         self.result_type = result_type
+
+
+class ContextBuildingError(RetrievalError):
+    """Exception raised when context building fails."""
+
+    def __init__(
+        self,
+        message: str,
+        context_type: Optional[str] = None,
+        details: Optional[str] = None,
+    ) -> None:
+        """Initialize context building error.
+
+        Args:
+            message: Error message
+            context_type: Type of context being built
+            details: Additional error details
+        """
+        super().__init__(
+            message=message,
+            operation="context_building",
+            details=details,
+        )
+        self.context_type = context_type

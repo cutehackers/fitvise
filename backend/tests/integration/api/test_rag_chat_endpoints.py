@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas.chat import ChatMessage, RagChatResponse, SourceCitation
-from app.api.v1.fitvise.dependencies import get_rag_chat_use_case, get_llm_health_monitor
+from app.api.v1.fitvise.deps import get_rag_chat_use_case, get_llm_health_monitor
 from app.infrastructure.llm.dependencies import get_chat_use_case
 
 

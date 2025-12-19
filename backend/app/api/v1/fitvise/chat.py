@@ -9,10 +9,10 @@ from typing import Annotated, Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 
-from app.api.v1.fitvise.dependencies import (
+from app.api.v1.fitvise.deps import (
     get_rag_chat_use_case,
-    get_llm_health_monitor,
 )
+from app.api.v1.fitvise.deps import get_llm_health_monitor
 from app.infrastructure.llm.dependencies import get_chat_use_case, get_llm_service
 from app.core.settings import settings
 from app.core.error_handler import (

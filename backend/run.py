@@ -1,7 +1,12 @@
 # run.py - Main entry point for Fitvise Backend API
 import uvicorn
 
-from app.core.settings import settings
+from app.di.containers.container import AppContainer
+
+# Initialize the application container to get settings
+container = AppContainer()
+container.configs.from_pydantic(container.settings())
+settings = container.settings()
 
 if __name__ == "__main__":
     print("🌪️  Starting Fitvise backend server...")

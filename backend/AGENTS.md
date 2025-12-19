@@ -220,6 +220,77 @@ The codebase follows DDD principles with clear domain boundaries:
 - **Routes**: HTTP endpoints with proper error handling
 - **Dependencies**: FastAPI dependency injection
 
+### Layered Container Architecture
+
+이 프로젝트는 Clean Architecture 원칙에 따라 계층화된 DI container 구조를 사용합니다:
+
+```
+app/di/containers/
+├── infra_container.py     # Infrastructure Layer
+├── domain_container.py    # Domain Layer
+└── container.py          # Application Layer (AppContainer)
+```
+
+#### Container Layer 설명
+
+##### Infrastructure Container (`InfraContainer`)
+- **담당**: 데이터베이스, 외부 서비스, 저장소
+- **포함**: Weaviate, 데이터베이스 세션, 리포지토리, 임베딩 서비스
+- **특징**: 외부 의존성과 가장 가까움
+
+##### Domain Container (`DomainContainer`)
+- **담당**: 비즈니스 로직, 도메인 서비스
+- **포함**: ContextService, RetrievalService, SessionService 등
+- **특징**: Infrastructure Container에 의존
+
+##### Application Container (`AppContainer`)
+- **담당**: 애플리케이션 오케스트레이션, 유스케이스
+- **포함**: 모든 계층을 통합한 최상위 컨테이너
+- **특징**: Domain Container와 Infrastructure Container에 의존
+
+#### FastAPI Dependency 구조
+
+```python
+# app/api/v1/fitvise/deps.py
+
+# ========================================
+# INFRASTRUCTURE
+# ========================================
+@lru_cache()
+def get_app_container() -> AppContainer:
+    return AppContainer()
+
+# ========================================
+# DOMAIN
+# ========================================
+@lru_cache()
+def get_session_service() -> SessionService:
+    return SessionService()
+
+# ========================================
+# APPLICATION
+# ========================================
+async def get_llama_index_retriever(
+    container: Annotated[AppContainer, Depends(get_app_container)]
+) -> BaseRetriever:
+    return container.llama_index_retriever
+```
+
+#### 사용법
+
+```python
+from fastapi import Depends
+from app.api.v1.fitvise.deps import get_llama_index_retriever
+
+@app.get("/search")
+async def search(
+    retriever: BaseRetriever = Depends(get_llama_index_retriever)
+):
+    # retriever는 자동으로 초기화되고 캐시됨
+    results = await retriever.ainvoke("query")
+    return results
+```
+
 ### Key Design Patterns
 - **Dependency Injection**: Services injected through FastAPI's dependency system
 - **Repository Pattern**: Data access abstraction through RepositoryContainer

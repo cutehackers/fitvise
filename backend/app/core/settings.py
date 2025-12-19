@@ -1,12 +1,17 @@
 import logging
+import os
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import ClassVar, List, Literal, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # project root
 BASE_DIR = Path(__file__).resolve().parents[3]
+
+# Load environment variables from .env file before defining Settings
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / ".env")
 
 
 class Settings(BaseSettings):
@@ -72,10 +77,8 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
-        env_file=str(BASE_DIR / ".env"),
-        env_file_encoding="utf-8",
         env_prefix="",
-        extra="ignore",        
+        extra="ignore",
     )
 
     # App Information
@@ -155,10 +158,10 @@ class Settings(BaseSettings):
     weaviate_additional_headers: Optional[dict] = None
     weaviate_grpc_secure: bool = False
     
-    llama_index_similarity_threshold=0.7
-    llama_index_top_k=5
-    llama_index_index_name="Chunk"
-    llama_index_text_key='text'
+    llama_index_similarity_threshold: ClassVar[float] = 0.7
+    llama_index_top_k: ClassVar[int] = 5
+    llama_index_index_name: ClassVar[str] = "Chunk"
+    llama_index_text_key: ClassVar[str] = 'text'
 
     @property
     def weaviate_url(self) -> str:

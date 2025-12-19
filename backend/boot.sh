@@ -93,4 +93,7 @@ echo "🚀 starting fitvise server..."
 echo "   press Ctrl+C to stop the server"
 echo ""
 
+# Load environment variables and start the server
+export $(grep -v '^#' .env | xargs) 2>/dev/null || true
+export PYTHONPATH="${PYTHONPATH}:$(pwd)"
 uv run python run.py

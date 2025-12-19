@@ -10,7 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import router
-from app.core.settings import settings
+from app.di.containers.container import AppContainer
+from app.di.bootstrap import ensure_weaviate_connected
+
+# Initialize the application container
+container = AppContainer()
+container.wire([__name__])
+settings = container.settings()
 
 # Configure logging with structured format
 class LogFormatter(logging.Formatter):

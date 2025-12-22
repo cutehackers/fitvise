@@ -21,7 +21,11 @@ from app.infrastructure.persistence.repositories.sqlalchemy_document_repository 
 from app.infrastructure.persistence.repositories.weaviate_embedding_repository import (
     WeaviateEmbeddingRepository,
 )
-from app.config.ml_models.embedding_model_configs import CacheStrategy, DeviceType, EmbeddingModelConfig
+from app.config.ml_models.embedding_model_configs import (
+    CacheStrategy,
+    DeviceType,
+    EmbeddingModelConfig,
+)
 from app.infrastructure.llm.services.llama_index_retriever import LlamaIndexRetriever
 from app.infrastructure.external_services.ml_services.embedding_models.sentence_transformer_service import (
     SentenceTransformerService,
@@ -35,72 +39,65 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.weaviate import WeaviateVectorStore
 
 
-def build_sentence_transformer_service(configs: providers.Configuration) -> SentenceTransformerService:
+def _get_config_value(configs, key: str, default=None):
+    """Fetch config values from providers.Configuration or plain dict(Settings)."""
+    if isinstance(configs, providers.Configuration):
+        provider = getattr(configs, key)
+        return provider()
+    if hasattr(configs, key):
+        attr = getattr(configs, key)
+        return attr() if callable(attr) else attr
+    if isinstance(configs, dict):
+        return configs.get(key, default)
+    return default
+
+
+def build_sentence_transformer_service(configs) -> SentenceTransformerService:
+    """Factory for SentenceTransformerService that works with Provider or dict configs."""
     return SentenceTransformerService(
         config=EmbeddingModelConfig(
-            model_name=configs.embedding_model_name(),
-            model_dimension=configs.embedding_model_dimension(),
-            device=DeviceType(configs.embedding_device()),
-            batch_size=configs.embedding_batch_size(),
-            max_seq_length=configs.embedding_max_seq_length(),
-            normalize_embeddings=configs.embedding_normalize_embeddings(),
-            cache_strategy=CacheStrategy(configs.embedding_cache_strategy()),
-            num_workers=configs.embedding_num_workers(),
-            show_progress=configs.embedding_show_progress(),
-            model_kwargs={"trust_remote_code": configs.embedding_trust_remote_code()},
+            model_name=_get_config_value(configs, "embedding_model_name"),
+            model_dimension=_get_config_value(
+                configs, "embedding_model_dimension"
+            ),
+            device=DeviceType(_get_config_value(configs, "embedding_device")),
+            batch_size=_get_config_value(configs, "embedding_batch_size"),
+            max_seq_length=_get_config_value(configs, "embedding_max_seq_length"),
+            normalize_embeddings=_get_config_value(
+                configs, "embedding_normalize_embeddings"
+            ),
+            cache_strategy=CacheStrategy(
+                _get_config_value(configs, "embedding_cache_strategy")
+            ),
+            num_workers=_get_config_value(configs, "embedding_num_workers"),
+            show_progress=_get_config_value(configs, "embedding_show_progress"),
+            model_kwargs={
+                "trust_remote_code": _get_config_value(
+                    configs, "embedding_trust_remote_code"
+                )
+            },
         )
     )
 
 
 def build_weaviate_client(configs) -> WeaviateClient:
-    # Handle both Configuration provider and dict
-    if hasattr(configs, 'weaviate_host'):  # Configuration provider
-        host = configs.weaviate_host()
-        port = configs.weaviate_port()
-        scheme = configs.weaviate_scheme()
-        auth_type = configs.weaviate_auth_type()
-        api_key = configs.weaviate_api_key()
-        timeout = configs.weaviate_timeout()
-        connection_timeout = configs.weaviate_connection_timeout()
-        read_timeout = configs.weaviate_read_timeout()
-        startup_period = configs.weaviate_startup_period()
-        max_retries = configs.weaviate_max_retries()
-        retry_delay = configs.weaviate_retry_delay()
-        consistency_level = configs.weaviate_consistency_level()
-        additional_headers = configs.weaviate_additional_headers()
-        grpc_secure = configs.weaviate_grpc_secure()
-    else:  # dict
-        host = configs.get('weaviate_host')
-        port = configs.get('weaviate_port')
-        scheme = configs.get('weaviate_scheme')
-        auth_type = configs.get('weaviate_auth_type')
-        api_key = configs.get('weaviate_api_key')
-        timeout = configs.get('weaviate_timeout')
-        connection_timeout = configs.get('weaviate_connection_timeout')
-        read_timeout = configs.get('weaviate_read_timeout')
-        startup_period = configs.get('weaviate_startup_period')
-        max_retries = configs.get('weaviate_max_retries')
-        retry_delay = configs.get('weaviate_retry_delay')
-        consistency_level = configs.get('weaviate_consistency_level')
-        additional_headers = configs.get('weaviate_additional_headers')
-        grpc_secure = configs.get('weaviate_grpc_secure')
-
+    """Factory for WeaviateClient that works with Provider or dict configs."""
     return WeaviateClient(
         config=WeaviateConfig(
-            host=host,
-            port=port,
-            scheme=scheme,
-            auth_type=auth_type,
-            api_key=api_key,
-            timeout=timeout,
-            connection_timeout=connection_timeout,
-            read_timeout=read_timeout,
-            startup_period=startup_period,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-            consistency_level=consistency_level,
-            additional_headers=additional_headers,
-            grpc_secure=grpc_secure,
+            host=_get_config_value(configs, "weaviate_host"),
+            port=_get_config_value(configs, "weaviate_port"),
+            scheme=_get_config_value(configs, "weaviate_scheme"),
+            auth_type=_get_config_value(configs, "weaviate_auth_type"),
+            api_key=_get_config_value(configs, "weaviate_api_key"),
+            timeout=_get_config_value(configs, "weaviate_timeout"),
+            connection_timeout=_get_config_value(configs, "weaviate_connection_timeout"),
+            read_timeout=_get_config_value(configs, "weaviate_read_timeout"),
+            startup_period=_get_config_value(configs, "weaviate_startup_period"),
+            max_retries=_get_config_value(configs, "weaviate_max_retries"),
+            retry_delay=_get_config_value(configs, "weaviate_retry_delay"),
+            consistency_level=_get_config_value(configs, "weaviate_consistency_level"),
+            additional_headers=_get_config_value(configs, "weaviate_additional_headers"),
+            grpc_secure=_get_config_value(configs, "weaviate_grpc_secure"),
         )
     )
 

@@ -309,7 +309,7 @@ class RagEmbeddingTask:
                 raise EmbeddingPipelineError(error_msg) from weaviate_error
 
             # Step 2: Ensure embedding service is initialized before use
-            embedding_service = self.infra.sentence_transformer_service
+            embedding_service = self.infra.sentence_transformer_service()
             logger.info(f"Initializing embedding model: {embedding_service.model_name}")
             try:
                 await embedding_service.initialize()

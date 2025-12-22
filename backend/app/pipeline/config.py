@@ -37,7 +37,7 @@ class StorageOptions(BaseModel):
 
 
 class ScheduleOptions(BaseModel):
-    mode: Literal["manual", "cron", "airflow"] = "manual"
+    mode: Literal["manual", "cron"] = "manual"
     cron: Optional[str] = Field("0 3 1 * *", description="Run monthly at 03:00 on day 1")
 
 

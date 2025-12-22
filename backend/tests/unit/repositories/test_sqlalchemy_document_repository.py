@@ -23,7 +23,7 @@ from app.domain.value_objects.quality_metrics import DataQualityMetrics, Content
 from app.infrastructure.persistence.repositories.sqlalchemy_document_repository import (
     SQLAlchemyDocumentRepository,
 )
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
+from app.di.containers.infra_container import InfraContainer
 from app.infrastructure.database import async_session_maker
 
 
@@ -745,35 +745,22 @@ class TestSQLAlchemyDocumentRepository:
     @pytest.mark.unit
     @pytest.mark.asyncio
     async def test_factory_selection_sqlalchemy_repository(self):
-        """Test that factory selects SQLAlchemy repository for async database URL."""
-        from app.core.settings import Settings
+        """Test that factory selects SQLAlchemy repository for database configuration."""
         from app.infrastructure.database.database import async_session_maker
 
-        # Set async database URL environment
-        import os
-        original_url = os.environ.get('DATABASE_URL')
-        os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///./test.db'
+        # Test repository container with database settings
+        async with async_session_maker() as session:
+            container = InfraContainer()
 
-        try:
-            # Create new settings with updated DATABASE_URL
-            settings = Settings()
+            # Configure for SQLAlchemy repository
+            container.configs.database_type.override('aiosqlite')
 
-            # Test repository container with database settings
-            async with async_session_maker() as session:
-                container = RepositoryContainer(settings, session)
+            # Override db_session with our test session
+            container.db_session.override(session)
 
-                # Verify container detects database mode
-                assert container._use_database is True
-
-                # Test repository creation
-                repo = container.document_repository
-                assert isinstance(repo, SQLAlchemyDocumentRepository)
-        finally:
-            # Restore original URL
-            if original_url:
-                os.environ['DATABASE_URL'] = original_url
-            else:
-                os.environ.pop('DATABASE_URL', None)
+            # Get repository from container
+            repo = container.document_repository()
+            assert isinstance(repo, SQLAlchemyDocumentRepository)
 
 
 class TestSQLAlchemyRepositoryPerformance:

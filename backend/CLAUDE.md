@@ -285,9 +285,9 @@ async def search(
 - **Comprehensive Error Handling**: Graceful degradation with meaningful error messages
 - **Health Monitoring**: Service and dependency health checking
 
-### Repository Container Pattern
+### InfraContainer Pattern
 
-The application uses **RepositoryContainer** for dependency injection of data repositories. This pattern provides:
+The application uses **InfraContainer** for dependency injection of infrastructure services including data repositories. This pattern provides:
 
 **Benefits**:
 - ✅ Works in both FastAPI endpoints and standalone scripts
@@ -296,52 +296,49 @@ The application uses **RepositoryContainer** for dependency injection of data re
 - ✅ Easy testing with dependency overrides
 - ✅ Clean property-based API
 
-**Location**: `app/infrastructure/repositories/container.py`
+**Location**: `app/di/containers/infra_container.py`
 
 **Usage in FastAPI Endpoints**:
 ```python
 from fastapi import Depends
-from app.infrastructure.repositories.dependencies import (
-    get_repository_container,
-    get_document_repository,
-)
+from app.di.containers.infra_container import InfraContainer
 from app.domain.repositories import DocumentRepository
 
 @router.post("/documents")
 async def create_document(
-    # Option 1: Inject specific repository
-    repo: DocumentRepository = Depends(get_document_repository),
+    # Inject InfraContainer and access repositories
+    container: InfraContainer = Depends(get_infra_container),
 ):
-    document = await repo.save(new_document)
+    document = await container.document_repository().save(new_document)
     return document
 
 @router.get("/documents")
 async def list_documents(
-    # Option 2: Inject entire container for multiple repositories
-    container: RepositoryContainer = Depends(get_repository_container),
+    # Inject InfraContainer for multiple repositories
+    container: InfraContainer = Depends(get_infra_container),
 ):
-    documents = await container.document_repository.find_all()
-    sources = await container.data_source_repository.find_all()
+    documents = await container.document_repository().find_all()
+    sources = await container.data_source_repository().find_all()
     return {"documents": documents, "sources": sources}
 ```
 
 **Usage in Scripts**:
 ```python
 import asyncio
-from app.core.settings import Settings
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.di.containers.infra_container import InfraContainer
 from app.infrastructure.database.database import AsyncSessionLocal
 
 async def maintenance_script():
-    """Example maintenance script using RepositoryContainer."""
-    settings = Settings()
+    """Example maintenance script using InfraContainer."""
+    # Create InfraContainer
+    container = InfraContainer()
 
     # For database operations
     async with AsyncSessionLocal() as session:
-        container = RepositoryContainer(settings, session)
+        container.db_session.override(session)
 
         # Access repositories
-        documents = await container.document_repository.find_all()
+        documents = await container.document_repository().find_all()
         for doc in documents:
             # Process documents
             pass
@@ -350,14 +347,12 @@ async def maintenance_script():
 
 async def quick_test():
     """Quick test using in-memory repositories."""
-    settings = Settings()
-    settings.database_url = "sqlite:///:memory:"
-
-    # No session needed for in-memory mode
-    container = RepositoryContainer(settings)
+    # Create InfraContainer with default configuration
+    container = InfraContainer()
+    container.configs.database_type.override('default')
 
     # Use repositories directly
-    await container.document_repository.save(document)
+    await container.document_repository().save(document)
 
 if __name__ == "__main__":
     asyncio.run(maintenance_script())
@@ -366,19 +361,19 @@ if __name__ == "__main__":
 **Usage in Pipeline Phases**:
 ```python
 from app.pipeline.phases.rag_ingestion_task import IngestionPhase
+from app.di.containers.infra_container import InfraContainer
 
 async def run_pipeline():
-    """Run pipeline with repository container."""
-    settings = Settings()
+    """Run pipeline with InfraContainer."""
+    container = InfraContainer()
 
     async with AsyncSessionLocal() as session:
-        # Create container once for entire pipeline
-        container = RepositoryContainer(settings, session)
+        container.db_session.override(session)
 
         # Pass to pipeline phases
         phase = IngestionPhase(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
+            document_repository=container.document_repository(),
+            data_source_repository=container.data_source_repository(),
         )
 
         await phase.execute(spec)
@@ -389,20 +384,21 @@ async def run_pipeline():
 ```python
 from fastapi.testclient import TestClient
 from app.main import app
-from app.infrastructure.dependencies import get_repository_container
+from app.di.containers.infra_container import InfraContainer
 
 def test_endpoint_with_mock_container():
-    """Test endpoint by mocking the entire container."""
+    """Test endpoint by mocking the InfraContainer."""
     # Create mock container
-    mock_container = Mock(spec=RepositoryContainer)
+    mock_container = InfraContainer()
     mock_repo = AsyncMock()
-    mock_container.document_repository = mock_repo
+    # Override the repository provider
+    mock_container.document_repository.override(mock_repo)
 
     # Override dependency
     async def override_container():
-        yield mock_container
+        return mock_container
 
-    app.dependency_overrides[get_repository_container] = override_container
+    app.dependency_overrides[get_infra_container] = override_container
 
     # Test endpoint
     client = TestClient(app)
@@ -417,22 +413,22 @@ def test_endpoint_with_mock_container():
 
 **Configuration-Based Selection**:
 
-The container automatically selects repository implementation based on `DATABASE_URL`:
+The container automatically selects repository implementation based on `database_type` configuration:
 
-- **In-Memory Mode**: `sqlite:///:memory:` (no async driver)
+- **In-Memory Mode**: `default` (InMemoryDocumentRepository)
   - Fast, no persistence
   - Ideal for testing and prototyping
 
-- **Database Mode**: Async drivers detected automatically
-  - `sqlite+aiosqlite:///` - SQLite with async support
-  - `postgresql+asyncpg://` - PostgreSQL with async support
-  - `mysql+aiomysql://` or `mysql+asyncmy://` - MySQL with async support
+- **Database Mode**: Async drivers configured automatically
+  - `aiosqlite` - SQLite with async support (SQLAlchemyDocumentRepository)
+  - `asyncpg` - PostgreSQL with async support (SQLAlchemyDocumentRepository)
+  - `aiomysql` or `asyncmy` - MySQL with async support (SQLAlchemyDocumentRepository)
 
 **See Also**:
-- Container implementation: `app/infrastructure/repositories/container.py`
-- FastAPI dependencies: `app/infrastructure/repositories/dependencies.py`
+- Container implementation: `app/di/containers/infra_container.py`
+- FastAPI dependencies: `app/di/bootstrap.py`
 - Usage examples: `scripts/examples/use_container.py`
-- Tests: `tests/unit/infrastructure/test_repository_container.py`
+- Tests: Updated factory selection tests in repository test files
 
 ### Development Considerations
 - The service expects an external LLM API (typically Ollama) for core functionality
@@ -636,9 +632,9 @@ When modifying LLM integration, ensure compatibility with the expected request/r
 - **Track deduplication stats** - Validate duplicate removal calculations
 
 ### Repository Access Patterns
-- **Use RepositoryContainer for dependency injection** - Provides consistent repository access
-- **Access repositories via dependency injection** - `Depends(get_repository_container)`
-- **In scripts, create RepositoryContainer manually** - With Settings and AsyncSession
+- **Use InfraContainer for dependency injection** - Provides consistent repository access
+- **Access repositories via dependency injection** - `Depends(get_infra_container)`
+- **In scripts, create InfraContainer manually** - With Settings and AsyncSession
 - **In tests, mock repositories with AsyncMock** - Realistic return values
 
 ### Error Handling

@@ -19,7 +19,7 @@ from app.domain.value_objects.document_metadata import (
 )
 from app.domain.value_objects.quality_metrics import DataQualityMetrics, ContentQualityMetrics
 from app.infrastructure.persistence.repositories.in_memory_document_repository import InMemoryDocumentRepository
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
+from app.di.containers.infra_container import InfraContainer
 from app.core.settings import Settings
 
 
@@ -565,31 +565,16 @@ class TestInMemoryDocumentRepository:
 
     @pytest.mark.unit
     def test_factory_selection_memory_repository(self):
-        """Test that factory selects in-memory repository for memory URL."""
-        # Set memory URL environment
-        import os
-        original_url = os.environ.get('DATABASE_URL')
-        os.environ['DATABASE_URL'] = 'memory'
+        """Test that factory selects in-memory repository for default configuration."""
+        # Create InfraContainer
+        container = InfraContainer()
 
-        try:
-            # Create settings with memory URL
-            settings = Settings()
+        # Configure for default (in-memory) repository
+        container.configs.database_type.override('default')
 
-            # Create container (no session needed for in-memory)
-            container = RepositoryContainer(settings)
-
-            # Verify container uses in-memory mode
-            assert container._use_database is False
-
-            # Get repository
-            repo = container.document_repository
-            assert isinstance(repo, InMemoryDocumentRepository)
-        finally:
-            # Restore original URL
-            if original_url:
-                os.environ['DATABASE_URL'] = original_url
-            else:
-                os.environ.pop('DATABASE_URL', None)
+        # Get repository from container
+        repo = container.document_repository()
+        assert isinstance(repo, InMemoryDocumentRepository)
 
 
 class TestInMemoryRepositoryPerformance:

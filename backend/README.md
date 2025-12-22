@@ -415,35 +415,32 @@ asyncio.run(test_fitness_api())
 python api_example.py
 ```
 
-## 🔌 Dependency Injection & Repository Container
+## 🔌 Dependency Injection & InfraContainer
 
-The application uses the **RepositoryContainer** pattern for flexible dependency injection that works in FastAPI endpoints, scripts, and pipeline phases.
+The application uses the **InfraContainer** pattern for flexible dependency injection that works in FastAPI endpoints, scripts, and pipeline phases.
 
 ### Using in FastAPI Endpoints
 
 ```python
 from fastapi import Depends
-from app.infrastructure.repositories.dependencies import (
-    get_repository_container,
-    get_document_repository,
-)
+from app.di.containers.infra_container import InfraContainer
 from app.domain.repositories import DocumentRepository
 
 @router.post("/documents")
 async def create_document(
-    # Option 1: Inject specific repository
-    repo: DocumentRepository = Depends(get_document_repository),
+    # Inject InfraContainer and access repositories
+    container: InfraContainer = Depends(get_infra_container),
 ):
-    document = await repo.save(new_document)
+    document = await container.document_repository().save(new_document)
     return document
 
 @router.get("/documents")
 async def list_documents(
-    # Option 2: Inject entire container for multiple repositories
-    container = Depends(get_repository_container),
+    # Inject InfraContainer for multiple repositories
+    container: InfraContainer = Depends(get_infra_container),
 ):
-    documents = await container.document_repository.find_all()
-    sources = await container.data_source_repository.find_all()
+    documents = await container.document_repository().find_all()
+    sources = await container.data_source_repository().find_all()
     return {"documents": documents, "sources": sources}
 ```
 
@@ -451,23 +448,21 @@ async def list_documents(
 
 ```python
 import asyncio
-from app.core.settings import Settings
-from app.infrastructure.repositories.container import RepositoryContainer
+from app.di.containers.infra_container import InfraContainer
 from app.infrastructure.database.database import AsyncSessionLocal
 from app.pipeline.phases.rag_ingestion_task import IngestionPhase
 
 async def run_pipeline():
-    """Run RAG pipeline with repository container."""
-    settings = Settings()
+    """Run RAG pipeline with InfraContainer."""
+    container = InfraContainer()
 
     async with AsyncSessionLocal() as session:
-        # Create container once for entire pipeline
-        container = RepositoryContainer(settings, session)
+        container.db_session.override(session)
 
         # Pass to pipeline phases
         phase = IngestionPhase(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
+            document_repository=container.document_repository(),
+            data_source_repository=container.data_source_repository(),
         )
 
         await phase.execute(spec)
@@ -478,12 +473,12 @@ asyncio.run(run_pipeline())
 
 ### Configuration-Based Repository Selection
 
-The container automatically selects repository implementation based on `DATABASE_URL`:
+The container automatically selects repository implementation based on `database_type` configuration:
 
-- **In-Memory Mode**: `sqlite:///:memory:` (ideal for testing)
-- **SQLite**: `sqlite+aiosqlite:///./fitvise.db`
-- **PostgreSQL**: `postgresql+asyncpg://user:password@localhost/fitvise`
-- **MySQL**: `mysql+aiomysql://` or `mysql+asyncmy://`
+- **In-Memory Mode**: `default` (InMemoryDocumentRepository, ideal for testing)
+- **SQLite**: `aiosqlite` (SQLAlchemyDocumentRepository)
+- **PostgreSQL**: `asyncpg` (SQLAlchemyDocumentRepository)
+- **MySQL**: `aiomysql` or `asyncmy` (SQLAlchemyDocumentRepository)
 
 ## 🎯 Critical Development Patterns
 
@@ -505,8 +500,8 @@ The container automatically selects repository implementation based on `DATABASE
 
 ### Repository Access Patterns
 
-✅ **Use RepositoryContainer for DI** - Provides consistent repository access
-✅ **Access via FastAPI Depends** - `Depends(get_repository_container)` in endpoints
+✅ **Use InfraContainer for DI** - Provides consistent repository access
+✅ **Access via FastAPI Depends** - `Depends(get_infra_container)` in endpoints
 ✅ **Manual creation in scripts** - With Settings and AsyncSession
 ✅ **Mock in tests with AsyncMock** - Realistic return values
 

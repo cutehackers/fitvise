@@ -20,6 +20,7 @@ class AppContainer(containers.DeclarativeContainer):
     # SETTINGS
     settings: providers.Singleton[Settings] = providers.Singleton(Settings)
     configs = providers.Configuration()
+    configs.from_pydantic(settings())
 
     # LAYERED CONTAINERS
     infra = providers.Container(InfraContainer, configs=configs)

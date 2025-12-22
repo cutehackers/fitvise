@@ -34,8 +34,8 @@ from app.domain.repositories.document_repository import DocumentRepository
 from app.domain.repositories.data_source_repository import DataSourceRepository
 from app.domain.repositories.embedding_repository import EmbeddingRepository
 
-from app.infrastructure.persistence.repositories.container import RepositoryContainer
-from app.infrastructure.external_services import ExternalServicesContainer
+from app.di.containers.container import AppContainer
+from app.di.containers.infra_container import InfraContainer
 from app.core.settings import Settings, get_settings
 from scripts.rag_summary import (
     RagBuildSummary,
@@ -205,7 +205,7 @@ class RAGWorkflow:
     def __init__(
         self,
         repositories: Optional[RepositoryBundle] = None,
-        external_services: Optional[ExternalServicesContainer] = None,
+        container: Optional[AppContainer] = None,
         session: Optional[AsyncSession] = None,
         verbose: bool = False,
     ):
@@ -214,8 +214,8 @@ class RAGWorkflow:
         Args:
             repositories: Optional pre-configured repository bundle.
                          If not provided, creates repositories based on session parameter.
-            external_services: Optional pre-configured external services container.
-                             If not provided, creates new container with settings.
+            container: Optional pre-configured AppContainer.
+                      If not provided, creates new AppContainer with settings.
             session: Optional database session for SQLAlchemy repositories.
                     If provided without repositories, creates SQLAlchemy-based bundle.
                     If neither provided, creates in-memory repositories.
@@ -227,72 +227,69 @@ class RAGWorkflow:
         if verbose:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        # Initialize or use provided external services (includes ML services)
-        if external_services is None:
-            settings = get_settings()
-            self.external_services = ExternalServicesContainer(settings)
+        # Initialize or use provided container
+        if container is None:
+            self.container = AppContainer()
         else:
-            self.external_services = external_services
+            self.container = container
+
+        # Extract infra container for easier access
+        self.infra = self.container.infra
 
         # Initialize or use provided repositories
         if repositories is None:
-            # We need external_services for the embedding repository
-            # Helper function updated to accept external_services
-            self.repositories = self._create_repository_bundle(
-                session,
-                self.external_services
-            )
+            # Repository bundle will be created lazily when needed
+            self.repositories = None
+            self._session = session
         else:
             self.repositories = repositories
 
-        # Initialize tasks with shared repositories and ML services
+        # Initialize tasks (repositories will be created lazily)
         self.infrastructure_task = RagInfrastructureTask(
             verbose=verbose
         )
-        self.ingestion_task = RagIngestionTask(
-            external_services=self.external_services,
-            document_repository=self.repositories.document_repository,
-            data_source_repository=self.repositories.data_source_repository,
-            verbose=verbose,
-        )
-        self.embedding_task = RagEmbeddingTask(
-            external_services=self.external_services,
-            document_repository=self.repositories.document_repository,
-            embedding_repository=self.repositories.embedding_repository,
-            verbose=verbose,
-        )
+        self.ingestion_task = None
+        self.embedding_task = None
 
         # Summary tracking
         self.summary = RagBuildSummary()
         self.start_time: Optional[datetime] = None
 
     @staticmethod
-    def _create_repository_bundle(
+    async def _create_repository_bundle(
         session: Optional[AsyncSession] = None,
-        external_services: Optional[ExternalServicesContainer] = None,
+        infra: Optional[InfraContainer] = None,
     ) -> RepositoryBundle:
         """Create a repository bundle based on session availability.
 
         Args:
             session: Optional database session
-            external_services: Optional external services container, needed for EmbeddingRepository
+            infra: Optional infra container, needed for EmbeddingRepository
 
         Returns:
             RepositoryBundle with appropriate repository implementations
         """
-        # Get settings
-        settings = get_settings()
+        if infra is None:
+            raise ValueError("InfraContainer is required for repository bundle creation")
 
-        # Create container with session (works for both database and in-memory)
-        # Passing external_services allows creation of embedding_repository
-        # Create container with session (works for both database and in-memory)
-        # Passing external_services allows creation of embedding_repository
-        container = RepositoryContainer(settings, session, external_services)
+        # Use repositories directly from InfraContainer
+        # Note: Some providers may return coroutines, so we await them if needed
+        doc_repo = infra.document_repository()
+        if hasattr(doc_repo, '__await__'):
+            doc_repo = await doc_repo
+
+        data_repo = infra.data_source_repository()
+        if hasattr(data_repo, '__await__'):
+            data_repo = await data_repo
+
+        embed_repo = infra.embedding_repository()
+        if hasattr(embed_repo, '__await__'):
+            embed_repo = await embed_repo
 
         return RepositoryBundle(
-            document_repository=container.document_repository,
-            data_source_repository=container.data_source_repository,
-            embedding_repository=container.embedding_repository,
+            document_repository=doc_repo,
+            data_source_repository=data_repo,
+            embedding_repository=embed_repo,
         )
 
     async def run_infrastructure_check(
@@ -344,6 +341,21 @@ class RAGWorkflow:
                 data["storage"]["provider"] = "local"
                 spec = PipelineSpec.model_validate(data)
 
+            # Create repository bundle if not exists
+            if self.repositories is None:
+                self.repositories = await self._create_repository_bundle(
+                    self._session, self.infra
+                )
+
+            # Initialize ingestion task if not exists
+            if self.ingestion_task is None:
+                self.ingestion_task = RagIngestionTask(
+                    infra=self.infra,
+                    document_repository=self.repositories.document_repository,
+                    data_source_repository=self.repositories.data_source_repository,
+                    verbose=self.verbose,
+                )
+
             # Task now returns TaskReport directly
             task_report = await self.ingestion_task.execute(
                 spec, dry_run=dry_run
@@ -391,6 +403,21 @@ class RAGWorkflow:
         logger.info("🔢 Task 3: Embedding Generation and Storage")
 
         try:
+            # Create repository bundle if not exists
+            if self.repositories is None:
+                self.repositories = await self._create_repository_bundle(
+                    self._session, self.infra
+                )
+
+            # Initialize embedding task if not exists
+            if self.embedding_task is None:
+                self.embedding_task = RagEmbeddingTask(
+                    infra=self.infra,
+                    document_repository=self.repositories.document_repository,
+                    embedding_repository=self.repositories.embedding_repository,
+                    verbose=self.verbose,
+                )
+
             # Task now returns TaskReport directly
             task_report = await self.embedding_task.execute(
                 spec=spec,
@@ -552,6 +579,21 @@ class RAGWorkflow:
             workflow_id: Optional workflow ID for tracing
         """
         try:
+            # Create repository bundle if not exists
+            if self.repositories is None:
+                self.repositories = await self._create_repository_bundle(
+                    self._session, self.infra
+                )
+
+            # Initialize ingestion task if not exists
+            if self.ingestion_task is None:
+                self.ingestion_task = RagIngestionTask(
+                    infra=self.infra,
+                    document_repository=self.repositories.document_repository,
+                    data_source_repository=self.repositories.data_source_repository,
+                    verbose=self.verbose,
+                )
+
             # Task now returns TaskReport directly with all timing
             task_report = await self.ingestion_task.execute(
                 spec, dry_run=dry_run
@@ -621,6 +663,21 @@ class RAGWorkflow:
             workflow_id: Optional workflow ID for tracing
         """
         try:
+            # Create repository bundle if not exists
+            if self.repositories is None:
+                self.repositories = await self._create_repository_bundle(
+                    self._session, self.infra
+                )
+
+            # Initialize embedding task if not exists
+            if self.embedding_task is None:
+                self.embedding_task = RagEmbeddingTask(
+                    infra=self.infra,
+                    document_repository=self.repositories.document_repository,
+                    embedding_repository=self.repositories.embedding_repository,
+                    verbose=self.verbose,
+                )
+
             # Determine chunk load policy based on the preset used in Task 2
             # This ensures fallback (if triggered) matches Task 2's chunking method
             chunking_config = resolve_chunking_configuration(spec)

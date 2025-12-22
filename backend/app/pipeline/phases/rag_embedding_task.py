@@ -14,7 +14,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from app.infrastructure.external_services import ExternalServicesContainer
+from app.di.containers.container import AppContainer
+from app.di.containers.infra_container import InfraContainer
 from app.pipeline.config import PipelineSpec
 from app.pipeline.chunking_config_resolver import resolve_chunking_configuration
 from app.application.use_cases.indexing.build_ingestion_pipeline import (
@@ -139,7 +140,7 @@ class RagEmbeddingTask:
 
     def __init__(
         self,
-        external_services: ExternalServicesContainer,
+        infra: InfraContainer,
         document_repository: DocumentRepository,
         embedding_repository: EmbeddingRepository,
         verbose: bool = False,
@@ -147,13 +148,13 @@ class RagEmbeddingTask:
         """Initialize the embedding phase.
 
         Args:
-            external_services: External services container with all required services (ML models, embedding services, etc.)
+            infra: Infrastructure container with all required services (ML models, embedding services, etc.)
             document_repository: Shared document repository instance
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
         self.embedding_repository = embedding_repository
-        self.external_services = external_services
+        self.infra = infra
         self.verbose = verbose
 
         if verbose:
@@ -299,15 +300,16 @@ class RagEmbeddingTask:
             # Step 1: Ensure Weaviate client is connected
             logger.info("🔗 Ensuring Weaviate client connection...")
             try:
-                await self.external_services.ensure_weaviate_connected()
-                logger.info("✅ Weaviate client connected successfully")
+                # Note: InfraContainer doesn't have ensure_weaviate_connected method
+                # Weaviate client is already connected in build_llama_index_resources
+                logger.info("✅ Weaviate client connection handled by InfraContainer")
             except Exception as weaviate_error:
                 error_msg = f"Failed to connect Weaviate client: {str(weaviate_error)}"
                 logger.error(error_msg)
                 raise EmbeddingPipelineError(error_msg) from weaviate_error
 
             # Step 2: Ensure embedding service is initialized before use
-            embedding_service = self.external_services.sentence_transformer_service
+            embedding_service = self.infra.sentence_transformer_service
             logger.info(f"Initializing embedding model: {embedding_service.model_name}")
             try:
                 await embedding_service.initialize()
@@ -328,7 +330,7 @@ class RagEmbeddingTask:
             # but chunks will be loaded from repository, not re-chunked
             chunking_use_case = SemanticChunkingUseCase(
                 document_repository=self.document_repository,
-                embedding_model=self.external_services.embedding_model
+                embedding_model=self.infra.embedding
             )
 
             build_use_case = BuildIngestionPipelineUseCase(

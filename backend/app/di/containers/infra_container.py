@@ -52,23 +52,55 @@ def build_sentence_transformer_service(configs: providers.Configuration) -> Sent
     )
 
 
-def build_weaviate_client(configs: providers.Configuration) -> WeaviateClient:
+def build_weaviate_client(configs) -> WeaviateClient:
+    # Handle both Configuration provider and dict
+    if hasattr(configs, 'weaviate_host'):  # Configuration provider
+        host = configs.weaviate_host()
+        port = configs.weaviate_port()
+        scheme = configs.weaviate_scheme()
+        auth_type = configs.weaviate_auth_type()
+        api_key = configs.weaviate_api_key()
+        timeout = configs.weaviate_timeout()
+        connection_timeout = configs.weaviate_connection_timeout()
+        read_timeout = configs.weaviate_read_timeout()
+        startup_period = configs.weaviate_startup_period()
+        max_retries = configs.weaviate_max_retries()
+        retry_delay = configs.weaviate_retry_delay()
+        consistency_level = configs.weaviate_consistency_level()
+        additional_headers = configs.weaviate_additional_headers()
+        grpc_secure = configs.weaviate_grpc_secure()
+    else:  # dict
+        host = configs.get('weaviate_host')
+        port = configs.get('weaviate_port')
+        scheme = configs.get('weaviate_scheme')
+        auth_type = configs.get('weaviate_auth_type')
+        api_key = configs.get('weaviate_api_key')
+        timeout = configs.get('weaviate_timeout')
+        connection_timeout = configs.get('weaviate_connection_timeout')
+        read_timeout = configs.get('weaviate_read_timeout')
+        startup_period = configs.get('weaviate_startup_period')
+        max_retries = configs.get('weaviate_max_retries')
+        retry_delay = configs.get('weaviate_retry_delay')
+        consistency_level = configs.get('weaviate_consistency_level')
+        additional_headers = configs.get('weaviate_additional_headers')
+        grpc_secure = configs.get('weaviate_grpc_secure')
+
     return WeaviateClient(
         config=WeaviateConfig(
-            host=configs.weaviate_host(),
-            port=configs.weaviate_port(),
-            scheme=configs.weaviate_scheme(),
-            auth_type=configs.weaviate_auth_type(),
-            api_key=configs.weaviate_api_key(),
-            timeout=configs.weaviate_timeout(),
-            connection_timeout=configs.weaviate_connection_timeout(),
-            read_timeout=configs.weaviate_read_timeout(),
-            startup_period=configs.weaviate_startup_period(),
-            max_retries=configs.weaviate_max_retries(),
-            retry_delay=configs.weaviate_retry_delay(),
-            consistency_level=configs.weaviate_consistency_level(),
-            additional_headers=configs.weaviate_additional_headers(),
-            grpc_secure=configs.weaviate_grpc_secure(),
+            host=host,
+            port=port,
+            scheme=scheme,
+            auth_type=auth_type,
+            api_key=api_key,
+            timeout=timeout,
+            connection_timeout=connection_timeout,
+            read_timeout=read_timeout,
+            startup_period=startup_period,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+            consistency_level=consistency_level,
+            additional_headers=additional_headers,
+            grpc_secure=grpc_secure,
         )
     )
 

@@ -88,7 +88,8 @@ from app.infrastructure.external_services.data_sources.database_connectors impor
 from app.infrastructure.persistence.repositories.in_memory_data_source_repository import InMemoryDataSourceRepository
 from app.infrastructure.storage.object_storage.minio_client import ObjectStorageClient, ObjectStorageConfig
 from app.infrastructure.external_services.ml_services.categorization.sklearn_categorizer import SklearnDocumentCategorizer
-from app.infrastructure.external_services import ExternalServicesContainer
+from app.di.containers.container import AppContainer
+from app.di.containers.infra_container import InfraContainer
 from app.config.ml_models import get_chunking_config
 from app.pipeline.chunking_config_resolver import resolve_chunking_configuration, requires_embedding_model
 from app.domain.repositories.document_repository import DocumentRepository
@@ -251,7 +252,7 @@ class RagIngestionTask:
 
     def __init__(
         self,
-        external_services: ExternalServicesContainer,
+        infra: InfraContainer,
         document_repository: DocumentRepository,
         data_source_repository: Optional[DataSourceRepository] = None,
         verbose: bool = False,
@@ -259,16 +260,16 @@ class RagIngestionTask:
         """Initialize the ingestion phase.
 
         Args:
+            infra: Infrastructure container with embedding model and other services.
+                   Ensures single service initialization.
             document_repository: Shared document repository instance (required).
                                 Should be provided by the workflow orchestrator
                                 to ensure data continuity across pipeline phases.
-            external_services: External services container with embedding model and other services.
-                        Ensures single service initialization.
             data_source_repository: Optional shared data source repository
             verbose: Enable verbose logging
         """
         self.document_repository = document_repository
-        self.external_services = external_services
+        self.infra = infra
         self.data_source_repository = data_source_repository
         self.verbose = verbose
         self.tracker = PerformanceTracker()
@@ -323,7 +324,7 @@ class RagIngestionTask:
             # Semantic chunking requires embedding model
             return SemanticChunkingUseCase(
                 document_repository=self.document_repository,
-                embedding_model=self.external_services.embedding_model,
+                embedding_model=self.infra.embedding,
             )
         else:
             # Sentence-based chunking doesn't need embedding model

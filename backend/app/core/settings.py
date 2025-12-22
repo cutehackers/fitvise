@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parents[3]
 
 # Load environment variables from .env file before defining Settings
 from dotenv import load_dotenv
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / "backend" / ".env")
 
 
 class Settings(BaseSettings):

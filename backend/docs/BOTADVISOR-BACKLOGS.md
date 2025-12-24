@@ -2,7 +2,7 @@
 
 ## Global Progress
 ```
-Epic A Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
+Epic A Progress: ✅⬜⬜ (1/3 tasks completed) - 33%
 Epic B Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 Epic C Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic D Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
@@ -14,18 +14,18 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 19    |
+| todo         | 18    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 0     |
+| done         | 1     |
 ```
 
 # Meta
 - **Goal:** Redesign BotAdvisor into a solo-friendly, script-first RAG backend powered by Docling, LlamaIndex, LangChain, Ollama Cloud `gemini-3-flash`, and LangFuse.
 - **Scope:** Ingestion/embedding scripts, flexible retriever adapter, LangChain agent API, lightweight storage/dedup logic, and LangFuse observability.
 - **Version:** 1.0
-- **Updated:** YYYY-MM-DD
+- **Updated:** 2024-12-24
 
 # Epics Overview
 
@@ -33,17 +33,17 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 
 ## Epic A: Foundation & Dependencies
 ### Progress
-⬜⬜⬜ (0/3 tasks completed) - 0%
+✅⬜⬜ (1/3 tasks completed) - 33%
 
 ### Backlog Items
-- [ ] **A1. Dependency baseline**  
-  Deliverable: `pyproject.toml`/`uv.lock` covering Docling, LlamaIndex, LangChain>=1.0, LangFuse, FastAPI, Weaviate/Chroma, Ollama.  
+- [x] **A1. Dependency baseline**
+  Deliverable: `pyproject.toml`/`uv.lock` covering Docling, LlamaIndex, LangChain>=1.0, LangFuse, FastAPI, Weaviate/Chroma, Ollama.
   Acceptance: fresh install, env var docs.
-- [ ] **A2. Repo cleanup**  
-  Deliverable: prune legacy modules while keeping `app/`, `scripts/`, `docs/`, `configs/`.  
+- [ ] **A2. Repo cleanup**
+  Deliverable: prune legacy modules while keeping `app/`, `scripts/`, `docs/`, `configs/`.
   Acceptance: legacy pipeline archived/moved to `deprecated/` with migration notes.
-- [ ] **A3. Document identity model**  
-  Deliverable: lean `Document` dataclass (id, source_id, platform, source_url, checksum, size_bytes, mime_type, created_at).  
+- [ ] **A3. Document identity model**
+  Deliverable: lean `Document` dataclass (id, source_id, platform, source_url, checksum, size_bytes, mime_type, created_at).
   Acceptance: reused to dedupe ingestion + enrich citations.
 
 ---
@@ -152,15 +152,15 @@ Task
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Define the minimal dependency set for Docling ingestion, LlamaIndex retrieval/embedding, LangChain >=1.0 agents, LangFuse tracing, FastAPI API, and vector store clients.
 
 ### Acceptance Criteria
-- `pyproject.toml` and `uv.lock` include Docling, LlamaIndex, LangChain >=1.0, LangFuse, FastAPI, Weaviate or Chroma, Ollama.
+- `pyproject.toml` and `uv.lock` include Docling, LlamaIndex, LangChain +1.0, LangFuse, FastAPI, Weaviate or Chroma, Ollama.
 - Fresh install works without manual pins or edits.
-- Env vars documented in `configs/.env.example`.
+- Env vars documented in `configs/.env.local`.
 
 ### Inputs Required
 - `pyproject.toml`

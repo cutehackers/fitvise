@@ -1,111 +1,73 @@
-# Fitvise Backend
+# BotAdvisor
 
-> **AI-Powered Fitness API** - Intelligent workout planning and health guidance through advanced language models with RAG pipeline
+> **Lean LLM-Powered RAG Service** - Solo-friendly, script-first retrieval-augmented generation with Docling, LlamaIndex, LangChain, and Ollama
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116.1-009688.svg?style=flat&logo=FastAPI)](https://fastapi.tiangolo.com)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Pydantic](https://img.shields.io/badge/Pydantic-2.11.7-red.svg)](https://pydantic-docs.helpmanual.io/)
-[![Testing](https://img.shields.io/badge/pytest-comprehensive-green.svg)](https://pytest.org/)
+[![uv](https://img.shields.io/badge/uv-compatible-brightgreen.svg)](https://github.com/astral-sh/uv)
 
 ## 🌟 Overview
 
-Fitvise Backend is a sophisticated REST API that leverages Large Language Models (LLMs) to provide personalized fitness coaching, workout planning, and health guidance. Built with modern Python technologies and Domain-Driven Design principles, it features a production-grade RAG (Retrieval-Augmented Generation) pipeline for intelligent document processing and retrieval.
+BotAdvisor is a lean, compact RAG service designed for solo development and script-first workflows. It combines document ingestion via Docling, semantic retrieval via LlamaIndex, and LangChain agents powered by Ollama.
 
 ### Key Features
 
-🤖 **AI-Powered Fitness Coaching** - Generate personalized workout plans, nutrition advice, and exercise recommendations
-🏗️ **Domain-Driven Design** - Modular FastAPI structure with clear separation of concerns and DDD principles
-📚 **RAG Pipeline** - Multi-phase document ingestion, embedding generation, and retrieval with comprehensive orchestration
-📊 **Health Monitoring** - Comprehensive health checks and service availability monitoring
-🔒 **Type Safety** - Full Pydantic validation for requests and responses with comprehensive data modeling
-⚡ **High Performance** - Async HTTP client with connection pooling, timeout management, and batch operations
-🧪 **Comprehensive Testing** - Unit, integration, and E2E tests with 30+ tests for RAG pipeline phases
-📚 **Auto-Generated Documentation** - Interactive Swagger UI and ReDoc documentation
+📄 **Docling Ingestion** - Parse PDF, Office, and web documents into normalized chunks
+🔍 **LlamaIndex Retrieval** - Hybrid search with platform filters and citation metadata
+🤖 **LangChain Agents** - Tool-calling agents with retriever integration
+⚡ **Ollama LLM** - Local or cloud-hosted models (gemini-3-flash, gemma2, etc.)
+📊 **LangFuse Observability** - End-to-end tracing for ingestion, retrieval, and generation
+🎯 **Script-First Design** - CLI scripts for ingest, embed, and eval workflows
+🪶 **Lean Architecture** - Minimal dependencies, SQLite storage, Weaviate vector DB
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- Python 3.8+
-- LLM service (e.g., [Ollama](https://ollama.ai/))
-- SQLite or PostgreSQL for data persistence
-- Weaviate for vector embeddings and semantic search
+- **Python 3.11+**
+- **uv** package manager (install with `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+- **Ollama** (local) or Ollama Cloud API key
+- **Weaviate** for vector storage (docker-compose provided)
 
-### Installation
+### 5-Minute Setup
 
-0. **Python dependency management**:
 ```bash
-pip freeze > requirements.txt
-```
-
-1. **Clone and setup environment**:
-```bash
+# 1. Clone repository
 git clone <repository-url>
-cd fitvise/backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+cd backend
+
+# 2. Install dependencies with uv (fast!)
+uv sync
+
+# 3. Copy environment template
+cp configs/.env.local .env
+
+# 4. Edit .env with your settings
+#    - Set LLM_PROVIDER=local or cloud
+#    - Configure Ollama URL and model
+
+# 5. Start Weaviate (docker-compose provided)
+docker-compose up -d weaviate
+
+# 6. Run API server
+uv run python -m app.main
+
+# API available at http://localhost:8000/docs
 ```
 
-2. **Configure environment variables**:
+### Using Scripts
+
 ```bash
-# Create .env file
-cat > .env << EOF
-APP_NAME=Fitvise Backend API
-APP_VERSION=1.0.0
-APP_DESCRIPTION=AI-powered fitness API
+# Ingest documents with Docling
+uv run python scripts/ingest.py --input ./docs --out ./data --platform filesystem
 
-# LLM Configuration
-LLM_BASE_URL=http://localhost:11434
-LLM_MODEL=llama3.2
-LLM_TEMPERATURE=0.7
-LLM_MAX_TOKENS=1000
-LLM_TIMEOUT=30
+# Generate embeddings and upsert to vector store
+uv run python scripts/embed_upsert.py --in ./data --store weaviate
 
-# API Configuration
-ENVIRONMENT=local
-DEBUG=true
-API_HOST=0.0.0.0
-API_PORT=8000
-API_V1_PREFIX=/api/v1
-
-# Database Configuration
-DATABASE_URL=sqlite+aiosqlite:///./fitvise.db
-# For PostgreSQL: DATABASE_URL=postgresql+asyncpg://user:password@localhost/fitvise
-
-# Vector Store Configuration (Weaviate)
-WEAVIATE_HOST=http://localhost
-WEAVIATE_PORT=8080
-WEAVIATE_GRPC_PORT=50051
-
-# RAG Pipeline Configuration
-RAG_CHUNK_SIZE=500
-RAG_CHUNK_OVERLAP=100
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-
-# CORS Configuration
-CORS_ORIGINS=*
-CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=GET,POST,PUT,DELETE,OPTIONS
-CORS_ALLOW_HEADERS=*
-
-# Logging
-LOG_LEVEL=INFO
-EOF
+# Evaluate retrieval quality
+uv run python scripts/eval_retrieval.py
 ```
-
-3. **Start the server**:
-```bash
-python run.py
-# Or with uvicorn directly:
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-4. **Access the API**:
-- **API Base**: http://localhost:8000
-- **Interactive Docs**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-- **Health Check**: http://localhost:8000/api/v1/workout/health
 
 ## 📚 API Documentation
 

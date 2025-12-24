@@ -1,0 +1,145 @@
+services:
+  # Weaviate Vector Database for Embeddings (Task 2.2.1)
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.32.2
+    container_name: fitvise-weaviate
+    ports:
+      - "8080:8080"
+      - "50051:50051" # gRPC endpoint
+      - "2112:2112" # Prometheus metrics port
+    environment:
+      # Basic Configuration
+      QUERY_DEFAULTS_LIMIT: 25
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: "true"
+      PERSISTENCE_DATA_PATH: "/var/lib/weaviate"
+
+      # Performance & Resources
+      DEFAULT_VECTORIZER_MODULE: "none" # We provide embeddings
+      ENABLE_MODULES: ""
+
+      # Cluster Configuration
+      CLUSTER_HOSTNAME: "node1"
+
+      # Performance Tuning
+      LIMIT_RESOURCES: "false"
+      GOMEMLIMIT: "2GiB"
+
+      # Logging
+      LOG_LEVEL: "info"
+
+      # HNSW Index Configuration (Optimized for Performance)
+      # These match our WeaviateSchema settings
+      VECTOR_INDEX_TYPE: "hnsw"
+
+      # Metrics (Prometheus-compatible format)
+      PROMETHEUS_MONITORING_ENABLED: "true"
+
+    volumes:
+      - weaviate_data:/var/lib/weaviate
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--spider",
+          "-q",
+          "http://localhost:8080/v1/.well-known/ready",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+    networks:
+      - fitvise-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+    networks:
+      - fitvise-network
+    depends_on:
+      - weaviate
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - fitvise-network
+    depends_on:
+      - prometheus
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fitvise-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # API Configuration
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      ENVIRONMENT: local
+
+      # Weaviate Configuration
+      WEAVIATE_HOST: weaviate
+      WEAVIATE_PORT: 8080
+      WEAVIATE_SCHEME: http
+
+      # Embedding Model Configuration
+      EMBEDDING_MODEL_NAME: Alibaba-NLP/gte-multilingual-base
+      EMBEDDING_MODEL_DIMENSION: 768
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_BATCH_SIZE: 32
+
+      # CORS Configuration
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8000
+      CORS_ALLOW_CREDENTIALS: "true"
+
+    volumes:
+      - ./app:/app/app
+      - model_cache:/root/.cache/torch/sentence_transformers
+    depends_on:
+      weaviate:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - fitvise-network
+    command: uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  weaviate_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  model_cache:
+    driver: local
+
+networks:
+  fitvise-network:
+    driver: bridge

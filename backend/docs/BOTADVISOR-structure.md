@@ -43,7 +43,14 @@ botadvisor/
 │   │
 │   └── core/
 │       ├── config.py            # Pydantic settings (env-driven)
-│       └── types.py             # Document dataclass (id, source_id, platform, source_url, checksum/hash, size_bytes, mime_type, created_at) + shared DTOs
+│       ├── entity/              # Individual entity classes
+│       │   ├── document.py      # Document dataclass
+│       │   ├── document_metadata.py # DocumentMetadata class
+│       │   ├── chunk.py         # Chunk class
+│       │   ├── storage_artifact.py # StorageArtifact class
+│       │   ├── retriever_request.py # RetrieverRequest class
+│       │   └── retriever_result.py # RetrieverResult class
+│       └── __init__.py          # Imports all entities
 │
 ├── scripts/                     # Script-first ingestion/embedding/evals
 │   ├── ingest.py                # Docling -> normalized chunks

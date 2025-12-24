@@ -2,7 +2,7 @@
 
 ## Global Progress
 ```
-Epic A Progress: ✅⬜⬜ (1/3 tasks completed) - 33%
+Epic A Progress: ✅✅⬜ (2/3 tasks completed) - 67%
 Epic B Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
 Epic C Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic D Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
@@ -14,11 +14,11 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 18    |
+| todo         | 17    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 1     |
+| done         | 2     |
 ```
 
 # Meta
@@ -33,7 +33,7 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 
 ## Epic A: Foundation & Dependencies
 ### Progress
-✅⬜⬜ (1/3 tasks completed) - 33%
+✅✅⬜ (2/3 tasks completed) - 67%
 
 ### Backlog Items
 - [x] **A1. Dependency baseline**
@@ -42,7 +42,7 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 - [ ] **A2. Repo cleanup**
   Deliverable: prune legacy modules while keeping `app/`, `scripts/`, `docs/`, `configs/`.
   Acceptance: legacy pipeline archived/moved to `deprecated/` with migration notes.
-- [ ] **A3. Document identity model**
+- [x] **A3. Document identity model**
   Deliverable: lean `Document` dataclass (id, source_id, platform, source_url, checksum, size_bytes, mime_type, created_at).
   Acceptance: reused to dedupe ingestion + enrich citations.
 
@@ -229,7 +229,7 @@ Task
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Define a minimal `Document` model used across ingestion, storage, retrieval, and citations to support deduplication and traceability.
@@ -280,7 +280,9 @@ Implement `scripts/ingest.py` to parse documents with Docling, produce normalize
 ### Inputs Required
 - Docling readers
 - `app/storage/local_storage.py` or `app/storage/minio_client.py`
-- `app/core/types.py`
+- `app/core/entity/document.py`
+- `app/core/entity/document_metadata.py`
+- `app/core/entity/chunk.py`
 
 ### Outputs Expected
 - `scripts/ingest.py`

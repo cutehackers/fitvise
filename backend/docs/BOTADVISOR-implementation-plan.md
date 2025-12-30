@@ -135,7 +135,7 @@ This plan maps each file in `docs/BOTADVISOR-phase.md` to concrete implementatio
 - Placeholder to allow shared helper functions for script adapters if needed.
 
 ## configs/
-### .env.example
+### .env.local
 - Document required variables: `LLM_PROVIDER`, `OLLAMA_CLOUD_URL`, `OLLAMA_CLOUD_API_KEY`, `OLLAMA_LOCAL_URL`, `VECTOR_STORE`, `WEAVIATE_URL`, `LANGFUSE_SECRET`, `LANGFUSE_PUBLIC_KEY`, logging toggles.
 
 ### vectorstore/weaviate.yaml

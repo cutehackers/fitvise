@@ -61,7 +61,7 @@ botadvisor/
 │       └── __init__.py
 │
 ├── configs/
-│   ├── .env.example             # Required env vars (LLM, LangFuse, vector store)
+│   ├── .env.local             # Required env vars (LLM, LangFuse, vector store)
 │   ├── vectorstore/
 │   │   ├── weaviate.yaml        # Class/schema defaults
 │   │   └── chroma.yaml          # Local dev defaults

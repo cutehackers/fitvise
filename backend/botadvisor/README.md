@@ -14,7 +14,7 @@ A script-first RAG backend powered by Docling, LlamaIndex, LangChain, Ollama Clo
 
 ```bash
 cd botadvisor
-cp configs/.env.example .env
+cp configs/.env.local .env
 ```
 
 Edit `.env` and add your API keys:
@@ -84,7 +84,7 @@ botadvisor/
 │   ├── setup_vector_store.py  # Initialize Weaviate
 │   └── eval_retrieval.py  # Quality evaluation
 ├── configs/
-│   ├── .env.example       # Environment variables
+│   ├── .env.local       # Environment variables
 │   └── logging.yaml       # Logging configuration
 ├── docker-compose.yaml    # Weaviate + LangFuse
 └── README.md

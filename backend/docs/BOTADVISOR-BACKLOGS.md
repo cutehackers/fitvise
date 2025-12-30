@@ -2,8 +2,10 @@
 
 ## Global Progress
 ```
+Total Progress: 4/19 tasks completed - 21%
+
 Epic A Progress: ✅✅⬜ (2/3 tasks completed) - 67%
-Epic B Progress: ⬜⬜⬜⬜ (0/4 tasks completed) - 0%
+Epic B Progress: ✅⬜⬜⬜ (1/4 tasks completed) - 25%
 Epic C Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic D Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic E Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
@@ -14,11 +16,11 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 17    |
+| todo         | 15    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 2     |
+| done         | 4     |
 ```
 
 # Meta
@@ -50,10 +52,10 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 
 ## Epic B: Script-First Data Path
 ### Progress
-⬜⬜⬜⬜ (0/4 tasks completed) - 0%
+✅⬜⬜⬜ (1/4 tasks completed) - 25%
 
 ### Backlog Items
-- [ ] **B1. Docling ingestion script**  
+- [x] **B1. Docling ingestion script**
   Deliverable: `scripts/ingest.py` that uses Docling to produce normalized chunks and persists raw artifacts to local storage/MinIO with checksum dedupe metadata (doc_id, page, section, platform).  
   Acceptance: CLI (`--input`, `--out`, `--platform`), dedupe log, LangFuse trace.
 - [ ] **B2. Embedding/upsert script**  
@@ -267,7 +269,7 @@ Feature
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Implement `scripts/ingest.py` to parse documents with Docling, produce normalized chunks, and persist raw artifacts via local/MinIO storage with checksum dedupe.

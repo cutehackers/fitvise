@@ -1,161 +1,113 @@
 # BotAdvisor
 
-A script-first RAG backend powered by Docling, LlamaIndex, LangChain, Ollama Cloud, and LangFuse.
+Canonical Fitvise backend under active migration.
 
-## 🚀 Quick Start (5 minutes)
+`backend/botadvisor` is the only future runtime target.
+`backend/app` remains legacy source material and is not part of the canonical execution path.
 
-### Prerequisites
-- Docker & Docker Compose
-- Python 3.11+
-- Ollama Cloud API key
-- LangFuse account (optional)
+## Current Scope
 
-### 1. Environment Setup
+The runtime currently standardizes:
+
+- shared package layout under `botadvisor.app`
+- canonical settings in `botadvisor.app.core.config`
+- script-first ingestion and embedding entrypoints
+- structured logging and LangFuse tracing foundations
+- module boundaries for `chat`, `ingestion`, `retrieval`, `storage`, and `observability`
+
+The retriever and thin API are still being migrated.
+
+## Working Directory
+
+Run canonical BotAdvisor commands from the backend root:
 
 ```bash
-cd botadvisor
-cp configs/.env.local .env
+cd /Users/junhyounglee/workspace/fitvise/backend
 ```
 
-Edit `.env` and add your API keys:
+The package root is `botadvisor`, so execution should use module form instead of direct script-path execution.
+
+## Canonical Commands
+
+### Ingestion
+
 ```bash
-OLLAMA_CLOUD_API_KEY=your_ollama_cloud_api_key
-LANGFUSE_PUBLIC_KEY=pk-lf-...
-LANGFUSE_SECRET_KEY=sk-lf-...
+uv run python -m botadvisor.scripts.ingest --help
 ```
 
-### 2. Start Services
+Example:
 
 ```bash
-docker-compose up -d
-```
-
-This starts:
-- Weaviate (vector database) on port 8080
-
-Note: LangFuse is accessed via [LangFuse Cloud](https://cloud.langfuse.com). No local setup required.
-
-### 3. Initialize Vector Store
-
-```bash
-uv run python scripts/setup_vector_store.py
-```
-
-### 4. Ingest Documents
-
-```bash
-# Ingest from local filesystem
-uv run python scripts/ingest.py \
-  --input ./documents \
+uv run python -m botadvisor.scripts.ingest \
+  --input ./documents/sample.txt \
   --out ./data/chunks \
   --platform filesystem
 ```
 
-### 5. Generate Embeddings
+### Embed And Upsert
 
 ```bash
-uv run python scripts/embed_upsert.py \
+uv run python -m botadvisor.scripts.embed_upsert --help
+```
+
+Example:
+
+```bash
+uv run python -m botadvisor.scripts.embed_upsert \
   --input ./data/chunks \
+  --store weaviate \
   --batch-size 32
 ```
 
-### 6. Start API Server
+## Testing
+
+Run BotAdvisor tests from the `backend/botadvisor` directory so they do not inherit the legacy `backend/tests` runtime setup.
 
 ```bash
-uvicorn botadvisor.app.main:app --reload --host 0.0.0.0 --port 8000
+cd /Users/junhyounglee/workspace/fitvise/backend/botadvisor
+uv run pytest tests/unit -q
 ```
 
-Visit http://localhost:8000/docs for API documentation.
-
-## 📁 Project Structure
-
-```
-botadvisor/
-├── app/
-│   ├── core/              # Document model, types
-│   ├── storage/           # local_storage, minio_client
-│   ├── retrieval/         # retriever, registry, adapters
-│   ├── agent/             # assembler, prompts
-│   ├── observability/     # langfuse, logging
-│   └── api/v2/            # FastAPI endpoints
-├── scripts/
-│   ├── ingest.py          # Docling ingestion
-│   ├── embed_upsert.py    # LlamaIndex embedding
-│   ├── setup_vector_store.py  # Initialize Weaviate
-│   └── eval_retrieval.py  # Quality evaluation
-├── configs/
-│   ├── .env.local       # Environment variables
-│   └── logging.yaml       # Logging configuration
-├── docker-compose.yaml    # Weaviate + LangFuse
-└── README.md
-```
-
-## 🔧 Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `OLLAMA_CLOUD_MODEL` | LLM model name | `gemini-3-flash` |
-| `WEAVIATE_HOST` | Weaviate host | `localhost` |
-| `WEAVIATE_PORT` | Weaviate port | `8080` |
-| `STORAGE_BACKEND` | Storage backend | `local` |
-| `EMBEDDING_MODEL_NAME` | Embedding model | `Alibaba-NLP/gte-multilingual-base` |
-
-### Supported Platforms
-
-- **filesystem**: Local files
-- **web**: Web pages (coming soon)
-- **gdrive**: Google Drive (coming soon)
-
-## 📊 Observability
-
-### LangFuse Cloud
-
-- Access: https://cloud.langfuse.com
-- Sign up for free at: https://langfuse.com
-- Add your public/secret keys to `.env` file
-
-## 🛠️ Development
-
-### Running Tests
+Targeted regression runs are also fine:
 
 ```bash
-pytest
+uv run pytest tests/unit/test_phase2_runtime_layout.py -q
+uv run pytest tests/unit/test_embed_upsert.py -q
 ```
 
-### Linting
+## Linting
+
+From the backend root:
 
 ```bash
-ruff check .
-black --check .
+uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
 ```
 
-### Cleanup
+## Services
+
+`docker-compose.yaml` currently provisions Weaviate for local development.
 
 ```bash
-# Stop all services
-docker-compose down
-
-# Remove volumes (deletes all data)
-docker-compose down -v
+cd /Users/junhyounglee/workspace/fitvise/backend/botadvisor
+docker compose up -d
 ```
 
-## 📝 Backlog
+## Canonical Docs
 
-See [../docs/BOTADVISOR-BACKLOGS.md](../docs/BOTADVISOR-BACKLOGS.md) for detailed task tracking.
+Use these docs as the single source of truth:
 
-## 🔄 Migration
+- `docs/architecture.md`
+- `docs/coding_conventions.md`
+- `docs/product_scope.md`
+- `docs/backlog.md`
+- `docs/migration.md`
+- `docs/tasks.md`
 
-See [../docs/MIGRATION_NOTES.md](../docs/MIGRATION_NOTES.md) for migration from legacy Fitvise code.
+## Non-Canonical References
 
-## 🤝 Contributing
+These are not current runtime references:
 
-1. Create a feature branch
-2. Implement changes
-3. Add tests
-4. Submit PR
-
-## 📄 License
-
-MIT
+- `backend/README.md`
+- `backend/app`
+- `backend/tests`
+- `backend/docs/*` except where explicitly mirrored for migration context

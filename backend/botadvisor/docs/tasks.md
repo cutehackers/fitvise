@@ -15,7 +15,7 @@
 - [x] Add a canonical `core` settings module for `botadvisor`
 - [x] Create canonical module boundaries for `ingestion`, `retrieval`, `chat`, `storage`, and `observability`
 - [x] Remove ad hoc path and import hacks where possible
-- [ ] Move runtime-only design decisions out of the legacy backend
+- [x] Move runtime-only design decisions out of the legacy backend
 
 ## Phase 3: Retrieval Core
 
@@ -37,7 +37,7 @@
 - [ ] Standardize LangFuse usage across scripts and API code
 - [ ] Standardize structured logging and request correlation
 - [ ] Define runtime health checks for vector store, retriever, and LLM path
-- [ ] Ensure `README.md` reflects the canonical runtime, not the historical layout
+- [x] Ensure `README.md` reflects the canonical runtime, not the historical layout
 
 ## Phase 6: Storage And Indexing
 

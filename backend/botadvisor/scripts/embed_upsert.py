@@ -8,17 +8,14 @@ and idempotently upserts them into a vector store (Weaviate or Chroma).
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 from typing import List, Optional
 from urllib.parse import urlparse
 
-# Add botadvisor to path
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from app.observability.langfuse import get_tracer
-from app.observability.logging import configure_logger, get_logger
+from botadvisor.app.core.config import get_settings
+from botadvisor.app.observability.langfuse import get_tracer
+from botadvisor.app.observability.logging import configure_logger, get_logger
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # LlamaIndex imports
@@ -96,11 +93,12 @@ class EmbedUpsertScript:
         logger.info(f"Initializing vector store: {self.store_type}")
         try:
             if self.store_type == "weaviate":
-                weaviate_url = self.url or os.environ.get("WEAVIATE_URL", "http://localhost:8080")
+                settings = get_settings()
+                weaviate_url = self.url or settings.weaviate_url
                 parsed = urlparse(weaviate_url)
                 host = parsed.hostname or "localhost"
                 port = parsed.port or (443 if parsed.scheme == "https" else 8080)
-                grpc_port = int(os.environ.get("WEAVIATE_GRPC_PORT", "50051"))
+                grpc_port = settings.weaviate_grpc_port
 
                 client = weaviate.connect_to_local(
                     host=host,
@@ -111,7 +109,7 @@ class EmbedUpsertScript:
 
             elif self.store_type == "chroma":
                 # Use a local persistence directory for Chroma
-                persist_dir = os.environ.get("CHROMA_PERSIST_DIR", "./data/chroma_db")
+                persist_dir = get_settings().chroma_persist_dir
                 client = chromadb.PersistentClient(path=persist_dir)
                 collection = client.get_or_create_collection(self.collection_name)
                 return ChromaVectorStore(chroma_collection=collection)
@@ -276,11 +274,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     args = create_parser().parse_args(argv)
 
     if args.verbose:
-        os.environ["LOG_LEVEL"] = "DEBUG"
-        # Re-configure logger if needed, or rely on env var being picked up by imported modules if they re-check
-        # But since we already called configure_logger, we might need to force update if the logger is already set up.
-        # For simplicity, we assume the user sets LOG_LEVEL env var before running if they want deep debug logs from start.
-        pass
+        configure_logger(level="DEBUG")
 
     script = EmbedUpsertScript(
         store_type=args.store,

@@ -12,9 +12,9 @@
 
 ## Phase 2: Core Runtime Layout
 
-- [ ] Add a canonical `core` settings module for `botadvisor`
-- [ ] Create canonical module boundaries for `ingestion`, `retrieval`, `chat`, `storage`, and `observability`
-- [ ] Remove ad hoc path and import hacks where possible
+- [x] Add a canonical `core` settings module for `botadvisor`
+- [x] Create canonical module boundaries for `ingestion`, `retrieval`, `chat`, `storage`, and `observability`
+- [x] Remove ad hoc path and import hacks where possible
 - [ ] Move runtime-only design decisions out of the legacy backend
 
 ## Phase 3: Retrieval Core

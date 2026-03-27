@@ -8,21 +8,17 @@ and uses only local storage for testing purposes.
 
 import argparse
 import json
-import os
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
-# Add botadvisor to path for imports
-sys.path.append(str(Path(__file__).parent.parent))
-
-from app.core.entity.document import Document
-from app.core.entity.document_metadata import DocumentMetadata
-from app.core.entity.chunk import Chunk
-from app.observability.langfuse import get_tracer
-from app.observability.logging import get_logger, configure_logger
-from app.storage.local_storage import LocalStorage
+from botadvisor.app.core.config import get_settings
+from botadvisor.app.core.entity.document import Document
+from botadvisor.app.core.entity.document_metadata import DocumentMetadata
+from botadvisor.app.core.entity.chunk import Chunk
+from botadvisor.app.observability.langfuse import get_tracer
+from botadvisor.app.observability.logging import get_logger, configure_logger
+from botadvisor.app.storage.local_storage import LocalStorage
 
 # Configure logging
 configure_logger()
@@ -36,7 +32,6 @@ OfficeReader = None
 TextReader = None
 
 try:
-    import docling
     from docling.readers import PDFReader, OfficeReader, TextReader
 
     DOCLING_AVAILABLE = True
@@ -62,8 +57,7 @@ class SimpleIngestionScript:
 
     def _initialize_storage_backend(self):
         """Initialize local storage backend."""
-        base_path = os.environ.get("STORAGE_LOCAL_PATH", "./data/artifacts")
-        return LocalStorage(base_path=base_path)
+        return LocalStorage(base_path=get_settings().storage_local_path)
 
     def _get_reader_for_file(self, file_path: Path) -> Optional[Any]:
         """
@@ -422,7 +416,7 @@ def main():
 
     # Configure logging level
     if args.verbose:
-        os.environ["LOG_LEVEL"] = "DEBUG"
+        configure_logger(level="DEBUG")
         global logger
         logger = get_logger("ingest")  # Re-initialize with new level
 
@@ -449,10 +443,10 @@ def main():
         ingestor.process_file(input_path, args.platform, output_dir)
     elif input_path.is_dir():
         logger.error("Directory processing not supported in simple version")
-        sys.exit(1)
+        raise SystemExit(1)
     else:
         logger.error(f"Input path does not exist: {args.input}")
-        sys.exit(1)
+        raise SystemExit(1)
 
     # Print summary
     print("\nIngestion Summary:")

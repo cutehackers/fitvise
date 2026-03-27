@@ -5,16 +5,13 @@ MinIO-based storage backend with checksum-driven deduplication
 for raw artifact persistence during document ingestion.
 """
 
-import hashlib
-import os
 from typing import Optional
-from urllib.parse import urljoin
 
 from minio import Minio
 from minio.error import S3Error
 
-from app.core.entity.document import Document
-from app.core.entity.storage_artifact import StorageArtifact
+from botadvisor.app.core.entity.document import Document
+from botadvisor.app.core.entity.storage_artifact import StorageArtifact
 
 class MinIOStorage:
     """
@@ -205,7 +202,7 @@ class MinIOStorage:
                 expires=expires
             )
             return presigned_url
-        except S3Error as e:
+        except S3Error:
             # Fallback to direct object URL if presigned fails
             return f"http{'s' if self.secure else ''}://{self.endpoint}/{self.bucket_name}/{object_name}"
 

@@ -1,16 +1,13 @@
-"""
-Structured Logging
-
-Structured logging utilities with request-id binding for BotAdvisor.
-"""
+"""Structured logging utilities with request-id binding for BotAdvisor."""
 
 import json
 import logging
-import os
 import sys
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, Dict, Optional
+
+from botadvisor.app.core.config import get_settings
 
 # Context variable for request ID
 _request_id_var: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
@@ -40,12 +37,14 @@ class BotLogger:
         if self.logger.hasHandlers():
             return
 
+        settings = get_settings()
+
         # Set log level from environment
-        log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+        log_level = settings.log_level.upper()
         self.logger.setLevel(getattr(logging, log_level, logging.INFO))
 
         # Create formatter based on environment setting
-        log_format = os.environ.get("LOG_FORMAT", "text").lower()
+        log_format = settings.log_format.lower()
 
         if log_format == "json":
             formatter = self._create_json_formatter()
@@ -58,7 +57,7 @@ class BotLogger:
         self.logger.addHandler(handler)
 
         # Add file handler if log file is configured
-        log_file = os.environ.get("LOG_FILE")
+        log_file = settings.log_file
         if log_file:
             file_handler = logging.FileHandler(log_file)
             file_handler.setFormatter(formatter)
@@ -240,17 +239,21 @@ def get_logger(name: Optional[str] = None) -> BotLogger:
     """
     return BotLogger(name or "botadvisor")
 
-def configure_logger():
+def configure_logger(level: str | None = None):
     """
     Configure global logging settings.
 
     This should be called early in application startup.
     """
+    settings = get_settings()
+    log_level = (level or settings.log_level).upper()
+
     # Set up basic logging configuration
     logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        level=log_level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        stream=sys.stdout
+        stream=sys.stdout,
+        force=True,
     )
 
     # Suppress overly verbose libraries

@@ -63,6 +63,10 @@ dependencies = [
     "charset-normalizer==3.4.2",
 ]
 
+[project.scripts]
+botadvisor-embed-upsert = "botadvisor.scripts.embed_upsert:main"
+botadvisor-ingest = "botadvisor.scripts.ingest:main"
+
 [tool.isort]
 profile = "black"
 

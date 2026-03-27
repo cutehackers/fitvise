@@ -8,8 +8,8 @@ for raw artifact persistence during document ingestion.
 from pathlib import Path
 from typing import Optional
 
-from app.core.entity.document import Document
-from app.core.entity.storage_artifact import StorageArtifact
+from botadvisor.app.core.entity.document import Document
+from botadvisor.app.core.entity.storage_artifact import StorageArtifact
 
 class LocalStorage:
     """

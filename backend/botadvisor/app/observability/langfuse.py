@@ -1,11 +1,8 @@
-"""
-LangFuse Observability
+"""LangFuse tracing integration for BotAdvisor workflows."""
 
-LangFuse tracing integration for BotAdvisor workflows.
-"""
-
-import os
 from typing import Any, Dict, Optional
+
+from botadvisor.app.core.config import get_settings
 
 # Dynamic LangFuse import with fallback
 LANGFUSE_AVAILABLE = False
@@ -47,9 +44,8 @@ class LangFuseTracer:
 
     def _is_enabled(self) -> bool:
         """Check if LangFuse tracing is enabled."""
-        return (os.environ.get("LANGFUSE_ENABLED", "false").lower() == "true" and
-                LANGFUSE_AVAILABLE and
-                Langfuse is not None)
+        settings = get_settings()
+        return settings.langfuse_enabled and LANGFUSE_AVAILABLE and Langfuse is not None
 
     def get_client(self) -> Optional[Any]:
         """
@@ -63,10 +59,11 @@ class LangFuseTracer:
 
         if self._client is None:
             try:
+                settings = get_settings()
                 self._client = Langfuse(
-                    secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
-                    public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
-                    host=os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com"),
+                    secret_key=settings.langfuse_secret_key,
+                    public_key=settings.langfuse_public_key,
+                    host=settings.langfuse_host,
                 )
             except Exception:
                 # Fail silently if LangFuse client cannot be initialized

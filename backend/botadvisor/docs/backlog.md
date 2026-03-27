@@ -26,7 +26,7 @@ Statuses reflect the actual codebase plus the new solo-developer quality bar.
 | C3 | LangChain adapter tooling | `done` | `backend/botadvisor/app/retrieval/langchain_adapter.py` | Canonical LangChain retriever adapter now wraps the `botadvisor` retrieval service |
 | D1 | LLM factory | `partial` | `backend/app/infrastructure/external_services/ml_services/llm_services/ollama_service.py` | Legacy LLM runtime exists, but no canonical small factory for `botadvisor` yet |
 | D2 | Agent & prompt | `partial` | `backend/app/infrastructure/llm/services/rag_orchestrator.py`, `backend/app/application/use_cases/chat/rag_chat_use_case.py` | Retrieval-aware orchestration exists in legacy code, but needs simplification and migration |
-| D3 | FastAPI surface | `partial` | `backend/app/api/v1/fitvise/chat.py` | Chat and health endpoints exist in legacy runtime, not in canonical `botadvisor` |
+| D3 | FastAPI surface | `done` | `backend/botadvisor/app/main.py`, `backend/botadvisor/app/api/*`, `backend/botadvisor/app/chat/*` | Canonical chat, query, and health endpoints now exist in `botadvisor` with thin router boundaries |
 | E1 | LangFuse tracing | `partial` | `backend/botadvisor/app/observability/langfuse.py`, `backend/botadvisor/scripts/*.py`, legacy callback wiring | LangFuse is integrated, but not yet consistently wired across the future runtime |
 | E2 | Structured logging | `partial` | `backend/botadvisor/app/observability/logging.py` | Structured logger exists, but config and full runtime adoption are incomplete |
 | E3 | Dev ergonomics | `partial` | `backend/botadvisor/docker-compose.yaml`, `backend/botadvisor/README.md` | Core assets exist, but one-command developer flow is not yet fully canonical |

@@ -27,10 +27,10 @@
 
 ## Phase 4: Thin API
 
-- [ ] Add canonical `chat` API endpoints inside `backend/botadvisor`
-- [ ] Add canonical `health` endpoints inside `backend/botadvisor`
-- [ ] Keep routers thin and push orchestration into focused services
-- [ ] Reuse only the behavior that is worth preserving from legacy chat endpoints
+- [x] Add canonical `chat` API endpoints inside `backend/botadvisor`
+- [x] Add canonical `health` endpoints inside `backend/botadvisor`
+- [x] Keep routers thin and push orchestration into focused services
+- [x] Reuse only the behavior that is worth preserving from legacy chat endpoints
 
 ## Phase 5: Observability And Runtime Quality
 

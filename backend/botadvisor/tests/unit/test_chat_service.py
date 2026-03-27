@@ -1,0 +1,63 @@
+from __future__ import annotations
+
+from unittest.mock import Mock
+
+from botadvisor.app.core.entity.chunk import Chunk
+from botadvisor.app.core.entity.document_metadata import DocumentMetadata
+
+
+def make_chunk(*, chunk_id: str, content: str, score: float, page: int | None = None) -> Chunk:
+    return Chunk(
+        chunk_id=chunk_id,
+        content=content,
+        metadata=DocumentMetadata(
+            doc_id="doc-1",
+            source_id="file-1",
+            platform="filesystem",
+            source_url="file:///tmp/sample.txt",
+            page=page,
+            section="chunk_0",
+        ),
+        score=score,
+    )
+
+
+def test_query_returns_citation_shaped_results():
+    from botadvisor.app.chat.schemas import QueryRequest
+    from botadvisor.app.chat.service import RetrievalChatService
+
+    retrieval_service = Mock()
+    retrieval_service.retrieve.return_value = [
+        make_chunk(chunk_id="chunk-1", content="first chunk", score=0.91, page=1),
+        make_chunk(chunk_id="chunk-2", content="second chunk", score=0.72, page=2),
+    ]
+
+    service = RetrievalChatService(retrieval_service=retrieval_service)
+    response = service.query(QueryRequest(query="protein intake", platform="filesystem", top_k=2))
+
+    assert response.query == "protein intake"
+    assert response.total_results == 2
+    assert [item.index for item in response.results] == [1, 2]
+    assert response.results[0].content == "first chunk"
+    assert response.results[0].metadata["source_url"] == "file:///tmp/sample.txt"
+
+
+def test_chat_builds_answer_from_retrieved_context():
+    from botadvisor.app.chat.schemas import ChatRequest
+    from botadvisor.app.chat.service import RetrievalChatService
+
+    retrieval_service = Mock()
+    retrieval_service.retrieve.return_value = [
+        make_chunk(chunk_id="chunk-1", content="first chunk", score=0.91, page=1),
+        make_chunk(chunk_id="chunk-2", content="second chunk", score=0.72, page=2),
+    ]
+
+    service = RetrievalChatService(retrieval_service=retrieval_service)
+    response = service.chat(ChatRequest(message="what is a good protein intake?", platform="filesystem", top_k=2))
+
+    assert "first chunk" in response.answer
+    assert "second chunk" in response.answer
+    assert "[1]" in response.answer
+    assert "[2]" in response.answer
+    assert response.total_sources == 2
+    assert response.sources[0].document_id == "doc-1"

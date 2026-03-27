@@ -59,6 +59,18 @@ uv run python -m botadvisor.scripts.embed_upsert \
   --batch-size 32
 ```
 
+### API Server
+
+```bash
+uv run uvicorn botadvisor.app.main:app --reload
+```
+
+Current canonical endpoints:
+
+- `GET /health`
+- `POST /query`
+- `POST /chat`
+
 ## Testing
 
 Run BotAdvisor tests from the `backend/botadvisor` directory so they do not inherit the legacy `backend/tests` runtime setup.

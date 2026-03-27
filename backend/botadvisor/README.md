@@ -161,6 +161,13 @@ cd backend
 uv run python -m botadvisor.scripts.release_check
 ```
 
+To validate the boot flow end-to-end with one command, use:
+
+```bash
+cd backend
+uv run python -m botadvisor.scripts.release_check --boot-smoke
+```
+
 The release check passes only when:
 
 - `/health` returns HTTP `200`

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 
@@ -10,6 +12,11 @@ class FakeResponse:
 
     def json(self) -> dict[str, object]:
         return self._payload
+
+
+class FakeProcess:
+    def __init__(self):
+        self.terminated = False
 
 
 def test_execute_release_check_returns_zero_for_ready_runtime():
@@ -69,3 +76,53 @@ def test_release_check_help_exits_cleanly():
         main(["--help"])
 
     assert exc_info.value.code == 0
+
+
+def test_execute_boot_smoke_check_runs_boot_sequence_and_stops_api_server():
+    from botadvisor.scripts.release_check import execute_boot_smoke_check
+
+    events: list[tuple[str, object]] = []
+    process = FakeProcess()
+
+    exit_code = execute_boot_smoke_check(
+        project_root="/tmp/backend",
+        host="127.0.0.1",
+        port=8000,
+        timeout_seconds=5.0,
+        start_dependencies=lambda root: events.append(("deps", root)),
+        bootstrap_vector_store=lambda root: events.append(("bootstrap", root)),
+        spawn_api_server=lambda *, project_root, host, port: events.append(("spawn", (project_root, host, port))) or process,
+        wait_for_ready=lambda *, base_url, timeout_seconds: events.append(("ready", (base_url, timeout_seconds))) or 0,
+        stop_api_server=lambda proc: events.append(("stop", proc)),
+    )
+
+    assert exit_code == 0
+    assert events == [
+        ("deps", Path("/tmp/backend")),
+        ("bootstrap", Path("/tmp/backend")),
+        ("spawn", (Path("/tmp/backend"), "127.0.0.1", 8000)),
+        ("ready", ("http://127.0.0.1:8000", 5.0)),
+        ("stop", process),
+    ]
+
+
+def test_execute_boot_smoke_check_stops_api_server_on_failed_readiness():
+    from botadvisor.scripts.release_check import execute_boot_smoke_check
+
+    process = FakeProcess()
+    stopped: list[FakeProcess] = []
+
+    exit_code = execute_boot_smoke_check(
+        project_root="/tmp/backend",
+        host="127.0.0.1",
+        port=8000,
+        timeout_seconds=5.0,
+        start_dependencies=lambda root: None,
+        bootstrap_vector_store=lambda root: None,
+        spawn_api_server=lambda *, project_root, host, port: process,
+        wait_for_ready=lambda *, base_url, timeout_seconds: 1,
+        stop_api_server=lambda proc: stopped.append(proc),
+    )
+
+    assert exit_code == 1
+    assert stopped == [process]

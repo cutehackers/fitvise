@@ -54,6 +54,33 @@ def bootstrap_local_vector_store(project_root: Path) -> None:
     )
 
 
+def spawn_local_api_server(*, project_root: Path, host: str, port: int) -> subprocess.Popen:
+    """Start the canonical API server in a child process for smoke checks."""
+    return subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "botadvisor.app.main:app",
+            "--host",
+            host,
+            "--port",
+            str(port),
+        ],
+        cwd=project_root,
+    )
+
+
+def stop_local_api_server(process: subprocess.Popen, *, wait_timeout: float = 5.0) -> None:
+    """Stop a spawned local API server process."""
+    process.terminate()
+    try:
+        process.wait(timeout=wait_timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=wait_timeout)
+
+
 def run_local_api_server(project_root: Path, *, host: str, port: int, reload_enabled: bool) -> None:
     """Replace the current process with the canonical development API server."""
     os.chdir(project_root)

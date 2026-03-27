@@ -67,7 +67,7 @@
 
 ## Phase 10: Release Hardening
 
-- [ ] Add a canonical smoke-test path that validates the local runtime boot flow end-to-end
+- [x] Add a canonical smoke-test path that validates the local runtime boot flow end-to-end
 - [x] Define startup and readiness checks for API, vector store, and required local dependencies
 - [x] Tighten the runtime env contract for local and deploy-oriented execution paths
 - [x] Add a minimal CI or repeatable verification command set for canonical release checks

@@ -127,3 +127,52 @@ def test_dev_script_release_check_delegates_to_release_command(monkeypatch):
 
     assert exit_code == 0
     assert calls == [("http://0.0.0.0:9000", 3.5)]
+
+
+def test_spawn_local_api_server_starts_uvicorn_subprocess(monkeypatch):
+    from botadvisor.app.dev.local_stack import spawn_local_api_server
+
+    calls: list[tuple[list[str], Path]] = []
+
+    def fake_popen(command, *, cwd):
+        calls.append((command, cwd))
+        return object()
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    project_root = Path("/tmp/backend")
+    process = spawn_local_api_server(project_root=project_root, host="127.0.0.1", port=8123)
+
+    assert process is not None
+    assert calls == [
+        (
+            [
+                sys.executable,
+                "-m",
+                "uvicorn",
+                "botadvisor.app.main:app",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8123",
+            ],
+            project_root,
+        )
+    ]
+
+
+def test_stop_local_api_server_terminates_subprocess():
+    from botadvisor.app.dev.local_stack import stop_local_api_server
+
+    events: list[str] = []
+
+    class FakeProcess:
+        def terminate(self):
+            events.append("terminate")
+
+        def wait(self, timeout):
+            events.append(f"wait:{timeout}")
+
+    stop_local_api_server(FakeProcess())
+
+    assert events == ["terminate", "wait:5.0"]

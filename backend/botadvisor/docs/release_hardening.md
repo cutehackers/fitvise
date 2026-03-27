@@ -33,6 +33,23 @@ uv run python -m botadvisor.scripts.release_check
 
 3. Treat the runtime as ready only when the command exits with code `0` and prints `runtime is ready`.
 
+## End-To-End Boot Smoke
+
+To validate the local boot path with one command:
+
+```bash
+cd backend
+uv run python -m botadvisor.scripts.release_check --boot-smoke
+```
+
+This path:
+
+- starts local dependencies
+- bootstraps the vector store schema
+- starts the API server in a child process
+- polls `/health` until the runtime is ready or the timeout is hit
+- stops the spawned API server before exiting
+
 ## Readiness Rules
 
 The release check fails when any of the following is true:

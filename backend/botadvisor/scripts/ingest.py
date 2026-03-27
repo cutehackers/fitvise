@@ -18,7 +18,7 @@ from botadvisor.app.core.entity.document_metadata import DocumentMetadata
 from botadvisor.app.core.entity.chunk import Chunk
 from botadvisor.app.observability.langfuse import get_tracer
 from botadvisor.app.observability.logging import get_logger, configure_logger
-from botadvisor.app.storage.local_storage import LocalStorage
+from botadvisor.app.storage.factory import get_storage_backend
 
 # Configure logging
 configure_logger()
@@ -56,8 +56,8 @@ class SimpleIngestionScript:
         self.chunks_generated = 0
 
     def _initialize_storage_backend(self):
-        """Initialize local storage backend."""
-        return LocalStorage(base_path=get_settings().storage_local_path)
+        """Initialize the configured storage backend."""
+        return get_storage_backend(get_settings())
 
     def _get_reader_for_file(self, file_path: Path) -> Optional[Any]:
         """
@@ -397,8 +397,8 @@ class SimpleIngestionScript:
                 )
 
 
-def main():
-    """Main entry point for ingestion script."""
+def create_parser() -> argparse.ArgumentParser:
+    """Create the CLI parser for the ingestion script."""
     parser = argparse.ArgumentParser(
         description="BotAdvisor Simple Document Ingestion Script",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -412,7 +412,12 @@ def main():
 
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose logging")
 
-    args = parser.parse_args()
+    return parser
+
+
+def main(argv: Optional[List[str]] = None) -> int:
+    """Main entry point for ingestion script."""
+    args = create_parser().parse_args(argv)
 
     # Configure logging level
     if args.verbose:
@@ -443,10 +448,10 @@ def main():
         ingestor.process_file(input_path, args.platform, output_dir)
     elif input_path.is_dir():
         logger.error("Directory processing not supported in simple version")
-        raise SystemExit(1)
+        return 1
     else:
         logger.error(f"Input path does not exist: {args.input}")
-        raise SystemExit(1)
+        return 1
 
     # Print summary
     print("\nIngestion Summary:")
@@ -457,7 +462,8 @@ def main():
 
     if ingestor.duplicates_skipped > 0:
         print(f"  Note: {ingestor.duplicates_skipped} duplicate documents were skipped")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

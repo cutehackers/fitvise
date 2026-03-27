@@ -12,10 +12,11 @@ The runtime currently standardizes:
 - shared package layout under `botadvisor.app`
 - canonical settings in `botadvisor.app.core.config`
 - script-first ingestion and embedding entrypoints
+- canonical Weaviate bootstrap via `botadvisor.scripts.setup_vector_store`
+- storage backend selection for local and MinIO artifact persistence
+- Weaviate-first hybrid retrieval and thin FastAPI endpoints
 - structured logging and LangFuse tracing foundations
 - module boundaries for `chat`, `ingestion`, `retrieval`, `storage`, and `observability`
-
-The retriever and thin API are still being migrated.
 
 ## Working Directory
 
@@ -59,6 +60,18 @@ uv run python -m botadvisor.scripts.embed_upsert \
   --batch-size 32
 ```
 
+### Vector Store Bootstrap
+
+```bash
+uv run python -m botadvisor.scripts.setup_vector_store --help
+```
+
+Example:
+
+```bash
+uv run python -m botadvisor.scripts.setup_vector_store --force
+```
+
 ### API Server
 
 ```bash
@@ -94,6 +107,13 @@ From the backend root:
 ```bash
 uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
 ```
+
+## Storage Configuration
+
+Canonical artifact storage is selected through environment variables in `botadvisor.app.core.config`.
+
+- `STORAGE_BACKEND=local` uses `STORAGE_LOCAL_PATH`
+- `STORAGE_BACKEND=minio` uses `STORAGE_MINIO_ENDPOINT`, `STORAGE_MINIO_ACCESS_KEY`, `STORAGE_MINIO_SECRET_KEY`, `STORAGE_MINIO_BUCKET`, and `STORAGE_MINIO_SECURE`
 
 ## Services
 

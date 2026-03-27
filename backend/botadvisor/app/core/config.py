@@ -24,7 +24,13 @@ class Settings(BaseSettings):
     langfuse_secret_key: str | None = Field(default=None, alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
 
+    storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")
     storage_local_path: str = Field(default="./data/artifacts", alias="STORAGE_LOCAL_PATH")
+    storage_minio_endpoint: str | None = Field(default=None, alias="STORAGE_MINIO_ENDPOINT")
+    storage_minio_access_key: str | None = Field(default=None, alias="STORAGE_MINIO_ACCESS_KEY")
+    storage_minio_secret_key: str | None = Field(default=None, alias="STORAGE_MINIO_SECRET_KEY")
+    storage_minio_bucket: str = Field(default="botadvisor-artifacts", alias="STORAGE_MINIO_BUCKET")
+    storage_minio_secure: bool = Field(default=False, alias="STORAGE_MINIO_SECURE")
 
     weaviate_url: str = Field(default="http://localhost:8080", alias="WEAVIATE_URL")
     weaviate_grpc_port: int = Field(default=50051, alias="WEAVIATE_GRPC_PORT")

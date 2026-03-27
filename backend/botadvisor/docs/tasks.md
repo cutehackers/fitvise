@@ -41,9 +41,9 @@
 
 ## Phase 6: Storage And Indexing
 
-- [ ] Canonicalize storage backend selection for local and MinIO modes
-- [ ] Port or rewrite vector-store bootstrap into `backend/botadvisor/scripts/setup_vector_store.py`
-- [ ] Verify script contracts for ingest, embed/upsert, and bootstrap remain explicit and testable
+- [x] Canonicalize storage backend selection for local and MinIO modes
+- [x] Port or rewrite vector-store bootstrap into `backend/botadvisor/scripts/setup_vector_store.py`
+- [x] Verify script contracts for ingest, embed/upsert, and bootstrap remain explicit and testable
 
 ## Phase 7: Legacy Isolation
 

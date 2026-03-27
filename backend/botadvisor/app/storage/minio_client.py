@@ -5,10 +5,18 @@ MinIO-based storage backend with checksum-driven deduplication
 for raw artifact persistence during document ingestion.
 """
 
+from __future__ import annotations
+
 from typing import Optional
 
-from minio import Minio
-from minio.error import S3Error
+try:
+    from minio import Minio
+    from minio.error import S3Error
+except ImportError:  # pragma: no cover - exercised through runtime guards
+    Minio = None
+
+    class S3Error(Exception):
+        """Fallback S3 error type when MinIO dependency is unavailable."""
 
 from botadvisor.app.core.entity.document import Document
 from botadvisor.app.core.entity.storage_artifact import StorageArtifact
@@ -44,19 +52,23 @@ class MinIOStorage:
         self.secret_key = secret_key
         self.bucket_name = bucket_name
         self.secure = secure
+        self._client: Minio | None = None
 
-        # Initialize MinIO client
-        self.client = Minio(
-            endpoint=endpoint,
-            access_key=access_key,
-            secret_key=secret_key,
-            secure=secure
-        )
+    @property
+    def client(self) -> Minio:
+        """Return a lazily-initialized MinIO client."""
+        if Minio is None:
+            raise RuntimeError("MinIO dependency is not installed")
+        if self._client is None:
+            self._client = Minio(
+                endpoint=self.endpoint,
+                access_key=self.access_key,
+                secret_key=self.secret_key,
+                secure=self.secure,
+            )
+        return self._client
 
-        # Ensure bucket exists
-        self._ensure_bucket_exists()
-
-    def _ensure_bucket_exists(self):
+    def _ensure_bucket_exists(self) -> None:
         """Ensure the bucket exists, create if it doesn't."""
         if not self.client.bucket_exists(self.bucket_name):
             self.client.make_bucket(self.bucket_name)
@@ -87,6 +99,7 @@ class MinIOStorage:
             )
 
         # Upload content to MinIO
+        self._ensure_bucket_exists()
         self.client.put_object(
             bucket_name=self.bucket_name,
             object_name=object_name,

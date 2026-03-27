@@ -19,26 +19,26 @@ try:
 
     # Try to find readers
     if hasattr(docling, 'readers'):
-        print(f"\n✅ docling.readers found")
+        print("\n✅ docling.readers found")
         readers_module = docling.readers
-        print(f"Available in docling.readers:")
+        print("Available in docling.readers:")
         for attr in dir(readers_module):
             if not attr.startswith('_'):
                 print(f"  - {attr}")
     else:
-        print(f"\n❌ docling.readers not found")
+        print("\n❌ docling.readers not found")
 
     # Try to find PDF reading functionality
-    print(f"\nLooking for PDF reading functionality...")
+    print("\nLooking for PDF reading functionality...")
     if hasattr(docling, 'PDFReader'):
-        print(f"✅ docling.PDFReader found")
+        print("✅ docling.PDFReader found")
     elif hasattr(docling, 'read_pdf'):
-        print(f"✅ docling.read_pdf found")
+        print("✅ docling.read_pdf found")
     else:
-        print(f"❌ No obvious PDF reading function found")
+        print("❌ No obvious PDF reading function found")
 
     # Try to read a simple text file
-    print(f"\nTrying to read text file...")
+    print("\nTrying to read text file...")
     try:
         with open('test_sample.txt', 'r') as f:
             content = f.read()
@@ -56,7 +56,7 @@ try:
                 print(f"✅ {approach_name} available")
                 break
         else:
-            print(f"❌ No text reading function found")
+            print("❌ No text reading function found")
 
     except Exception as e:
         print(f"Error reading file: {e}")

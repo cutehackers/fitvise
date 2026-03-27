@@ -143,6 +143,38 @@ From the backend root:
 uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
 ```
 
+## Release Verification
+
+Use this flow before push or deploy work that changes runtime behavior.
+
+In terminal 1, start the canonical local runtime:
+
+```bash
+cd backend
+uv run python -m botadvisor.scripts.dev up
+```
+
+In terminal 2, run the canonical readiness check:
+
+```bash
+cd backend
+uv run python -m botadvisor.scripts.release_check
+```
+
+The release check passes only when:
+
+- `/health` returns HTTP `200`
+- the top-level status is `healthy`
+- `retrieval`, `vector_store`, and `llm_path` checks are all `healthy`
+
+For a broader pre-release verification pass, also run:
+
+```bash
+cd backend
+uv run pytest -q
+uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
+```
+
 ## Storage Configuration
 
 Canonical artifact storage is selected through environment variables in `botadvisor.app.core.config`.
@@ -168,6 +200,7 @@ Use these docs as the single source of truth:
 - `docs/product_scope.md`
 - `docs/backlog.md`
 - `docs/migration.md`
+- `docs/release_hardening.md`
 - `docs/tasks.md`
 
 ## Non-Canonical References

@@ -64,3 +64,19 @@
 - [x] Add a canonical local runtime command that brings up dependencies and the API server
 - [x] Add a canonical backend-root `.env.example` aligned with runtime settings
 - [x] Update the README and backlog to describe the one-command developer workflow
+
+## Phase 10: Release Hardening
+
+- [ ] Add a canonical smoke-test path that validates the local runtime boot flow end-to-end
+- [ ] Define startup and readiness checks for API, vector store, and required local dependencies
+- [ ] Tighten the runtime env contract for local and deploy-oriented execution paths
+- [ ] Add a minimal CI or repeatable verification command set for canonical release checks
+- [ ] Document the release-readiness checklist and deployment assumptions for the solo-developer workflow
+
+## Phase 11: Retrieval Evaluation
+
+- [ ] Define a small canonical gold query set for retrieval evaluation
+- [ ] Add a retrieval evaluation contract for relevance, citation integrity, and metadata correctness
+- [ ] Add hybrid-search regression checks so retrieval quality changes are measurable
+- [ ] Define how evaluation results are stored, reviewed, and compared over time
+- [ ] Document the retrieval quality gate required before adding more advanced agent features

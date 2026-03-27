@@ -110,3 +110,20 @@ def test_dev_script_up_runs_startup_sequence(monkeypatch):
 
     assert exit_code == 0
     assert calls == [("deps", project_root), ("bootstrap", project_root), ("api", project_root)]
+
+
+def test_dev_script_release_check_delegates_to_release_command(monkeypatch):
+    from botadvisor.scripts import dev
+
+    calls: list[tuple[str, float]] = []
+
+    monkeypatch.setattr(
+        dev,
+        "execute_release_check",
+        lambda *, base_url, timeout_seconds: calls.append((base_url, timeout_seconds)) or 0,
+    )
+
+    exit_code = dev.main(["release-check", "--host", "0.0.0.0", "--port", "9000", "--timeout", "3.5"])
+
+    assert exit_code == 0
+    assert calls == [("http://0.0.0.0:9000", 3.5)]

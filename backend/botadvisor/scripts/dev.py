@@ -12,6 +12,7 @@ from botadvisor.app.dev.local_stack import (
     start_local_dependencies,
     stop_local_dependencies,
 )
+from botadvisor.scripts.release_check import execute_release_check
 
 
 def resolve_project_root() -> Path:
@@ -32,6 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
     up_parser.add_argument("--skip-bootstrap", action="store_true", help="Skip vector store bootstrap.")
 
     subparsers.add_parser("down", help="Stop local BotAdvisor dependencies.")
+    release_check_parser = subparsers.add_parser(
+        "release-check",
+        help="Run the canonical release-readiness check against a running API server.",
+    )
+    release_check_parser.add_argument("--host", default="127.0.0.1", help="Host for the BotAdvisor API.")
+    release_check_parser.add_argument("--port", type=int, default=8000, help="Port for the BotAdvisor API.")
+    release_check_parser.add_argument("--timeout", type=float, default=5.0, help="Timeout in seconds for the check.")
     return parser
 
 
@@ -44,6 +52,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "down":
         stop_local_dependencies(project_root)
         return 0
+
+    if args.command == "release-check":
+        return execute_release_check(
+            base_url=f"http://{args.host}:{args.port}",
+            timeout_seconds=args.timeout,
+        )
 
     if not args.skip_compose:
         start_local_dependencies(project_root)

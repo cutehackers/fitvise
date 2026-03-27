@@ -2,10 +2,10 @@
 
 ## Global Progress
 ```
-Total Progress: 4/19 tasks completed - 21%
+Total Progress: 6/19 tasks completed - 32%
 
 Epic A Progress: ✅✅⬜ (2/3 tasks completed) - 67%
-Epic B Progress: ✅⬜⬜⬜ (1/4 tasks completed) - 25%
+Epic B Progress: ✅✅⬜⬜ (2/4 tasks completed) - 50%
 Epic C Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic D Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 Epic E Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
@@ -16,18 +16,18 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 ```
 | Status       | Count |
 |--------------|-------|
-| todo         | 15    |
+| todo         | 13    |
 | in_progress  | 0     |
 | blocked      | 0     |
 | review       | 0     |
-| done         | 4     |
+| done         | 6     |
 ```
 
 # Meta
 - **Goal:** Redesign BotAdvisor into a solo-friendly, script-first RAG backend powered by Docling, LlamaIndex, LangChain, Ollama Cloud `gemini-3-flash`, and LangFuse.
 - **Scope:** Ingestion/embedding scripts, flexible retriever adapter, LangChain agent API, lightweight storage/dedup logic, and LangFuse observability.
 - **Version:** 1.0
-- **Updated:** 2024-12-24
+- **Updated:** 2026-03-27
 
 # Epics Overview
 
@@ -52,13 +52,13 @@ Epic F Progress: ⬜⬜⬜ (0/3 tasks completed) - 0%
 
 ## Epic B: Script-First Data Path
 ### Progress
-✅⬜⬜⬜ (1/4 tasks completed) - 25%
+✅✅⬜⬜ (2/4 tasks completed) - 50%
 
 ### Backlog Items
 - [x] **B1. Docling ingestion script**
   Deliverable: `scripts/ingest.py` that uses Docling to produce normalized chunks and persists raw artifacts to local storage/MinIO with checksum dedupe metadata (doc_id, page, section, platform).  
   Acceptance: CLI (`--input`, `--out`, `--platform`), dedupe log, LangFuse trace.
-- [ ] **B2. Embedding/upsert script**  
+- [x] **B2. Embedding/upsert script**  
   Deliverable: `scripts/embed_upsert.py` that runs LlamaIndex ingestion, generates embeddings, and idempotently upserts into Weaviate/Chroma with retries.  
   Acceptance: CLI options for store/model/batch; success/failure counts.
 - [ ] **B3. Vector store bootstrap**  
@@ -193,7 +193,7 @@ Task
 P2
 
 ### Status
-todo
+done
 
 ### Description
 Remove or isolate legacy pipeline boilerplate to keep a focused redesign workspace while preserving reference artifacts if needed.
@@ -311,7 +311,7 @@ Feature
 P1
 
 ### Status
-todo
+done
 
 ### Description
 Implement `scripts/embed_upsert.py` to generate embeddings via LlamaIndex and idempotently upsert into Weaviate or Chroma.

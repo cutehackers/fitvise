@@ -5,9 +5,9 @@ This file defines how agents should understand and modify the backend project.
 ## Current Project Truth
 
 - The future canonical backend is `backend/botadvisor`.
-- The legacy backend is `backend/app`.
-- `backend/app` is migration source material, not the long-term runtime target.
-- The long-term goal is to replace `backend/app` with `backend/botadvisor` and then archive or remove the legacy runtime.
+- The archived legacy backend is `backend/deprecated/legacy_backend/app`.
+- `backend/deprecated/legacy_backend/app` is migration source material, not the long-term runtime target.
+- The long-term goal is to keep `backend/botadvisor` as the only live runtime and leave the legacy backend archived.
 
 ## Canonical Planning Docs
 
@@ -63,8 +63,8 @@ Core design choices:
 ## Migration Rules
 
 - Prefer creating or refactoring code under `backend/botadvisor`.
-- Do not add new product features under `backend/app` unless the task is explicitly legacy-only.
-- Do not import from `backend/app` into final `backend/botadvisor` runtime code.
+- Do not add new product features under `backend/deprecated/legacy_backend/app` unless the task is explicitly legacy-only.
+- Do not import from `backend/deprecated/legacy_backend/app` into final `backend/botadvisor` runtime code.
 - You may mine legacy code for behavior, contracts, or tests, but port the behavior into `botadvisor` cleanly.
 - Port behavior, not architecture.
 
@@ -78,7 +78,7 @@ These rules apply to every new file and every meaningful refactor.
 
 - New runtime code goes into `backend/botadvisor`.
 - New canonical docs go into `backend/botadvisor/docs`.
-- Treat `backend/docs` as historical or compatibility-oriented unless the user explicitly asks otherwise.
+- Treat `backend/deprecated/legacy_backend/docs` as historical or compatibility-oriented unless the user explicitly asks otherwise.
 
 ### Structure Rules
 
@@ -163,8 +163,7 @@ Use the current `backend` project tooling:
 cd backend
 uv sync
 uv run pytest
-uv run ruff check .
-uv run black .
+uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
 ```
 
 BotAdvisor-oriented examples:

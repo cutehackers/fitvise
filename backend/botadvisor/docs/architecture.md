@@ -3,7 +3,7 @@
 ## Purpose
 
 BotAdvisor is the future canonical Fitvise backend.
-It replaces the legacy `backend/app` runtime with a maintainable hybrid modular monolith built for a solo developer.
+It replaces the archived legacy backend runtime with a maintainable hybrid modular monolith built for a solo developer.
 
 The system keeps the following first-class capabilities:
 
@@ -16,7 +16,7 @@ The system keeps the following first-class capabilities:
 ## Architectural Principles
 
 - `backend/botadvisor` is the only long-term runtime target.
-- `backend/app` is migration source material, not the future architecture.
+- `backend/deprecated/legacy_backend/app` is migration source material, not the future architecture.
 - Retrieval is the core product capability. Everything else serves retrieval quality and safe delivery.
 - LangChain is used for orchestration and tool-calling, not as the retrieval core.
 - Weaviate is the default production vector store because hybrid search is a hard requirement.
@@ -58,7 +58,7 @@ BotAdvisor follows a hybrid modular monolith:
 - retrieval depends on vector-store adapters and shared contracts
 - ingestion depends on storage and shared contracts
 - observability is imported by runtime edges and services, but never owns business logic
-- no feature module may depend on legacy `backend/app`
+- no feature module may depend on the archived legacy backend runtime
 
 ## Runtime Model
 
@@ -118,7 +118,7 @@ Grafana, Prometheus, and wider ops stacks are not required for the initial solo-
 
 ## Legacy Strategy
 
-`backend/app` currently contains reusable implementation ideas for:
+`backend/deprecated/legacy_backend/app` contains reusable implementation ideas for:
 
 - LlamaIndex retriever wrapping
 - RAG chat orchestration

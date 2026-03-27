@@ -50,7 +50,7 @@
 - [x] Identify every runtime feature still coming from `backend/app`
 - [x] Port only the behavior needed into `backend/botadvisor`
 - [x] Mark remaining old docs as superseded
-- [ ] Archive `backend/app` and obsolete docs once the canonical runtime replaces them
+- [x] Archive `backend/app` and obsolete docs once the canonical runtime replaces them
 
 ## Phase 8: Quality Sweep
 

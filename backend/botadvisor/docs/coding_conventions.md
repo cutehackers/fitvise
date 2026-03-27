@@ -45,7 +45,7 @@ Code must also satisfy a strict readability and responsibility standard.
 - Split files once a second responsibility emerges.
 - Group code by feature first, not by abstract technical layer.
 - Shared modules must stay small. If shared code keeps growing, it probably belongs in a feature module.
-- Do not import from `backend/app` in the final `botadvisor` runtime.
+- Do not import from `backend/deprecated/legacy_backend/app` in the final `botadvisor` runtime.
 
 ## Function Rules
 

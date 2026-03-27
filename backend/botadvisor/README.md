@@ -1,9 +1,9 @@
 # BotAdvisor
 
-Canonical Fitvise backend under active migration.
+Canonical Fitvise backend.
 
-`backend/botadvisor` is the only future runtime target.
-`backend/app` remains legacy source material and is not part of the canonical execution path.
+`backend/botadvisor` is the only live runtime target.
+Legacy source material is archived under `backend/deprecated/legacy_backend` and is not part of the canonical execution path.
 
 ## Current Scope
 
@@ -23,7 +23,7 @@ The runtime currently standardizes:
 Run canonical BotAdvisor commands from the backend root:
 
 ```bash
-cd /Users/junhyounglee/workspace/fitvise/backend
+cd backend
 ```
 
 The package root is `botadvisor`, so execution should use module form instead of direct script-path execution.
@@ -86,10 +86,10 @@ Current canonical endpoints:
 
 ## Testing
 
-Run BotAdvisor tests from the `backend/botadvisor` directory so they do not inherit the legacy `backend/tests` runtime setup.
+Run BotAdvisor tests from the `backend/botadvisor` directory so they stay isolated from archived legacy tests.
 
 ```bash
-cd /Users/junhyounglee/workspace/fitvise/backend/botadvisor
+cd backend/botadvisor
 uv run pytest tests/unit -q
 ```
 
@@ -120,7 +120,7 @@ Canonical artifact storage is selected through environment variables in `botadvi
 `docker-compose.yaml` currently provisions Weaviate for local development.
 
 ```bash
-cd /Users/junhyounglee/workspace/fitvise/backend/botadvisor
+cd backend/botadvisor
 docker compose up -d
 ```
 
@@ -140,6 +140,6 @@ Use these docs as the single source of truth:
 These are not current runtime references:
 
 - `backend/README.md`
-- `backend/app`
-- `backend/tests`
-- `backend/docs/*` except where explicitly mirrored for migration context
+- `backend/deprecated/legacy_backend/app`
+- `backend/deprecated/legacy_backend/tests`
+- `backend/deprecated/legacy_backend/docs/*`

@@ -14,7 +14,7 @@ Build a maintainable Fitvise backend for a solo developer by converging all futu
 - thin chat and health APIs
 - LangFuse tracing
 - structured logging
-- migration path away from legacy `backend/app`
+- migration path away from the archived legacy backend
 
 ## Initial Production Defaults
 
@@ -34,7 +34,7 @@ Build a maintainable Fitvise backend for a solo developer by converging all futu
 
 ## Explicit Non-Goals
 
-- preserving every legacy abstraction from `backend/app`
+- preserving every legacy abstraction from the archived legacy backend
 - supporting many runtime modes equally from day one
 - maximizing configurability at the cost of clarity
 - building a framework-like backend before the core RAG path is clean

@@ -15,7 +15,7 @@ Statuses reflect the actual codebase plus the new solo-developer quality bar.
 | ID | Title | Status | Evidence | Notes |
 |----|-------|--------|----------|-------|
 | A1 | Dependency baseline | `done` | `backend/pyproject.toml`, `backend/uv.lock` | Core dependencies for Docling, LangChain, LlamaIndex, LangFuse, Weaviate, Chroma exist |
-| A2 | Repo cleanup | `partial` | `backend/deprecated`, `backend/app`, `backend/docs` | Cleanup started, but legacy runtime and docs still coexist |
+| A2 | Repo cleanup | `done` | `backend/deprecated/legacy_backend`, `backend/README.md` | Legacy runtime, docs, tests, and scripts are archived and the root now points only to the canonical BotAdvisor runtime |
 | A3 | Document identity model | `done` | `backend/botadvisor/app/core/entity/document.py` | Lean document entity exists and is used by ingestion and storage |
 | B1 | Docling ingestion script | `done` | `backend/botadvisor/scripts/ingest.py` | CLI, chunk generation, dedupe skip path, LangFuse trace are implemented |
 | B2 | Embedding/upsert script | `done` | `backend/botadvisor/scripts/embed_upsert.py`, `backend/botadvisor/tests/unit/test_embed_upsert.py` | CLI and processing summary are implemented and tested |
@@ -32,7 +32,7 @@ Statuses reflect the actual codebase plus the new solo-developer quality bar.
 | E3 | Dev ergonomics | `partial` | `backend/botadvisor/docker-compose.yaml`, `backend/botadvisor/README.md` | Core assets exist, but one-command developer flow is not yet fully canonical |
 | F1 | Platform adapters | `drop` | scope decision | Only `filesystem` remains first-class in the current scope |
 | F2 | Quality loop | `drop` | scope decision | Offline retrieval evaluation is deferred until the core runtime is stable |
-| F3 | Legacy cleanup | `partial` | `backend/deprecated`, legacy runtime still active | Cleanup work is required before redesign completion |
+| F3 | Legacy cleanup | `done` | `backend/deprecated/legacy_backend`, `backend/botadvisor/docs/migration.md` | Legacy runtime assets are archived and no longer presented as live backend surfaces |
 
 ## Priority Order
 

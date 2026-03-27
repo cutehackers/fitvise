@@ -47,9 +47,9 @@
 
 ## Phase 7: Legacy Isolation
 
-- [ ] Identify every runtime feature still coming from `backend/app`
-- [ ] Port only the behavior needed into `backend/botadvisor`
-- [ ] Mark remaining old docs as superseded
+- [x] Identify every runtime feature still coming from `backend/app`
+- [x] Port only the behavior needed into `backend/botadvisor`
+- [x] Mark remaining old docs as superseded
 - [ ] Archive `backend/app` and obsolete docs once the canonical runtime replaces them
 
 ## Phase 8: Quality Sweep

@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 rag-system-phase5/                        # PHASE 5: Deployment and Production Infrastructure
 ├── README.md                              # Phase 5 specific documentation
 ├── requirements-phase5.txt                # Phase 5 dependencies (adds production libs, security, scaling)

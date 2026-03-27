@@ -33,6 +33,7 @@ def test_settings_reads_environment_overrides(monkeypatch):
         "botadvisor.app.chat",
         "botadvisor.app.core",
         "botadvisor.app.ingestion",
+        "botadvisor.app.llm",
         "botadvisor.app.observability",
         "botadvisor.app.retrieval",
         "botadvisor.app.storage",

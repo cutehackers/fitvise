@@ -59,6 +59,21 @@ Move Fitvise backend ownership from the legacy `backend/app` runtime to the cano
 - add tests in canonical locations
 - remove runtime dependencies on `backend/app`
 
+## Phase 7 Inventory
+
+The last runtime behaviors that still materially depended on legacy `backend/app` were:
+
+- LLM client selection and health behavior from `app/infrastructure/external_services/ml_services/llm_services/ollama_service.py`
+- retrieval-aware prompt and answer orchestration from `app/application/use_cases/chat/rag_chat_use_case.py`
+- historical planning and implementation docs under `backend/docs`
+
+Current Phase 7 status:
+
+- canonical LLM path now lives in `backend/botadvisor/app/llm`
+- canonical retrieval-aware prompt assembly now lives in `backend/botadvisor/app/chat/prompting.py`
+- `backend/docs/*.md` should be treated as superseded historical references only
+- physical archive/removal of `backend/app` is still pending and should happen only after final legacy-readiness verification
+
 ### Stage 3
 
 - move old docs into `deprecated/docs`

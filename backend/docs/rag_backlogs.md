@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # RAG System Implementation - Project Backlog
 
 ## Epic 1: Data Acquisition and Preprocessing Pipeline

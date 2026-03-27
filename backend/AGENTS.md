@@ -171,8 +171,9 @@ BotAdvisor-oriented examples:
 
 ```bash
 cd backend
-uv run python botadvisor/scripts/ingest.py --help
-uv run python botadvisor/scripts/embed_upsert.py --help
+uv run python -m botadvisor.scripts.ingest --help
+uv run python -m botadvisor.scripts.embed_upsert --help
+uv run python -m botadvisor.scripts.setup_vector_store --help
 ```
 
 ## When In Doubt

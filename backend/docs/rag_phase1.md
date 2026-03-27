@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 rag-system-phase1/                        # PHASE 1: Data Acquisition and Preprocessing
 ├── [README.md](http://readme.md/)                              # Phase 1 specific documentation
 ├── requirements-phase1.txt                # Phase 1 dependencies only

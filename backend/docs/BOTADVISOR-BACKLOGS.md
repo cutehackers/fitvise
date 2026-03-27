@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # BotAdvisor Backlog
 
 > Superseded by `backend/botadvisor/docs/backlog.md`.

@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
   Your current Weaviate setup is the optimal choice. Migrating would introduce costs and complexity without meaningful benefits at your scale (10K-1M vectors).
 
   ---

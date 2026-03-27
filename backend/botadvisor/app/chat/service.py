@@ -8,7 +8,7 @@ from typing import Any
 
 from botadvisor.app.core.entity.chunk import Chunk
 from botadvisor.app.core.entity.retriever_request import RetrieverRequest
-from botadvisor.app.observability.langfuse import get_tracer
+from botadvisor.app.chat.prompting import build_chat_prompt_messages
 from botadvisor.app.chat.schemas import (
     ChatRequest,
     ChatResponse,
@@ -17,6 +17,7 @@ from botadvisor.app.chat.schemas import (
     QueryResponse,
     SourceCitation,
 )
+from botadvisor.app.observability.langfuse import get_tracer
 
 
 @dataclass
@@ -24,6 +25,7 @@ class RetrievalChatService:
     """Coordinate retrieval results into query and chat responses."""
 
     retrieval_service: Any
+    llm_service: Any = None
     tracer: Any = None
 
     def __post_init__(self) -> None:
@@ -49,26 +51,39 @@ class RetrievalChatService:
             RetrieverRequest(query=request.message, platform=request.platform, top_k=request.top_k)
         )
         citations = self._to_citations(chunks)
-        answer = self._build_answer(citations)
+        answer = self._generate_answer(request.message, citations)
         return ChatResponse(answer=answer, total_sources=len(citations), sources=citations)
 
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[ChatResponseChunk]:
         trace = self._start_trace("api_chat", {"message": request.message, "top_k": request.top_k})
         try:
-            response = self.chat(request)
-            segments = response.answer.splitlines() or [response.answer]
+            chunks = self.retrieval_service.retrieve(
+                RetrieverRequest(query=request.message, platform=request.platform, top_k=request.top_k)
+            )
+            citations = self._to_citations(chunks)
 
-            for segment in segments:
-                if segment:
-                    yield ChatResponseChunk(delta=f"{segment}\n", done=False)
+            if self.llm_service is not None:
+                prompt_messages = build_chat_prompt_messages(question=request.message, citations=citations)
+                answer_parts: list[str] = []
+                async for token in self.llm_service.generate_stream(prompt_messages):
+                    answer_parts.append(token)
+                    yield ChatResponseChunk(delta=token, done=False)
+                final_answer = "".join(answer_parts)
+            else:
+                final_answer = self._build_answer(citations)
+                segments = final_answer.splitlines() or [final_answer]
+
+                for segment in segments:
+                    if segment:
+                        yield ChatResponseChunk(delta=f"{segment}\n", done=False)
 
             final_chunk = ChatResponseChunk(
-                answer=response.answer,
-                total_sources=response.total_sources,
-                sources=response.sources,
+                answer=final_answer,
+                total_sources=len(citations),
+                sources=citations,
                 done=True,
             )
-            self._finish_trace(trace, "success", {"total_sources": response.total_sources})
+            self._finish_trace(trace, "success", {"total_sources": len(citations)})
             yield final_chunk
         except Exception as exc:
             self._finish_trace(trace, "error", {"error": str(exc)})
@@ -103,6 +118,13 @@ class RetrievalChatService:
         for citation in citations:
             parts.append(f"[{citation.index}] {citation.content}")
         return "\n".join(parts)
+
+    def _generate_answer(self, question: str, citations: list[SourceCitation]) -> str:
+        if self.llm_service is None:
+            return self._build_answer(citations)
+
+        prompt_messages = build_chat_prompt_messages(question=question, citations=citations)
+        return self.llm_service.generate(prompt_messages)
 
     def _start_trace(self, name: str, metadata: dict[str, Any]) -> Any:
         if self.tracer and self.tracer.is_enabled():

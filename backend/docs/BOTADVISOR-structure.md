@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # BotAdvisor Redesign - Target Folder Structure
 
 Purpose: filesystem layout produced when executing `docs/BOTADVISOR-BACKLOGS.md` — optimized for solo-friendly, script-first RAG with Docling ingestion, LlamaIndex retrieval, LangChain agent on Ollama Cloud `gemini-3-flash`, and LangFuse observability.

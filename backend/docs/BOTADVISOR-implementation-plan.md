@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # BotAdvisor Implementation Plan (per target structure)
 
 This plan maps each file in `docs/BOTADVISOR-phase.md` to concrete implementation steps. Reuse legacy patterns only when they reduce work and fit the slim architecture (e.g., Pydantic settings, FastAPI wiring style). Avoid reintroducing legacy boilerplate or Airflow-era complexity.

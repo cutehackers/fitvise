@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 rag-system-phase3/                        # PHASE 3: Generation System and LLM Integration
 ├── README.md                              # Phase 3 specific documentation
 ├── requirements-phase3.txt                # Phase 3 dependencies (adds LLM libs, vLLM, transformers)

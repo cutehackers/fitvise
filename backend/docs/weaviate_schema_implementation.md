@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # Weaviate Schema Implementation (Task 2.3.2)
 
 **Status**: ✅ Complete

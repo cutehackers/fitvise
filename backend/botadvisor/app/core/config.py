@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     langfuse_secret_key: str | None = Field(default=None, alias="LANGFUSE_SECRET_KEY")
     langfuse_host: str = Field(default="https://cloud.langfuse.com", alias="LANGFUSE_HOST")
 
+    llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
+    llm_base_url: str = Field(default="http://localhost:11434", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="llama3.2:3b", alias="LLM_MODEL")
+    llm_temperature: float = Field(default=0.2, alias="LLM_TEMPERATURE")
+
     storage_backend: str = Field(default="local", alias="STORAGE_BACKEND")
     storage_local_path: str = Field(default="./data/artifacts", alias="STORAGE_LOCAL_PATH")
     storage_minio_endpoint: str | None = Field(default=None, alias="STORAGE_MINIO_ENDPOINT")

@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 rag-system-phase2/                        # PHASE 2: Indexing and Retrieval System
 ├── README.md                              # Phase 2 specific documentation
 ├── requirements-phase2.txt                # Phase 2 dependencies (adds Weaviate, Elasticsearch, ML libs)

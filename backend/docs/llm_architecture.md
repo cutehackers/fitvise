@@ -1,3 +1,6 @@
+> Superseded: use `backend/botadvisor/docs/*` as the canonical source of truth.
+> This file is kept only as historical migration reference.
+
 # LLM Service Architecture
 
 This document describes the new LLM service architecture that provides a clean, extensible, and maintainable foundation for AI-powered features.

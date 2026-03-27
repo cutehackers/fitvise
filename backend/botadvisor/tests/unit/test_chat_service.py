@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import Mock
 
+import pytest
+
 from botadvisor.app.core.entity.chunk import Chunk
 from botadvisor.app.core.entity.document_metadata import DocumentMetadata
 
@@ -61,3 +63,23 @@ def test_chat_builds_answer_from_retrieved_context():
     assert "[2]" in response.answer
     assert response.total_sources == 2
     assert response.sources[0].document_id == "doc-1"
+
+
+@pytest.mark.asyncio
+async def test_stream_chat_yields_ndjson_ready_chunks():
+    from botadvisor.app.chat.schemas import ChatRequest
+    from botadvisor.app.chat.service import RetrievalChatService
+
+    retrieval_service = Mock()
+    retrieval_service.retrieve.return_value = [
+        make_chunk(chunk_id="chunk-1", content="first chunk", score=0.91, page=1),
+        make_chunk(chunk_id="chunk-2", content="second chunk", score=0.72, page=2),
+    ]
+
+    service = RetrievalChatService(retrieval_service=retrieval_service)
+    chunks = [chunk async for chunk in service.stream_chat(ChatRequest(message="protein intake?", top_k=2))]
+
+    assert len(chunks) >= 2
+    assert chunks[-1].done is True
+    assert chunks[-1].answer is not None
+    assert chunks[-1].sources is not None

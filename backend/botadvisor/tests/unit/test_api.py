@@ -40,6 +40,27 @@ class FakeChatService:
             ],
         )
 
+    async def stream_chat(self, request):
+        from botadvisor.app.chat.schemas import ChatResponseChunk, SourceCitation
+
+        yield ChatResponseChunk(delta="Based on retrieved context [1]: ", done=False)
+        yield ChatResponseChunk(
+            delta="retrieved content",
+            answer="Based on retrieved context [1]: retrieved content",
+            total_sources=1,
+            sources=[
+                SourceCitation(
+                    index=1,
+                    content="retrieved content",
+                    similarity_score=0.88,
+                    document_id="doc-1",
+                    chunk_id="chunk-1",
+                    metadata={"source_url": "file:///tmp/sample.txt"},
+                )
+            ],
+            done=True,
+        )
+
 
 class FakeHealthService:
     async def get_status(self):
@@ -91,13 +112,15 @@ def test_chat_endpoint_returns_answer_and_citations():
 
     client = TestClient(create_app(chat_service=FakeChatService(), health_service=FakeHealthService()))
 
-    response = client.post(
+    with client.stream(
+        "POST",
         "/chat",
         json={"message": "protein intake?", "platform": "filesystem", "top_k": 1},
-    )
+    ) as response:
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("application/x-ndjson")
+        lines = [line for line in response.iter_lines() if line]
 
-    assert response.status_code == 200
-    data = response.json()
-    assert "retrieved content" in data["answer"]
-    assert data["total_sources"] == 1
-    assert data["sources"][0]["chunk_id"] == "chunk-1"
+    assert len(lines) >= 1
+    assert '"done":true' in lines[-1]
+    assert '"chunk_id":"chunk-1"' in lines[-1]

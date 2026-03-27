@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 
 from botadvisor.app.api.deps import get_chat_service, get_health_service
-from botadvisor.app.chat.schemas import ChatRequest, ChatResponse, HealthResponse, QueryRequest, QueryResponse
+from botadvisor.app.chat.schemas import ChatRequest, HealthResponse, QueryRequest, QueryResponse
 
 
 router = APIRouter()
@@ -23,7 +24,12 @@ async def query(payload: QueryRequest, chat_service=Depends(get_chat_service)) -
     return chat_service.query(payload)
 
 
-@router.post("/chat", response_model=ChatResponse, tags=["chat"])
-async def chat(payload: ChatRequest, chat_service=Depends(get_chat_service)) -> ChatResponse:
-    """Return a retrieval-backed answer with citations."""
-    return chat_service.chat(payload)
+@router.post("/chat", response_class=StreamingResponse, tags=["chat"])
+async def chat(payload: ChatRequest, chat_service=Depends(get_chat_service)) -> StreamingResponse:
+    """Return a streaming retrieval-backed answer with citations."""
+
+    async def stream():
+        async for chunk in chat_service.stream_chat(payload):
+            yield f"{chunk.model_dump_json()}\n"
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")

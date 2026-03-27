@@ -50,6 +50,16 @@ class ChatResponse(BaseModel):
     sources: list[SourceCitation]
 
 
+class ChatResponseChunk(BaseModel):
+    """Streaming chunk schema for NDJSON chat responses."""
+
+    delta: str | None = None
+    answer: str | None = None
+    total_sources: int | None = None
+    sources: list[SourceCitation] | None = None
+    done: bool = False
+
+
 class HealthResponse(BaseModel):
     """Minimal runtime health response for the canonical API."""
 

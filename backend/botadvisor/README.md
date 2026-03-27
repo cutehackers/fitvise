@@ -69,7 +69,7 @@ Current canonical endpoints:
 
 - `GET /health`
 - `POST /query`
-- `POST /chat`
+- `POST /chat` returns `application/x-ndjson` streaming chunks
 
 ## Testing
 

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
 from botadvisor.app.core.entity.chunk import Chunk
 from botadvisor.app.core.entity.retriever_request import RetrieverRequest
-from botadvisor.app.chat.schemas import ChatRequest, ChatResponse, QueryRequest, QueryResponse, SourceCitation
+from botadvisor.app.chat.schemas import (
+    ChatRequest,
+    ChatResponse,
+    ChatResponseChunk,
+    QueryRequest,
+    QueryResponse,
+    SourceCitation,
+)
 
 
 @dataclass
@@ -30,6 +38,21 @@ class RetrievalChatService:
         citations = self._to_citations(chunks)
         answer = self._build_answer(citations)
         return ChatResponse(answer=answer, total_sources=len(citations), sources=citations)
+
+    async def stream_chat(self, request: ChatRequest) -> AsyncIterator[ChatResponseChunk]:
+        response = self.chat(request)
+        segments = response.answer.splitlines() or [response.answer]
+
+        for segment in segments:
+            if segment:
+                yield ChatResponseChunk(delta=f"{segment}\n", done=False)
+
+        yield ChatResponseChunk(
+            answer=response.answer,
+            total_sources=response.total_sources,
+            sources=response.sources,
+            done=True,
+        )
 
     def _to_citations(self, chunks: list[Chunk]) -> list[SourceCitation]:
         citations: list[SourceCitation] = []

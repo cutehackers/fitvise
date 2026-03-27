@@ -185,6 +185,7 @@ migrate_working_dir/
 
 # Visual Studio Code related
 .vscode/
+.worktrees/
 
 # Flutter/Dart/Pub related
 **/doc/api/

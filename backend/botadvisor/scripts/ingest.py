@@ -10,12 +10,14 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any
 
 from botadvisor.app.core.config import get_settings
-from botadvisor.app.core.entity.document import Document
-from botadvisor.app.core.entity.document_metadata import DocumentMetadata
 from botadvisor.app.core.entity.chunk import Chunk
+from botadvisor.app.core.entity.document import Document
+from botadvisor.app.ingestion.chunking import create_chunks
+from botadvisor.app.ingestion.files import detect_mime_type, extract_source_metadata
+from botadvisor.app.ingestion.readers import DOCLING_AVAILABLE, get_reader_for_file, read_text_with_reader
 from botadvisor.app.observability.langfuse import get_tracer
 from botadvisor.app.observability.logging import get_logger, configure_logger
 from botadvisor.app.storage.factory import get_storage_backend
@@ -25,20 +27,10 @@ configure_logger()
 logger = get_logger("ingest")
 tracer = get_tracer()
 
-# Dynamic Docling import with fallback
-DOCLING_AVAILABLE = False
-PDFReader = None
-OfficeReader = None
-TextReader = None
-
-try:
-    from docling.readers import PDFReader, OfficeReader, TextReader
-
-    DOCLING_AVAILABLE = True
+if DOCLING_AVAILABLE:
     logger.info("Docling imported successfully")
-except ImportError as e:
-    logger.warning(f"Docling not available: {e}. Using fallback text processing.")
-    DOCLING_AVAILABLE = False
+else:
+    logger.warning("Docling not available. Using fallback text processing.")
 
 
 class SimpleIngestionScript:
@@ -50,86 +42,10 @@ class SimpleIngestionScript:
 
     def __init__(self):
         """Initialize ingestion script with local storage backend."""
-        self.storage_backend = self._initialize_storage_backend()
+        self.storage_backend = get_storage_backend(get_settings())
         self.duplicates_skipped = 0
         self.documents_processed = 0
         self.chunks_generated = 0
-
-    def _initialize_storage_backend(self):
-        """Initialize the configured storage backend."""
-        return get_storage_backend(get_settings())
-
-    def _get_reader_for_file(self, file_path: Path) -> Optional[Any]:
-        """
-        Get appropriate document reader for file based on extension.
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            Reader function or None if unsupported
-        """
-        extension = file_path.suffix.lower()
-
-        if not DOCLING_AVAILABLE:
-            # Fallback: simple text reading for testing
-            if extension in (".txt", ".md", ".html", ".htm"):
-                return self._simple_text_reader
-            else:
-                logger.warning("Docling not available, only text files supported", extra={"file": str(file_path)})
-                return None
-
-        # Use Docling readers when available
-        if extension == ".pdf":
-            return PDFReader()
-        elif extension in (".doc", ".docx"):
-            return OfficeReader()
-        elif extension in (".txt", ".md", ".html", ".htm"):
-            return TextReader()
-        else:
-            logger.warning(f"Unsupported file type: {extension}", extra={"file": str(file_path)})
-            return None
-
-    def _simple_text_reader(self, content: bytes) -> str:
-        """
-        Simple text reader fallback when Docling is not available.
-
-        Args:
-            content: Raw content bytes
-
-        Returns:
-            Decoded text content
-        """
-        try:
-            # Try UTF-8 first
-            return content.decode("utf-8")
-        except UnicodeDecodeError:
-            try:
-                # Fallback to latin-1 which can decode any byte sequence
-                return content.decode("latin-1")
-            except Exception:
-                # Last resort: decode with errors replaced
-                return content.decode("utf-8", errors="replace")
-
-    def _extract_metadata_from_path(self, file_path: Path, platform: str) -> Dict[str, str]:
-        """
-        Extract metadata from file path and platform.
-
-        Args:
-            file_path: Path to source file
-            platform: Source platform
-
-        Returns:
-            Dictionary of extracted metadata
-        """
-        return {
-            "source_id": str(file_path),
-            "platform": platform,
-            "source_url": f"file://{file_path.absolute()}",
-            "file_name": file_path.name,
-            "file_extension": file_path.suffix,
-            "file_size": str(file_path.stat().st_size),
-        }
 
     def _create_document(self, file_path: Path, platform: str, content: bytes) -> Document:
         """
@@ -143,47 +59,15 @@ class SimpleIngestionScript:
         Returns:
             Document entity with computed checksum
         """
-        metadata = self._extract_metadata_from_path(file_path, platform)
+        metadata = extract_source_metadata(file_path, platform)
 
         return Document.create(
             source_id=metadata["source_id"],
             platform=platform,
             source_url=metadata["source_url"],
             content=content,
-            mime_type=self._get_mime_type(file_path),
+            mime_type=detect_mime_type(file_path),
         )
-
-    def _get_mime_type(self, file_path: Path) -> str:
-        """
-        Get MIME type for file based on extension.
-
-        Args:
-            file_path: Path to file
-
-        Returns:
-            MIME type string
-        """
-        extension = file_path.suffix.lower()
-        mime_types = {
-            ".pdf": "application/pdf",
-            ".doc": "application/msword",
-            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            ".txt": "text/plain",
-            ".md": "text/markdown",
-            ".html": "text/html",
-            ".htm": "text/html",
-            ".json": "application/json",
-            ".xml": "application/xml",
-            ".xls": "application/vnd.ms-excel",
-            ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            ".ppt": "application/vnd.ms-powerpoint",
-            ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            ".jpg": "image/jpeg",
-            ".jpeg": "image/jpeg",
-            ".png": "image/png",
-            ".gif": "image/gif",
-        }
-        return mime_types.get(extension, "application/octet-stream")
 
     def _parse_document(self, file_path: Path, platform: str) -> Optional[Tuple[Document, str]]:
         """
@@ -214,16 +98,12 @@ class SimpleIngestionScript:
                 return None
 
             # Get appropriate reader
-            reader = self._get_reader_for_file(file_path)
+            reader = get_reader_for_file(file_path, logger)
             if not reader:
                 return None
 
             # Parse document content
-            if hasattr(reader, "read"):
-                raw_text = reader.read(content)
-            else:
-                # Fallback for simple reader functions
-                raw_text = reader(content)
+            raw_text = read_text_with_reader(reader, content)
 
             return document, raw_text
 
@@ -232,44 +112,6 @@ class SimpleIngestionScript:
                 f"Failed to parse document {file_path.name}: {str(e)}", extra={"file": str(file_path), "error": str(e)}
             )
             return None
-
-    def _chunk_text(self, text: str, document: Document) -> List[Chunk]:
-        """
-        Chunk text into manageable pieces with metadata.
-
-        Args:
-            text: Raw text content
-            document: Document entity
-
-        Returns:
-            List of Chunk entities
-        """
-        # Simple chunking strategy - can be enhanced later
-        chunk_size = 1000  # characters per chunk
-        chunks = []
-
-        # Split text into chunks
-        for i, start in enumerate(range(0, len(text), chunk_size)):
-            end = start + chunk_size
-            chunk_content = text[start:end]
-
-            # Create chunk with metadata
-            chunk = Chunk(
-                chunk_id=f"{document.id}_chunk_{i}",
-                content=chunk_content.strip(),
-                metadata=DocumentMetadata(
-                    doc_id=document.id,
-                    source_id=document.source_id,
-                    platform=document.platform,
-                    source_url=document.source_url,
-                    page=None,  # Could be extracted from PDF
-                    section=f"chunk_{i}",
-                ),
-            )
-            chunks.append(chunk)
-
-        self.chunks_generated += len(chunks)
-        return chunks
 
     def _store_document(self, document: Document, content: bytes) -> Any:
         """
@@ -361,7 +203,8 @@ class SimpleIngestionScript:
             artifact = self._store_document(document, content)
 
             # Chunk text
-            chunks = self._chunk_text(raw_text, document)
+            chunks = create_chunks(raw_text, document=document)
+            self.chunks_generated += len(chunks)
 
             # Save chunks
             self._save_chunks(chunks, output_dir, platform)

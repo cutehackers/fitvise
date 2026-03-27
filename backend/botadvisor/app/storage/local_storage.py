@@ -10,6 +10,7 @@ from typing import Optional
 
 from botadvisor.app.core.entity.document import Document
 from botadvisor.app.core.entity.storage_artifact import StorageArtifact
+from botadvisor.app.storage.layout import build_artifact_name, build_checksum_prefix
 
 class LocalStorage:
     """
@@ -78,7 +79,7 @@ class LocalStorage:
             True if content exists, False otherwise
         """
         # Look for any file with this checksum in the storage
-        checksum_dir = self.base_path / checksum[:2] / checksum[2:4]
+        checksum_dir = self.base_path / build_checksum_prefix(checksum)
         if not checksum_dir.exists():
             return False
 
@@ -103,45 +104,13 @@ class LocalStorage:
             Full path where content should be stored
         """
         # Create hierarchical path based on checksum
-        checksum_dir = self.base_path / checksum[:2] / checksum[2:4]
-        filename = f"{checksum}_{document.id}"
-
-        # Add appropriate file extension based on mime type
-        extension = self._get_extension_from_mime(document.mime_type)
-        if extension:
-            filename += extension
-
+        checksum_dir = self.base_path / build_checksum_prefix(checksum)
+        filename = build_artifact_name(
+            checksum=checksum,
+            document_id=document.id,
+            mime_type=document.mime_type,
+        )
         return checksum_dir / filename
-
-    def _get_extension_from_mime(self, mime_type: str) -> str:
-        """
-        Get file extension from MIME type.
-
-        Args:
-            mime_type: MIME type string
-
-        Returns:
-            File extension (including dot) or empty string
-        """
-        mime_to_ext = {
-            "application/pdf": ".pdf",
-            "text/plain": ".txt",
-            "text/html": ".html",
-            "application/json": ".json",
-            "application/xml": ".xml",
-            "application/msword": ".doc",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-            "application/vnd.ms-excel": ".xls",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-            "application/vnd.ms-powerpoint": ".ppt",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-            "image/jpeg": ".jpg",
-            "image/png": ".png",
-            "image/gif": ".gif",
-            "application/zip": ".zip",
-        }
-
-        return mime_to_ext.get(mime_type, "")
 
     def get_artifact_path(self, checksum: str, document_id: str) -> Optional[Path]:
         """
@@ -154,7 +123,7 @@ class LocalStorage:
         Returns:
             Path to artifact if found, None otherwise
         """
-        checksum_dir = self.base_path / checksum[:2] / checksum[2:4]
+        checksum_dir = self.base_path / build_checksum_prefix(checksum)
         if not checksum_dir.exists():
             return None
 

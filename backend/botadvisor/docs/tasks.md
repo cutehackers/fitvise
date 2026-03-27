@@ -54,7 +54,7 @@
 
 ## Phase 8: Quality Sweep
 
-- [ ] Break up oversized files that violate single responsibility
-- [ ] Remove dead wrappers, dead abstractions, and speculative extension points
-- [ ] Add focused tests around migrated retrieval and API seams
-- [ ] Verify all surviving code meets the coding conventions
+- [x] Break up oversized files that violate single responsibility
+- [x] Remove dead wrappers, dead abstractions, and speculative extension points
+- [x] Add focused tests around migrated retrieval and API seams
+- [x] Verify all surviving code meets the coding conventions

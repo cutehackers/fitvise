@@ -20,6 +20,7 @@ except ImportError:  # pragma: no cover - exercised through runtime guards
 
 from botadvisor.app.core.entity.document import Document
 from botadvisor.app.core.entity.storage_artifact import StorageArtifact
+from botadvisor.app.storage.layout import build_artifact_name, build_checksum_prefix
 
 class MinIOStorage:
     """
@@ -129,7 +130,7 @@ class MinIOStorage:
             True if content exists, False otherwise
         """
         # List objects with prefix matching the checksum pattern
-        object_prefix = f"{checksum[:2]}/{checksum[2:4]}/{checksum}_"
+        object_prefix = f"{build_checksum_prefix(checksum)}/{checksum}_"
 
         try:
             objects = self.client.list_objects(
@@ -157,45 +158,13 @@ class MinIOStorage:
             Object name for MinIO storage
         """
         # Create hierarchical path based on checksum
-        checksum_prefix = f"{checksum[:2]}/{checksum[2:4]}"
-        filename = f"{checksum}_{document.id}"
-
-        # Add appropriate file extension based on mime type
-        extension = self._get_extension_from_mime(document.mime_type)
-        if extension:
-            filename += extension
-
+        checksum_prefix = build_checksum_prefix(checksum)
+        filename = build_artifact_name(
+            checksum=checksum,
+            document_id=document.id,
+            mime_type=document.mime_type,
+        )
         return f"{checksum_prefix}/{filename}"
-
-    def _get_extension_from_mime(self, mime_type: str) -> str:
-        """
-        Get file extension from MIME type.
-
-        Args:
-            mime_type: MIME type string
-
-        Returns:
-            File extension (including dot) or empty string
-        """
-        mime_to_ext = {
-            "application/pdf": ".pdf",
-            "text/plain": ".txt",
-            "text/html": ".html",
-            "application/json": ".json",
-            "application/xml": ".xml",
-            "application/msword": ".doc",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-            "application/vnd.ms-excel": ".xls",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-            "application/vnd.ms-powerpoint": ".ppt",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-            "image/jpeg": ".jpg",
-            "image/png": ".png",
-            "image/gif": ".gif",
-            "application/zip": ".zip",
-        }
-
-        return mime_to_ext.get(mime_type, "")
 
     def _generate_presigned_url(self, object_name: str, expires: int = 3600) -> str:
         """
@@ -230,7 +199,7 @@ class MinIOStorage:
         Returns:
             URL to object if found, None otherwise
         """
-        object_prefix = f"{checksum[:2]}/{checksum[2:4]}/{checksum}_{document_id}"
+        object_prefix = f"{build_checksum_prefix(checksum)}/{checksum}_{document_id}"
 
         try:
             objects = list(self.client.list_objects(

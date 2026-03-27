@@ -19,11 +19,11 @@
 
 ## Phase 3: Retrieval Core
 
-- [ ] Port the reusable LlamaIndex retriever behavior from legacy code into `backend/botadvisor`
-- [ ] Make Weaviate the default canonical retrieval backend
-- [ ] Implement hybrid-search-aware retriever configuration
-- [ ] Add citation-preserving retrieval results
-- [ ] Add a thin LangChain retriever adapter or tool boundary
+- [x] Port the reusable LlamaIndex retriever behavior from legacy code into `backend/botadvisor`
+- [x] Make Weaviate the default canonical retrieval backend
+- [x] Implement hybrid-search-aware retriever configuration
+- [x] Add citation-preserving retrieval results
+- [x] Add a thin LangChain retriever adapter or tool boundary
 
 ## Phase 4: Thin API
 

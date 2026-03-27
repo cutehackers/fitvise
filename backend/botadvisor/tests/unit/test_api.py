@@ -71,6 +71,11 @@ class FakeHealthService:
             service="botadvisor-api",
             retrieval_available=True,
             langfuse_enabled=False,
+            checks={
+                "retrieval": {"status": "healthy"},
+                "vector_store": {"status": "healthy"},
+                "llm_path": {"status": "healthy"},
+            },
         )
 
 
@@ -87,7 +92,22 @@ def test_health_endpoint_returns_runtime_status():
         "service": "botadvisor-api",
         "retrieval_available": True,
         "langfuse_enabled": False,
+        "checks": {
+            "retrieval": {"status": "healthy"},
+            "vector_store": {"status": "healthy"},
+            "llm_path": {"status": "healthy"},
+        },
     }
+
+
+def test_request_id_header_is_echoed_by_middleware():
+    from botadvisor.app.main import create_app
+
+    client = TestClient(create_app(chat_service=FakeChatService(), health_service=FakeHealthService()))
+    response = client.get("/health", headers={"x-request-id": "req-123"})
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "req-123"
 
 
 def test_query_endpoint_returns_retrieved_sources():

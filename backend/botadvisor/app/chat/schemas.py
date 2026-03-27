@@ -67,3 +67,4 @@ class HealthResponse(BaseModel):
     service: str
     retrieval_available: bool
     langfuse_enabled: bool
+    checks: dict[str, dict[str, str]] = Field(default_factory=dict)

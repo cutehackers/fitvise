@@ -83,3 +83,23 @@ async def test_stream_chat_yields_ndjson_ready_chunks():
     assert chunks[-1].done is True
     assert chunks[-1].answer is not None
     assert chunks[-1].sources is not None
+
+
+def test_query_creates_langfuse_trace_when_enabled():
+    from botadvisor.app.chat.schemas import QueryRequest
+    from botadvisor.app.chat.service import RetrievalChatService
+
+    retrieval_service = Mock()
+    retrieval_service.retrieve.return_value = [make_chunk(chunk_id="chunk-1", content="first chunk", score=0.91)]
+
+    trace = Mock()
+    tracer = Mock()
+    tracer.is_enabled.return_value = True
+    tracer.trace.return_value = trace
+
+    service = RetrievalChatService(retrieval_service=retrieval_service, tracer=tracer)
+    response = service.query(QueryRequest(query="protein intake"))
+
+    assert response.total_results == 1
+    tracer.trace.assert_called_once()
+    trace.update.assert_called_once()

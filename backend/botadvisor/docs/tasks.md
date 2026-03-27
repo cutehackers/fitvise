@@ -34,9 +34,9 @@
 
 ## Phase 5: Observability And Runtime Quality
 
-- [ ] Standardize LangFuse usage across scripts and API code
-- [ ] Standardize structured logging and request correlation
-- [ ] Define runtime health checks for vector store, retriever, and LLM path
+- [x] Standardize LangFuse usage across scripts and API code
+- [x] Standardize structured logging and request correlation
+- [x] Define runtime health checks for vector store, retriever, and LLM path
 - [x] Ensure `README.md` reflects the canonical runtime, not the historical layout
 
 ## Phase 6: Storage And Indexing

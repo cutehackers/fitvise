@@ -4,11 +4,11 @@
 
 ## Phase 1: Canonical Documentation
 
-- [ ] Create and keep `backend/botadvisor/docs/architecture.md` as the single architecture reference
-- [ ] Create and keep `backend/botadvisor/docs/coding_conventions.md` as the code quality gate
-- [ ] Create and keep `backend/botadvisor/docs/product_scope.md` as the scope boundary
-- [ ] Reclassify backlog into `backend/botadvisor/docs/backlog.md`
-- [ ] Define migration steps in `backend/botadvisor/docs/migration.md`
+- [x] Create and keep `backend/botadvisor/docs/architecture.md` as the single architecture reference
+- [x] Create and keep `backend/botadvisor/docs/coding_conventions.md` as the code quality gate
+- [x] Create and keep `backend/botadvisor/docs/product_scope.md` as the scope boundary
+- [x] Reclassify backlog into `backend/botadvisor/docs/backlog.md`
+- [x] Define migration steps in `backend/botadvisor/docs/migration.md`
 
 ## Phase 2: Core Runtime Layout
 

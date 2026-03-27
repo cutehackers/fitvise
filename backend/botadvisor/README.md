@@ -18,6 +18,35 @@ The runtime currently standardizes:
 - structured logging and LangFuse tracing foundations
 - module boundaries for `chat`, `ingestion`, `retrieval`, `storage`, and `observability`
 
+## Quick Start
+
+Prerequisites:
+
+- Docker
+- Python with `uv`
+- Ollama running locally at `http://localhost:11434` if you want live chat responses
+
+From the backend root:
+
+```bash
+cd backend
+cp .env.example .env
+uv sync
+uv run python -m botadvisor.scripts.dev up
+```
+
+This canonical startup flow:
+
+- starts local Weaviate with Docker Compose
+- bootstraps the canonical vector store schema
+- starts the FastAPI server with reload enabled
+
+Stop local dependencies with:
+
+```bash
+uv run python -m botadvisor.scripts.dev down
+```
+
 ## Working Directory
 
 Run canonical BotAdvisor commands from the backend root:
@@ -78,6 +107,12 @@ uv run python -m botadvisor.scripts.setup_vector_store --force
 uv run uvicorn botadvisor.app.main:app --reload
 ```
 
+Canonical local runtime entrypoint:
+
+```bash
+uv run python -m botadvisor.scripts.dev up
+```
+
 Current canonical endpoints:
 
 - `GET /health`
@@ -115,14 +150,13 @@ Canonical artifact storage is selected through environment variables in `botadvi
 - `STORAGE_BACKEND=local` uses `STORAGE_LOCAL_PATH`
 - `STORAGE_BACKEND=minio` uses `STORAGE_MINIO_ENDPOINT`, `STORAGE_MINIO_ACCESS_KEY`, `STORAGE_MINIO_SECRET_KEY`, `STORAGE_MINIO_BUCKET`, and `STORAGE_MINIO_SECURE`
 
-## Services
+Start from the backend root `.env.example` and override only what you need for local development.
 
-`docker-compose.yaml` currently provisions Weaviate for local development.
+## Local Runtime Pieces
 
-```bash
-cd backend/botadvisor
-docker compose up -d
-```
+- `.env.example` in the backend root provides the canonical local settings baseline
+- `botadvisor/docker-compose.yaml` provisions the local Weaviate dependency
+- `botadvisor.scripts.dev` is the canonical developer entrypoint
 
 ## Canonical Docs
 

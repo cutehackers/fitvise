@@ -58,3 +58,9 @@
 - [x] Remove dead wrappers, dead abstractions, and speculative extension points
 - [x] Add focused tests around migrated retrieval and API seams
 - [x] Verify all surviving code meets the coding conventions
+
+## Phase 9: Dev Ergonomics Completion
+
+- [x] Add a canonical local runtime command that brings up dependencies and the API server
+- [x] Add a canonical backend-root `.env.example` aligned with runtime settings
+- [x] Update the README and backlog to describe the one-command developer workflow

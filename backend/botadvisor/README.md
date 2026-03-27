@@ -151,6 +151,7 @@ Canonical artifact storage is selected through environment variables in `botadvi
 - `STORAGE_BACKEND=minio` uses `STORAGE_MINIO_ENDPOINT`, `STORAGE_MINIO_ACCESS_KEY`, `STORAGE_MINIO_SECRET_KEY`, `STORAGE_MINIO_BUCKET`, and `STORAGE_MINIO_SECURE`
 
 Start from the backend root `.env.example` and override only what you need for local development.
+Legacy Fitvise env keys are not part of the canonical `botadvisor` runtime and may be ignored.
 
 ## Local Runtime Pieces
 

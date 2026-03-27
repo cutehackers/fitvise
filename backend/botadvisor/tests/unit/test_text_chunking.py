@@ -4,7 +4,7 @@ from botadvisor.app.core.entity.document import Document
 
 
 def test_create_chunks_preserves_document_metadata():
-    from botadvisor.app.ingestion.chunking import create_chunks
+    from botadvisor.app.ingestion.text_chunking import create_chunks
 
     document = Document.create(
         source_id="file-1",
@@ -21,12 +21,3 @@ def test_create_chunks_preserves_document_metadata():
     assert [chunk.chunk_id for chunk in chunks] == ["doc-1_chunk_0", "doc-1_chunk_1", "doc-1_chunk_2"]
     assert all(chunk.metadata.doc_id == "doc-1" for chunk in chunks)
     assert all(chunk.metadata.platform == "filesystem" for chunk in chunks)
-
-
-def test_detect_mime_type_returns_expected_mapping(tmp_path):
-    from botadvisor.app.ingestion.files import detect_mime_type
-
-    file_path = tmp_path / "sample.md"
-    file_path.write_text("# hello", encoding="utf-8")
-
-    assert detect_mime_type(file_path) == "text/markdown"

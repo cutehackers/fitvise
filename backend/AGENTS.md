@@ -32,6 +32,15 @@ Prioritize the following in order:
 4. Clear module boundaries
 5. Explicit, testable runtime behavior
 
+## Naming Discipline Comes First
+
+Agents must treat naming discipline as the strongest project rule.
+
+- Do not introduce vague names such as `helper`, `helpers`, `utils`, `manager`, or `processor`.
+- If you cannot give a file, module, class, function, or test a precise name, stop and redesign the boundary.
+- Naming violations are not cosmetic issues. They are architecture and maintainability defects.
+- Before committing, verify that newly introduced names describe domain purpose rather than generic implementation buckets.
+
 Do not optimize first for framework cleverness, generalized extensibility, or preserving legacy architecture.
 
 ## Canonical Architecture Summary
@@ -117,7 +126,7 @@ These rules apply to every new file and every meaningful refactor.
 - Every file must have one clear responsibility.
 - Every function must have one clear reason to change.
 - Prefer small, boring, explicit code.
-- Avoid god services, vague helpers, and oversized files.
+- Avoid god services, vague naming, and oversized files.
 - If a file mixes parsing, IO, orchestration, and formatting, split it.
 - If an abstraction does not reduce real coupling or improve testing, remove it.
 - Code that violates SRP or SOLID is a refactor target even if it currently works.

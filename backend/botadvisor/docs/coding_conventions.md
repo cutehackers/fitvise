@@ -6,6 +6,15 @@ Every surviving BotAdvisor module must be tidy, testable, and maintainable for a
 Functional code is not enough.
 Code must also satisfy a strict readability and responsibility standard.
 
+## Highest-Priority Rule: Naming Discipline
+
+Naming discipline is the strongest BotAdvisor code-quality rule.
+If a file, module, class, function, or test cannot be named precisely, the design is not ready.
+
+- A naming violation blocks completion even when the code is functionally correct.
+- Naming must be reviewed before implementation, during refactoring, and before commit.
+- If the best available name is vague, split the responsibility or redesign the boundary first.
+
 ## Core Quality Rules
 
 - Prefer small, focused modules over large generic layers.
@@ -107,7 +116,10 @@ Code must also satisfy a strict readability and responsibility standard.
 ## Naming Rules
 
 - Names must describe business purpose, not implementation trivia.
-- Avoid vague names such as `manager`, `helper`, `utils`, `processor`, or `service` unless the context is truly precise.
+- Avoid vague names such as `manager`, `helper`, `helpers`, `utils`, or `processor`.
+- Do not create modules, files, classes, functions, or tests that use those names as generic buckets.
+- `service` and `factory` are allowed only when they describe a real boundary with a narrow, obvious role.
+- Prefer domain names such as `file_metadata`, `text_chunking`, and `document_readers` over implementation buckets.
 - Prefer `EmbedUpsertRunner` over `EmbedManager` and `retrieve_context` over `handle_query_data`.
 
 ## Forbidden Patterns

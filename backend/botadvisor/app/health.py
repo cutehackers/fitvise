@@ -1,4 +1,4 @@
-"""Runtime health helpers for the canonical BotAdvisor API."""
+"""Runtime health status assembly for the canonical BotAdvisor API."""
 
 from __future__ import annotations
 

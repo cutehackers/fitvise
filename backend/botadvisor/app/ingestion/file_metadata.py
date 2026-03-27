@@ -1,4 +1,4 @@
-"""Filesystem helpers for canonical ingestion workflows."""
+"""File metadata rules for canonical ingestion workflows."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""FastAPI dependency helpers for the canonical BotAdvisor runtime."""
+"""FastAPI dependency providers for the canonical BotAdvisor runtime."""
 
 from __future__ import annotations
 

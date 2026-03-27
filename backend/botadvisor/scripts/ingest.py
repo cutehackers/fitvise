@@ -15,9 +15,9 @@ from typing import List, Optional, Tuple, Any
 from botadvisor.app.core.config import get_settings
 from botadvisor.app.core.entity.chunk import Chunk
 from botadvisor.app.core.entity.document import Document
-from botadvisor.app.ingestion.chunking import create_chunks
-from botadvisor.app.ingestion.files import detect_mime_type, extract_source_metadata
-from botadvisor.app.ingestion.readers import DOCLING_AVAILABLE, get_reader_for_file, read_text_with_reader
+from botadvisor.app.ingestion.document_readers import DOCLING_AVAILABLE, get_reader_for_file, read_text_with_reader
+from botadvisor.app.ingestion.file_metadata import detect_mime_type, extract_source_metadata
+from botadvisor.app.ingestion.text_chunking import create_chunks
 from botadvisor.app.observability.langfuse import get_tracer
 from botadvisor.app.observability.logging import get_logger, configure_logger
 from botadvisor.app.storage.factory import get_storage_backend

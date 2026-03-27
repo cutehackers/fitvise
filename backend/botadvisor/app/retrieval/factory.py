@@ -1,4 +1,4 @@
-"""Factory helpers for the canonical retrieval core."""
+"""Factory for the canonical retrieval core."""
 
 from __future__ import annotations
 

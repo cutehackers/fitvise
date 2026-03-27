@@ -1,4 +1,4 @@
-"""Factory helpers for the canonical BotAdvisor LLM path."""
+"""Factory for the canonical BotAdvisor LLM path."""
 
 from __future__ import annotations
 

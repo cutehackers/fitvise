@@ -1,4 +1,4 @@
-"""Prompt helpers for retrieval-backed chat answers."""
+"""Prompt assembly for retrieval-backed chat answers."""
 
 from __future__ import annotations
 

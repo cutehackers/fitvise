@@ -1,4 +1,4 @@
-"""Reader selection helpers for canonical ingestion workflows."""
+"""Document reader selection for canonical ingestion workflows."""
 
 from __future__ import annotations
 

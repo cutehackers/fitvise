@@ -1,4 +1,4 @@
-"""Chunk creation helpers for canonical ingestion workflows."""
+"""Text chunking for canonical ingestion workflows."""
 
 from __future__ import annotations
 

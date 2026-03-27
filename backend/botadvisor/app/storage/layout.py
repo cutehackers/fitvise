@@ -1,4 +1,4 @@
-"""Shared artifact naming and layout helpers for storage backends."""
+"""Artifact naming and storage layout rules for storage backends."""
 
 from __future__ import annotations
 

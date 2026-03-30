@@ -4,6 +4,14 @@ import sys
 from pathlib import Path
 
 
+def test_canonical_compose_file_defines_weaviate_volume():
+    compose_path = Path(__file__).resolve().parents[2] / "docker-compose.yaml"
+    compose_text = compose_path.read_text(encoding="utf-8")
+
+    assert "- weaviate_data:/var/lib/weaviate" in compose_text
+    assert "\nvolumes:\n  weaviate_data:\n" in compose_text
+
+
 def test_start_local_dependencies_uses_canonical_compose_file(monkeypatch):
     from botadvisor.app.dev.local_stack import start_local_dependencies
 

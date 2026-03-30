@@ -182,6 +182,23 @@ uv run pytest -q
 uv run ruff check botadvisor/app botadvisor/scripts botadvisor/tests
 ```
 
+## Retrieval Evaluation
+
+Use this flow before expanding the backend into tool calling or more advanced
+agent orchestration.
+
+```bash
+cd backend
+uv run python -m botadvisor.scripts.evaluate_retrieval --prepare-corpus
+```
+
+This command:
+
+- rebuilds the checked-in evaluation corpus in the canonical Weaviate collection
+- runs the gold query set against the live retrieval service
+- writes local JSON and Markdown artifacts under `backend/.tmp/retrieval_evaluation`
+- compares the run against `botadvisor/evaluation/baseline/retrieval_baseline.json`
+
 ## Storage Configuration
 
 Canonical artifact storage is selected through environment variables in `botadvisor.app.core.config`.

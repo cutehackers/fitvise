@@ -31,7 +31,7 @@ Statuses reflect the actual codebase plus the new solo-developer quality bar.
 | E2 | Structured logging | `done` | `backend/botadvisor/app/observability/logging.py`, `backend/botadvisor/app/api/middleware.py` | Request correlation and structured logging are standardized for the canonical runtime |
 | E3 | Dev ergonomics | `done` | `backend/.env.example`, `backend/botadvisor/scripts/dev.py`, `backend/botadvisor/tests/unit/test_local_stack.py`, `backend/botadvisor/README.md` | Canonical one-command local startup, env baseline, and developer docs now exist for the live BotAdvisor runtime |
 | F1 | Platform adapters | `drop` | scope decision | Only `filesystem` remains first-class in the current scope |
-| F2 | Quality loop | `drop` | scope decision | Offline retrieval evaluation is deferred until the core runtime is stable |
+| F2 | Quality loop | `done` | `backend/botadvisor/docs/retrieval_quality.md`, `backend/botadvisor/evaluation/*`, `backend/botadvisor/scripts/evaluate_retrieval.py` | Canonical retrieval evaluation, baseline comparison, and fixture corpus now exist as the quality gate before more advanced agent work |
 | F3 | Legacy cleanup | `done` | `backend/deprecated/legacy_backend`, `backend/botadvisor/docs/migration.md` | Legacy runtime assets are archived and no longer presented as live backend surfaces |
 
 ## Priority Order

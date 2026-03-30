@@ -34,3 +34,6 @@ services:
 networks:
   botadvisor-network:
     driver: bridge
+
+volumes:
+  weaviate_data:

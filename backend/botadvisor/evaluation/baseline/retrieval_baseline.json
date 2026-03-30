@@ -1,0 +1,83 @@
+{
+  "summary": {
+    "total_cases": 8,
+    "passed_cases": 8,
+    "failed_case_ids": [],
+    "pass_rate": 1.0,
+    "average_expected_doc_recall": 1.0
+  },
+  "results": [
+    {
+      "case_id": "protein-target-range",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "protein-meal-pattern",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "creatine-maintenance-dose",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "sleep-duration-range",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "hydration-after-sweat-loss",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "progressive-overload-definition",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "warmup-before-heavy-lifting",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    },
+    {
+      "case_id": "warmup-readiness-goal",
+      "relevance_hit": true,
+      "citation_integrity_hit": true,
+      "metadata_integrity_hit": true,
+      "expected_doc_recall": 1.0,
+      "diagnostic_notes": [],
+      "passed": true
+    }
+  ]
+}

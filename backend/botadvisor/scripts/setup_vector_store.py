@@ -11,9 +11,10 @@ from weaviate.classes.config import Configure, DataType, Property, VectorDistanc
 
 from botadvisor.app.core.config import get_settings
 from botadvisor.app.observability.logging import configure_logger, get_logger
+from botadvisor.app.retrieval.config import RetrievalConfig
 
 
-DEFAULT_COLLECTION_NAME = "Chunk"
+DEFAULT_COLLECTION_NAME = RetrievalConfig().index_name
 DEFAULT_EMBEDDING_DIMENSION = 384
 
 configure_logger()
@@ -61,12 +62,13 @@ def collection_exists(client, collection_name: str) -> bool:
 
 def create_collection(client, collection_name: str) -> None:
     """Create the canonical collection schema used by retrieval."""
+    retrieval_config = RetrievalConfig()
     client.collections.create(
         name=collection_name,
         vectorizer_config=Configure.Vectorizer.none(),
         vector_index_config=Configure.VectorIndex.hnsw(distance_metric=VectorDistances.COSINE),
         properties=[
-            Property(name="content", data_type=DataType.TEXT),
+            Property(name=retrieval_config.text_key, data_type=DataType.TEXT),
             Property(name="doc_id", data_type=DataType.TEXT),
             Property(name="source_id", data_type=DataType.TEXT),
             Property(name="source_url", data_type=DataType.TEXT),

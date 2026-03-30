@@ -1,0 +1,82 @@
+[
+  {
+    "case_id": "protein-target-range",
+    "query": "recommended protein intake per kilogram for strength training",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/protein_intake_basics.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["1.6 to 2.2 grams per kilogram"],
+    "notes": "Should retrieve the protein guidance document for dosage-range intent."
+  },
+  {
+    "case_id": "protein-meal-pattern",
+    "query": "meal pattern matters more than supplement timing for protein",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/protein_intake_basics.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["Practical consistency matters more than supplement timing"],
+    "notes": "Should keep the same document for behavior-focused protein advice."
+  },
+  {
+    "case_id": "creatine-maintenance-dose",
+    "query": "common daily creatine monohydrate maintenance dose",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/creatine_guidance.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["3 to 5 grams per day"],
+    "notes": "Should find the explicit creatine maintenance recommendation."
+  },
+  {
+    "case_id": "sleep-duration-range",
+    "query": "how many hours of sleep help recovery for most adults",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/sleep_recovery.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["7 to 9 hours of sleep"],
+    "notes": "Should retrieve the sleep recovery document for duration intent."
+  },
+  {
+    "case_id": "hydration-after-sweat-loss",
+    "query": "what to replace after heavy sweat loss on hot training days",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/hydration_principles.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["replacing fluids and sodium"],
+    "notes": "Should match hydration recovery guidance."
+  },
+  {
+    "case_id": "progressive-overload-definition",
+    "query": "what changes gradually over time in progressive overload",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/strength_progression.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["load, repetitions, or total training volume increase gradually"],
+    "notes": "Should return the strength progression document."
+  },
+  {
+    "case_id": "warmup-before-heavy-lifting",
+    "query": "is long static stretching best before heavy lifting warmup",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/mobility_warmup.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["Dynamic mobility drills"],
+    "notes": "Should favor the mobility warmup document."
+  },
+  {
+    "case_id": "warmup-readiness-goal",
+    "query": "what is the goal of a warmup before a workout",
+    "top_k": 3,
+    "platform": "filesystem",
+    "expected_source_ids": ["evaluation_corpus/mobility_warmup.md"],
+    "expected_sections": ["chunk_0"],
+    "must_include_text": ["The goal is readiness, not fatigue"],
+    "notes": "Should capture the readiness emphasis from the warmup document."
+  }
+]

@@ -24,7 +24,7 @@ def test_main_accepts_force_and_dimension(monkeypatch):
         captured["dimension"] = dimension
         return {
             "backend": "weaviate",
-            "collection_name": "Chunk",
+            "collection_name": "BotAdvisorDocs",
             "created": True,
             "force": force,
             "dimension": dimension,
@@ -46,7 +46,7 @@ def test_setup_vector_store_returns_summary_for_existing_collection(monkeypatch)
 
     class FakeCollections:
         def exists(self, name: str) -> bool:
-            assert name == "Chunk"
+            assert name == "BotAdvisorDocs"
             return True
 
         def delete(self, name: str) -> None:
@@ -69,7 +69,7 @@ def test_setup_vector_store_returns_summary_for_existing_collection(monkeypatch)
 
     assert summary == {
         "backend": "weaviate",
-        "collection_name": "Chunk",
+        "collection_name": "BotAdvisorDocs",
         "created": False,
         "force": False,
         "dimension": 384,

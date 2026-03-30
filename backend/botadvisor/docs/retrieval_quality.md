@@ -53,6 +53,11 @@ Each case should include:
 The first version should stay intentionally small, targeting 8 to 12 queries.
 Coverage should favor stable, high-signal cases over dataset breadth.
 
+The gold set is paired with a checked-in fixture corpus under
+`backend/botadvisor/evaluation/corpus/`. Source identifiers in gold cases must
+use stable logical values such as `evaluation_corpus/<file>.md`, not absolute
+machine-specific paths.
+
 ## Evaluation Contract
 
 Each evaluation case produces a structured result with:

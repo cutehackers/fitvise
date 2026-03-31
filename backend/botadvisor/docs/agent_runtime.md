@@ -167,6 +167,64 @@ The design intentionally leaves room for later phases:
 
 Those are future layers, not Phase 12 requirements.
 
+## Future Roadmap
+
+These are future candidate phases, not active implementation commitments.
+
+### Phase 13: Bounded Multi-Step Tool Loop
+
+Purpose:
+Allow a small number of repeated tool calls with explicit stop conditions.
+
+Deferred reason:
+Phase 12 must first prove that single-step tool orchestration is stable and
+maintainable.
+
+Entry condition:
+Phase 12 tool-aware chat must be stable under regression tests and retrieval
+quality gates.
+
+### Phase 14: Additional First-Class Tools
+
+Purpose:
+Introduce a small number of high-value tools beyond retrieval.
+
+Deferred reason:
+Additional tools increase runtime surface area, policy decisions, and test
+burden before the kernel is proven.
+
+Entry condition:
+The retrieval tool kernel must remain small, explicit, and easy to extend
+without naming or boundary drift.
+
+### Phase 15: Agent Safety And Approval Gates
+
+Purpose:
+Add policy checks, human approval gates, and stronger execution controls for
+riskier tool actions.
+
+Deferred reason:
+Phase 12 uses a low-risk retrieval-only tool set, so safety workflow complexity
+is not yet justified.
+
+Entry condition:
+The runtime must start supporting tools whose effects or data exposure require
+stronger control.
+
+### Phase 16: Planner-Oriented Orchestration
+
+Purpose:
+Add planner or executor splits, or graph-shaped orchestration, when multi-step
+reasoning becomes product-critical.
+
+Deferred reason:
+Planner-style orchestration would add architectural weight before the single-step
+runtime is operationally mature.
+
+Entry condition:
+Repeated multi-step workflows must appear often enough that single-step
+orchestration becomes the limiting factor.
+
 ## Non-Goals
 
 Phase 12 does not attempt to deliver:

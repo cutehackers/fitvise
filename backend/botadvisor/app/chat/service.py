@@ -26,6 +26,7 @@ class RetrievalChatService:
 
     retrieval_service: Any
     llm_service: Any = None
+    agent_service: Any = None
     tracer: Any = None
 
     def __post_init__(self) -> None:
@@ -47,6 +48,11 @@ class RetrievalChatService:
             raise
 
     def chat(self, request: ChatRequest) -> ChatResponse:
+        if self.agent_service is not None:
+            turn_result = self.agent_service.run_turn(message=request.message)
+            citations = self._tool_result_to_citations(turn_result.tool_result)
+            return ChatResponse(answer=turn_result.answer, total_sources=len(citations), sources=citations)
+
         chunks = self.retrieval_service.retrieve(
             RetrieverRequest(query=request.message, platform=request.platform, top_k=request.top_k)
         )
@@ -57,6 +63,23 @@ class RetrievalChatService:
     async def stream_chat(self, request: ChatRequest) -> AsyncIterator[ChatResponseChunk]:
         trace = self._start_trace("api_chat", {"message": request.message, "top_k": request.top_k})
         try:
+            if self.agent_service is not None:
+                turn_result = self.agent_service.run_turn(message=request.message)
+                citations = self._tool_result_to_citations(turn_result.tool_result)
+                final_answer = turn_result.answer
+                for segment in final_answer.splitlines() or [final_answer]:
+                    if segment:
+                        yield ChatResponseChunk(delta=f"{segment}\n", done=False)
+                final_chunk = ChatResponseChunk(
+                    answer=final_answer,
+                    total_sources=len(citations),
+                    sources=citations,
+                    done=True,
+                )
+                self._finish_trace(trace, "success", {"total_sources": len(citations)})
+                yield final_chunk
+                return
+
             chunks = self.retrieval_service.retrieve(
                 RetrieverRequest(query=request.message, platform=request.platform, top_k=request.top_k)
             )
@@ -106,6 +129,25 @@ class RetrievalChatService:
                         "page": chunk.metadata.page,
                         "section": chunk.metadata.section,
                     },
+                )
+            )
+        return citations
+
+    def _tool_result_to_citations(self, tool_result: Any) -> list[SourceCitation]:
+        if tool_result is None:
+            return []
+
+        raw_results = tool_result.payload.get("results", [])
+        citations: list[SourceCitation] = []
+        for index, raw_result in enumerate(raw_results, start=1):
+            citations.append(
+                SourceCitation(
+                    index=index,
+                    content=raw_result["content"],
+                    similarity_score=raw_result["similarity_score"],
+                    document_id=raw_result["document_id"],
+                    chunk_id=raw_result["chunk_id"],
+                    metadata=raw_result.get("metadata", {}),
                 )
             )
         return citations

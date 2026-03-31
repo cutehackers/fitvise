@@ -80,3 +80,13 @@
 - [x] Add hybrid-search regression checks so retrieval quality changes are measurable
 - [x] Define how evaluation results are stored, reviewed, and compared over time
 - [x] Document the retrieval quality gate required before adding more advanced agent features
+
+## Phase 12: Agent Runtime Foundation
+
+- [ ] Add a canonical tool runtime kernel with explicit tool contracts, registry, and executor boundaries
+- [ ] Add a retrieval tool adapter that wraps the canonical retrieval service without moving retrieval logic out of `retrieval/`
+- [ ] Add a single-step agent orchestration path that supports at most one retrieval tool call per turn
+- [ ] Extend the LLM boundary to support tool-aware decision and final-answer generation contracts
+- [ ] Keep `/chat` streaming stable while routing chat execution through the tool-aware agent runtime
+- [ ] Add regression tests for tool selection, retrieval tool payloads, citation preservation, and NDJSON streaming behavior
+- [ ] Document the Phase 12 agent runtime rules in `backend/botadvisor/docs/agent_runtime.md`

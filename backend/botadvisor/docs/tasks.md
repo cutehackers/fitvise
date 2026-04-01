@@ -2,6 +2,12 @@
 
 > This task list turns the redesign into execution work for the canonical `backend/botadvisor` runtime.
 
+This file is the **overall management tracker** (milestones, sequencing, and cross-feature rollout status).
+Feature-level execution plans and task checklists are kept in dedicated folders:
+
+- [Agent runtime plan/tasks](/Users/junhyounglee/workspace/fitvise/backend/botadvisor/docs/agent_runtime/plan.md), [tasks](/Users/junhyounglee/workspace/fitvise/backend/botadvisor/docs/agent_runtime/tasks.md)
+- [Retrieval quality plan/tasks](/Users/junhyounglee/workspace/fitvise/backend/botadvisor/docs/retrieval_quality/plan.md), [tasks](/Users/junhyounglee/workspace/fitvise/backend/botadvisor/docs/retrieval_quality/tasks.md)
+
 ## Phase 1: Canonical Documentation
 
 - [x] Create and keep `backend/botadvisor/docs/architecture.md` as the single architecture reference

@@ -188,7 +188,7 @@ Commit: `feat(botadvisor): route chat through agent runtime`
 ### Task 7: Close Phase 12 With Verification
 
 **Files:**
-- Modify: `backend/botadvisor/docs/tasks.md`
+- Modify: `backend/botadvisor/docs/agent_runtime/tasks.md`
 - Modify: `backend/botadvisor/docs/agent_runtime.md`
 - Modify: `backend/botadvisor/README.md`
 
@@ -206,7 +206,7 @@ Run: `cd backend && uv run ruff check botadvisor/app botadvisor/scripts botadvis
 
 - [ ] **Step 4: Update docs and status**
 
-Mark Phase 12 complete in `backend/botadvisor/docs/tasks.md` and document the
+Mark Phase 12 complete in `backend/botadvisor/docs/agent_runtime/tasks.md` and document the
 canonical agent-runtime usage path.
 
 - [ ] **Step 5: Commit**

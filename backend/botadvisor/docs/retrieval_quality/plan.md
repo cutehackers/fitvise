@@ -15,7 +15,7 @@
 **Files:**
 - Create: `backend/botadvisor/app/evaluation/retrieval_cases.py`
 - Create: `backend/botadvisor/tests/unit/test_retrieval_cases.py`
-- Modify: `backend/botadvisor/docs/tasks.md`
+- Modify: `backend/botadvisor/docs/retrieval_quality/tasks.md`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -129,7 +129,7 @@ Commit: `feat(botadvisor): add retrieval evaluation command`
 ### Task 5: Close Phase 11 With Full Verification
 
 **Files:**
-- Modify: `backend/botadvisor/docs/tasks.md`
+- Modify: `backend/botadvisor/docs/retrieval_quality/tasks.md`
 - Modify: `backend/botadvisor/docs/backlog.md`
 - Modify: `backend/botadvisor/docs/retrieval_quality.md`
 
